@@ -2,6 +2,10 @@
 
 ---
 
+<div align="center">
+  <img src="https://github.com/aditya-lucis/bfs-erp/blob/main/frontend/public/bfs-logo.png" alt="VampiFox Golang ERP Framework Logo" width="400" />
+</div>div>
+
 ## Transform Financial Operations Into Strategic Intelligence
 
 BFS ERP is a modern financial management platform designed to help organizations streamline financial processes, strengthen governance, and gain complete visibility across business operations.
