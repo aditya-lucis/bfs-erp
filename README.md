@@ -132,12 +132,6 @@ Transform operational data into meaningful financial insights through dashboards
 * Django REST Framework
 * PostgreSQL
 
-### Infrastructure
-
-* Docker
-* Nginx
-* Linux Deployment
-
 ---
 
 ## Platform Modules
