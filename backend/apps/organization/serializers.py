@@ -8,7 +8,7 @@ class CompanySerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
 class DepartmentSerializer(serializers.ModelSerializer):
-    level       = serializers.IntegerField(read_only=True)
+    level       = serializers.SerializerMethodField()
     parent_name = serializers.CharField(source='parent.name', read_only=True)
     children    = serializers.SerializerMethodField()
 
@@ -16,6 +16,9 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model  = Department
         fields = ['id', 'code', 'name', 'parent', 'parent_name',
                   'order', 'level', 'is_active', 'children']
+        
+    def get_level(self, obj):
+        return obj.level
         
     def get_children(self, obj):
         kids = obj.children.filter(is_active=True).order_by('order')

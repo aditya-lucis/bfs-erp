@@ -664,9 +664,9 @@ export const menuData = {
       { name: 'Budget Module', url: '' },
       { name: 'Budget Global Setting', url: '' },
     ] },
-    { name: 'Organizational Structure', url: '', children: [
+    { name: 'Organizational Structure', url: '/settings/organizational-level', children: [
       { name: 'Organizational Level', url: '' },
-      { name: 'Company Information', url: '' },
+      { name: 'Company Information', url: '/settings/company-information' },
       { name: 'Position', url: '' },
       { name: 'Employee Data', url: '' },
       { name: 'Company Share Setting', url: '' },

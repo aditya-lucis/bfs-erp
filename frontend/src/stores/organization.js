@@ -19,6 +19,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const departmentList = computed(() => {
     const result = []
     const flatten = (depts, level = 0) => {
+      if (!Array.isArray(depts)) return   // ← guard ini yang missing
       depts.forEach(dept => {
         result.push({ ...dept, level })
         if (dept.children?.length) {
@@ -29,6 +30,21 @@ export const useOrganizationStore = defineStore('organization', () => {
     flatten(departments.value)
     return result
   })
+
+  async function createDepartment(payload) {
+    const res = await api.post('/org/departments/', payload)
+    return res.data
+  }
+
+  async function updateDepartment(id, payload) {
+    const res = await api.patch(`/org/departments/${id}/`, payload)
+    return res.data
+  }
+
+  async function deleteDepartment(id) {
+    await api.delete(`/org/departments/${id}/`)
+  }
+
 
   // ── Actions ───────────────────────────────────────────────────────────────
   async function fetchCompany() {
@@ -62,8 +78,9 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   async function fetchDepartments() {
     try {
-      const res        = await api.get('/org/departments/')
-      departments.value = res.data
+      const res = await api.get('/org/departments/')
+      // ← Backend bisa return { results: [...] } atau langsung [...]
+      departments.value = res.data.results ?? res.data
     } catch (err) {
       console.error('Gagal memuat departments', err)
     }
@@ -99,10 +116,31 @@ export const useOrganizationStore = defineStore('organization', () => {
     ])
   }
 
+  async function fetchPositionsByDept(deptId) {
+    const res = await api.get(`/org/departments/${deptId}/positions/`)
+    return res.data.results || res.data
+  }
+
+  async function createPosition(deptId, payload) {
+    const res = await api.post(`/org/departments/${deptId}/positions/`, payload)
+    return res.data
+  }
+
+  async function updatePosition(deptId, posId, payload) {
+    const res = await api.patch(`/org/departments/${deptId}/positions/${posId}/`, payload)
+    return res.data
+  }
+
+  async function deletePosition(deptId, posId) {
+    await api.delete(`/org/departments/${deptId}/positions/${posId}/`)
+  }
+
   return {
     company, departments, positions, employees, isLoading, error,
     companyName, companyCode, departmentList,
+    createDepartment, updateDepartment, deleteDepartment,
     fetchCompany, updateCompany, fetchDepartments,
     fetchPositions, fetchEmployees, fetchAll,
+    fetchPositionsByDept, createPosition, updatePosition, deletePosition,
   }
 })

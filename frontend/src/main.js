@@ -11,6 +11,9 @@ import HomeView from './views/HomeView.vue'
 import DashboardView from './views/DashboardView.vue'
 import FinanceView from './views/FinanceView.vue'
 import UnderConstruction from './views/UnderConstruction.vue'
+import CompanyInformationView from './views/settings/CompanyInformationView.vue'
+import DepartmentView from './views/settings/DepartmentView.vue'
+import AuthGroupListView from './views/settings/AuthGroupListView.vue'
 import { menuData } from './menuData.js'
 
 function generateRoutesFromMenu() {
@@ -94,6 +97,36 @@ const routes = [
     path: '/finance/penyerapan-rap', 
     component: FinanceView,
     meta: { title: 'Penyerapan RAP', moduleId: 'finance', moduleName: 'Finance', layout: 'default' }
+  },
+  {
+    path: '/settings/company-information',
+    component: CompanyInformationView,
+    meta: { 
+      title: 'Company Information', 
+      moduleId: 'settings', 
+      moduleName: 'Settings',
+      layout: 'default' 
+    }
+  },
+  {
+    path: '/settings/organizational-level',
+    component: DepartmentView,
+    meta: {
+      title: 'Organizational Structure',
+      moduleId: 'settings',
+      moduleName: 'Settings',
+      layout: 'default'
+    }
+  },
+  {
+    path: '/settings/user-authorization-group',
+    component: AuthGroupListView,
+    meta: {
+      title: 'User Authorization Group',
+      moduleId: 'settings',
+      moduleName: 'Settings',
+      layout: 'default'
+    }
   },
   ...dynamicRoutes.map(r => ({ ...r, meta: { ...r.meta, layout: 'default' } })),
   { path: '/:pathMatch(.*)*', redirect: '/login' }
