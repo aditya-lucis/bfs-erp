@@ -112,7 +112,7 @@ const routes = [
     path: '/settings/organizational-level',
     component: DepartmentView,
     meta: {
-      title: 'Organizational Structure',
+      title: 'Organizational Level',
       moduleId: 'settings',
       moduleName: 'Settings',
       layout: 'default'

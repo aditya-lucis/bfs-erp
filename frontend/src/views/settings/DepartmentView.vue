@@ -1,5 +1,5 @@
 <template>
-  <Panel title="Organizational Structure" subtitle="Setting | Organizational Structure">
+  <Panel title="Organizational Structure" subtitle="Setting | Organizational Level">
 
     <!-- Toolbar -->
     <div class="flex items-center justify-between mb-4">

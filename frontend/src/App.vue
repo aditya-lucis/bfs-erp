@@ -22,9 +22,9 @@
       />
 
       <div 
-        class="flex-1 overflow-auto transition-all duration-300"
-        :class="isSidebarVisible ? 'ml-64' : 'ml-0'"
-      >
+          class="flex-1 overflow-auto transition-all duration-300 pt-10"
+          :class="isSidebarVisible ? 'ml-64' : 'ml-0'"
+        >
         <ToolBar />
         <main class="p-4">
           <router-view />

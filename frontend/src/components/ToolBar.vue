@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white border-b border-erp-border px-4 py-2 flex items-center justify-between">
+  <div class="fixed top-14 z-30 w-full bg-white border-b border-erp-border px-4 py-2 flex items-center justify-between shadow-sm">
     <!-- Dynamic Breadcrumb -->
     <nav class="flex items-center gap-2 text-sm">
       <template v-for="(crumb, index) in breadcrumbs" :key="index">
