@@ -4,7 +4,7 @@
 
 <div align="center">
   <img src="https://github.com/aditya-lucis/bfs-erp/blob/main/frontend/public/bfs-logo.png" alt="VampiFox Golang ERP Framework Logo" width="400" />
-</div>div>
+</div>
 
 ## Transform Financial Operations Into Strategic Intelligence
 
