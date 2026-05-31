@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* BFS ERP Custom Colors */
+@theme {
+  /* Primary: Gold/Bronze dari logo BFS */
+  --color-bfs-gold: #C9A96E;
+  --color-bfs-gold-light: #D4B87A;
+  --color-bfs-gold-dark: #A68B52;
+  
+  /* Secondary: Silver dari logo */
+  --color-bfs-silver: #B8B8B8;
+  --color-bfs-silver-light: #D1D1D1;
+  
+  /* Background: Dark Navy dari logo */
+  --color-bfs-navy: #1A2744;
+  --color-bfs-navy-light: #243352;
+  --color-bfs-navy-dark: #111B2E;
+  
+  /* Accent colors untuk ERP (mirip SOKKA) */
+  --color-erp-blue: #2196F3;
+  --color-erp-green: #4CAF50;
+  --color-erp-orange: #FF9800;
+  --color-erp-red: #F44336;
+  --color-erp-purple: #9C27B0;
+  
+  /* Neutral */
+  --color-erp-bg: #F0F2F5;
+  --color-erp-panel: #FFFFFF;
+  --color-erp-border: #D1D5DB;
+  --color-erp-text: #374151;
+  --color-erp-text-light: #6B7280;
+}
+
+/* Global styles */
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-erp-bg);
+  color: var(--color-erp-text);
+}
+
+/* Custom scrollbar mirip Windows */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
