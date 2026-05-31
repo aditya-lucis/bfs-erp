@@ -166,6 +166,6 @@ Modern enterprise authentication experience with secure access control and centr
 
 Proprietary Software
 
-© BFS ERP. All Rights Reserved.
+© Aditya Lucis, A Vampire Prince Who Lives In The Shadow . All Rights Reserved.
 
 ---
