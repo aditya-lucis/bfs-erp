@@ -668,7 +668,7 @@ export const menuData = {
       { name: 'Organizational Level', url: '' },
       { name: 'Company Information', url: '/settings/company-information' },
       { name: 'Position', url: '' },
-      { name: 'Employee Data', url: '' },
+      { name: 'Employee Data', url: '/settings/employee-data' },
       { name: 'Company Share Setting', url: '' },
       { name: 'Career History', url: '' },
       { name: 'Master Payment To', url: '' },

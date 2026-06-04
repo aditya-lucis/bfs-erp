@@ -1,12 +1,12 @@
-<!-- src/components/rbac/FunctionAssignModal.vue -->
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50" />
 
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl z-10 flex flex-col max-h-[90vh]">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl z-10 flex flex-col max-h-[90vh]"
+           style="isolation: isolate;">
 
-        <!-- Header -->
+        <!-- ── Header modal ── -->
         <div class="px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div class="flex items-center justify-between">
             <div>
@@ -21,13 +21,12 @@
             </button>
           </div>
 
-          <!-- Select All + Status bar -->
           <div class="mt-3 flex items-center gap-4">
             <label class="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 :checked="isAllSelected"
-                :indeterminate="isIndeterminate"
+                :indeterminate.prop="isIndeterminate"
                 @change="toggleSelectAll"
                 class="w-4 h-4 rounded"
               />
@@ -39,25 +38,40 @@
           </div>
         </div>
 
-        <!-- Loading -->
-        <div v-if="isLoading" class="flex justify-center items-center py-20 flex-1">
-          <Loader2 class="w-7 h-7 animate-spin text-bfs-gold" />
+        <!-- ── Sticky column header — SELALU KELIHATAN ── -->
+        <div class="flex-shrink-0 grid grid-cols-12 px-4 py-2.5
+                    bg-slate-100 border-b-2 border-slate-300
+                    text-[10px] font-bold text-gray-500 uppercase tracking-wider
+                    shadow-sm z-10">
+          <div class="col-span-4 pl-8">Function</div>
+          <div class="col-span-1 text-center">Read</div>
+          <div class="col-span-1 text-center">Create</div>
+          <div class="col-span-1 text-center">Update</div>
+          <div class="col-span-1 text-center">Delete</div>
+          <div class="col-span-1 text-center">Approve</div>
+          <div class="col-span-1 text-center">Print</div>
+          <div class="col-span-2 text-center">Export</div>
         </div>
 
-        <!-- Function List — scroll area -->
-        <div v-else class="overflow-y-auto flex-1 px-4 py-3 space-y-2">
-          <ModuleFunctionGroup
-            v-for="module in moduleTree"
-            :key="module.id"
-            :module="module"
-            :selections="selections"
-            @toggle-module="toggleModule"
-            @toggle-function="toggleFunction"
-            @toggle-action="toggleAction"
-          />
+        <!-- ── Scroll area — konten module ── -->
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <div v-if="isLoading" class="flex justify-center items-center py-20">
+            <Loader2 class="w-7 h-7 animate-spin text-bfs-gold" />
+          </div>
+          <div v-else class="divide-y divide-gray-100">
+            <ModuleFunctionGroup
+              v-for="module in moduleTree"
+              :key="module.id"
+              :module="module"
+              :selections="selections"
+              @toggle-module="toggleModule"
+              @toggle-function="toggleFunction"
+              @toggle-action="toggleAction"
+            />
+          </div>
         </div>
 
-        <!-- Footer -->
+        <!-- ── Footer ── -->
         <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0 bg-bfs-navy/5">
           <p class="text-xs text-bfs-navy font-medium">Current Status: Edit Mode</p>
           <div class="flex gap-2">
@@ -114,28 +128,28 @@ const isIndeterminate = computed(() =>
 onMounted(async () => {
   isLoading.value = true
   try {
-    // 1. Fetch semua modules + functions
     const [modules, functions, assigned] = await Promise.all([
       rbacStore.fetchModules(),
-      rbacStore.fetchFunctions({ page_size: 999 }),
+      rbacStore.fetchFunctions(),
       rbacStore.fetchGroupFunctions(props.group.id),
     ])
 
-    // Build assigned map: { function_id → GroupFunction }
+    // Semua sudah array langsung — tidak perlu ?? lagi
     const assignedMap = {}
     assigned.forEach(gf => { assignedMap[gf.function] = gf })
 
-    // Build moduleTree dengan nested functions
-    moduleTree.value = modules.map(mod => ({
-      ...mod,
-      functions: functions.filter(f => f.module === mod.id && !f.parent),
-    }))
+    moduleTree.value = modules
+      .filter(mod => mod.is_active)
+      .map(mod => ({
+        ...mod,
+        functions: functions.filter(f => f.module === mod.id && !f.parent),
+      }))
+      .filter(mod => mod.functions.length > 0)
 
-    // Init selections dari semua functions
     functions.forEach(fn => {
       const gf = assignedMap[fn.id]
       selections[fn.id] = {
-        checked:    !!gf,
+        checked:     !!gf,
         can_create:  gf?.can_create  || false,
         can_read:    gf?.can_read    ?? true,
         can_update:  gf?.can_update  || false,
@@ -145,6 +159,8 @@ onMounted(async () => {
         can_export:  gf?.can_export  || false,
       }
     })
+  } catch (err) {
+    console.error('FunctionAssign load error:', err)
   } finally {
     isLoading.value = false
   }

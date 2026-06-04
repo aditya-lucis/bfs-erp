@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../services/api.js'
+import { useMenuStore } from './menu.js'
 
 export const useAuthStore = defineStore('auth', () => {
   // ── State ──────────────────────────────────────────────────────────────────
@@ -16,30 +17,35 @@ export const useAuthStore = defineStore('auth', () => {
   const fullName    = computed(() => user.value?.full_name || user.value?.username || '')
   const employee    = computed(() => user.value?.employee || null)
 
-  // ── Actions ────────────────────────────────────────────────────────────────
   async function login(username, password) {
     isLoading.value = true
     error.value     = null
     try {
-      // 1. Dapat token
       const res = await api.post('/auth/login/', { username, password })
       accessToken.value = res.data.access
       localStorage.setItem('access_token',  res.data.access)
       localStorage.setItem('refresh_token', res.data.refresh)
 
-      // 2. Fetch full profile
       await fetchMe()
-      return true
+
+      // ← Wrap init() sendiri — jangan crash login kalau menu gagal
+      try {
+        const menuStore = useMenuStore()
+        await menuStore.init()
+      } catch (menuErr) {
+        console.warn('Menu init gagal, lanjut tanpa menu:', menuErr)
+      }
+
+      return true   // ← tetap return true meskipun menu gagal
     } catch (err) {
-      // Django DRF error shape: { non_field_errors: [...] } atau { detail: '...' }
       error.value = err.response?.data?.non_field_errors?.[0]
-                 || err.response?.data?.detail
-                 || 'Login gagal. Periksa username dan password.'
+                || err.response?.data?.detail
+                || 'Login gagal.'
       return false
     } finally {
       isLoading.value = false
     }
-  }
+}
 
   async function fetchMe() {
     try {
@@ -53,6 +59,12 @@ export const useAuthStore = defineStore('auth', () => {
   async function restoreSession() {
     if (accessToken.value && !user.value) {
       await fetchMe()
+      try {
+        const menuStore = useMenuStore()
+        await menuStore.init()
+      } catch (err) {
+        console.warn('Menu restore gagal:', err)
+      }
     }
   }
 
@@ -60,9 +72,12 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const refresh = localStorage.getItem('refresh_token')
       if (refresh) await api.post('/auth/logout/', { refresh })
-    } catch {
-      // tetap logout walau API gagal
-    } finally {
+    } catch { /* tetap logout */ } finally {
+      try {
+        const menuStore = useMenuStore()
+        menuStore.reset()
+      } catch { /* ignore */ }
+
       user.value        = null
       accessToken.value = null
       localStorage.removeItem('access_token')

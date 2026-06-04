@@ -65,7 +65,7 @@ export const useRbacStore = defineStore('rbac', () => {
   // ── Group Functions (Function Assignment) ──────────────────────────────────
   async function fetchGroupFunctions(groupId) {
     const res = await api.get(`/rbac/groups/${groupId}/functions/`)
-    return res.data
+    return res.data   // langsung array
   }
 
   async function assignFunctions(groupId, functions) {
@@ -79,12 +79,12 @@ export const useRbacStore = defineStore('rbac', () => {
   // ── Modules + Functions (untuk checklist) ──────────────────────────────────
   async function fetchModules() {
     const res = await api.get('/rbac/modules/')
-    return res.data.results || res.data
+    return res.data   // langsung array
   }
 
   async function fetchFunctions(params = {}) {
     const res = await api.get('/rbac/functions/', { params })
-    return res.data.results || res.data
+    return res.data   // langsung array
   }
 
   // ── Menu tree & permissions (untuk sidebar) ────────────────────────────────

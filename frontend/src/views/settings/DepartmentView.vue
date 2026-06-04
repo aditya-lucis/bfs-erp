@@ -11,7 +11,7 @@
           <ChevronsUp class="w-3.5 h-3.5" /> Collapse All
         </button>
       </div>
-      <button @click="openAddModal(null)" class="btn-primary text-xs flex items-center gap-1.5">
+      <button v-if="canCreate" @click="openAddModal(null)" class="btn-primary text-xs flex items-center gap-1.5">
         <Plus class="w-3.5 h-3.5" /> Add Department
       </button>
     </div>
@@ -48,7 +48,7 @@
     <div v-else class="flex flex-col items-center justify-center py-20 text-gray-400">
       <Network class="w-10 h-10 mb-3" />
       <p class="text-sm">Belum ada data department.</p>
-      <button @click="openAddModal(null)" class="mt-3 text-sm text-bfs-gold hover:underline">
+      <button v-if="canCreate" @click="openAddModal(null)" class="mt-3 text-sm text-bfs-gold hover:underline">
         Tambah sekarang
       </button>
     </div>
@@ -186,6 +186,8 @@ import { useOrganizationStore } from '../../stores/organization.js'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import DepartmentTreeNode from '../../components/DepartmentTreeNode.vue'
+import { usePermission } from '../../composables/usePermission.js'
+const { canCreate, canUpdate, canDelete } = usePermission('SETTINGS-ORGANIZATIONAL-STRUCTURE')
 import {
   Plus, Save, X, Loader2, Trash2, Network,
   ChevronsDown, ChevronsUp,

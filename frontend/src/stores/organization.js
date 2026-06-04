@@ -100,12 +100,41 @@ export const useOrganizationStore = defineStore('organization', () => {
     isLoading.value = true
     try {
       const res       = await api.get('/org/employees/', { params: filters })
-      employees.value = res.data.results || res.data
+      employees.value = res.data.results ?? res.data
     } catch (err) {
-      console.error('Gagal memuat employees', err)
+      console.error(err)
     } finally {
       isLoading.value = false
     }
+  }
+
+  async function createEmployee(formData) {
+    // formData bisa FormData (ada file) atau plain object
+    const res = await api.post('/org/employees/', formData, {
+      headers: formData instanceof FormData
+        ? { 'Content-Type': 'multipart/form-data' }
+        : { 'Content-Type': 'application/json' }
+    })
+    return res.data
+  }
+
+  async function updateEmployee(id, formData) {
+    const res = await api.patch(`/org/employees/${id}/`, formData, {
+      headers: formData instanceof FormData
+        ? { 'Content-Type': 'multipart/form-data' }
+        : { 'Content-Type': 'application/json' }
+    })
+    return res.data
+  }
+
+  async function uploadSignature(employeeId, payload) {
+    // payload: FormData dengan signature_image atau { signature_draw: '...' }
+    const res = await api.post(`/org/employees/${employeeId}/signature/`, payload, {
+      headers: payload instanceof FormData
+        ? { 'Content-Type': 'multipart/form-data' }
+        : { 'Content-Type': 'application/json' }
+    })
+    return res.data
   }
 
   // Fetch semua sekaligus
@@ -140,7 +169,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     companyName, companyCode, departmentList,
     createDepartment, updateDepartment, deleteDepartment,
     fetchCompany, updateCompany, fetchDepartments,
-    fetchPositions, fetchEmployees, fetchAll,
+    fetchPositions, fetchEmployees, createEmployee, updateEmployee, uploadSignature, fetchAll,
     fetchPositionsByDept, createPosition, updatePosition, deletePosition,
   }
 })

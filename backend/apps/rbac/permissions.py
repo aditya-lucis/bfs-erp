@@ -29,11 +29,6 @@ METHOD_ACTION_MAP = {
 
 
 def get_user_permissions(user):
-    """
-    Returns a dict of  { function_code: {can_read, can_create, ...} }
-    for all groups the user belongs to (merged with OR logic).
-    Result is cached on the user object for the request lifetime.
-    """
 
     if not user or not user.is_authenticated:
         return {}
@@ -55,7 +50,7 @@ def get_user_permissions(user):
         }
         perms = {
             fn.code: all_actions
-            for fn in Function.objects.filter(is_active=True)
+            for fn in Function.objects.filter(is_active=True).only('code')
         }
         user._rbac_permissions_cache = perms
         return perms
@@ -79,18 +74,17 @@ def get_user_permissions(user):
     for row in gf_qs:
         code = row['function__code']
         if code not in perms:
-            perms[code] = {
-                'can_create':  False,
-                'can_read':    False,
-                'can_update':  False,
-                'can_delete':  False,
-                'can_approve': False,
-                'can_print':   False,
-                'can_export':  False,
-            }
+            perms[code] = { k: False for k in (
+                'can_create',
+                'can_read',
+                'can_update',
+                'can_delete',
+                'can_approve',
+                'can_print',
+                'can_export',
+            )}
         # OR-merge across multiple groups
-        for action in ('can_create', 'can_read', 'can_update',
-                       'can_delete', 'can_approve', 'can_print', 'can_export'):
+        for action in perms[code]:
             if row[action]:
                 perms[code][action] = True
 

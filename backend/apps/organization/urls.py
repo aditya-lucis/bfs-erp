@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     CompanyDetailView, DepartmentDetailView, DepartmentPositionDetailView, 
-    DepartmentPositionListView, DepartmentTreeView,
+    DepartmentPositionListView, DepartmentTreeView, EmployeeSignatureView,
     PositionListView, EmployeeListCreateView, EmployeeDetailView,
 )
 
@@ -10,7 +10,9 @@ urlpatterns = [
     path('departments/',          DepartmentTreeView.as_view(),   name='department-tree'),
     path('positions/',            PositionListView.as_view(),     name='position-list'),
     path('employees/',            EmployeeListCreateView.as_view(),name='employee-list'),
-    path('employees/<int:pk>/',   EmployeeDetailView.as_view(),   name='employee-detail'),
+    path('employees/',                        EmployeeListCreateView.as_view()),
+    path('employees/<int:pk>/',               EmployeeDetailView.as_view()),
+    path('employees/<int:pk>/signature/',     EmployeeSignatureView.as_view()),
     path('departments/<int:pk>/', DepartmentDetailView.as_view(), name='department-detail'),
     
     path('departments/<int:dept_id>/positions/',

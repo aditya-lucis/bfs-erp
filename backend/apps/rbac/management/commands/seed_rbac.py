@@ -852,6 +852,16 @@ GROUPS = [
 ]
 
 
+# apps/rbac/management/commands/seed_rbac.py
+# Update url_path untuk function yang sudah ada halaman
+
+URL_MAP = {
+    'SETTINGS-COMPANY-INFORMATION':       '/settings/company-information',
+    'SETTINGS-ORGANIZATIONAL-STRUCTURE':  '/settings/organizational-structure',
+    'SETTINGS-USER-AUTHORIZATION-GROUP':  '/settings/user-authorization-group',
+    'SETTINGS-EMPLOYEE-DATA':             '/settings/employee-data',
+}
+
 class Command(BaseCommand):
     help = 'Seed Modules, Functions (full menu tree), and Authorization Groups'
 
@@ -906,7 +916,7 @@ class Command(BaseCommand):
                     'module':    module,
                     'parent':    parent,
                     'name':      item['name'],
-                    'url_path':  '',
+                    'url_path':  URL_MAP.get(code, ''),   # ← pakai URL_MAP
                     'order':     order,
                     'is_active': True,
                 },

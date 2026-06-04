@@ -14,6 +14,7 @@ import UnderConstruction from './views/UnderConstruction.vue'
 import CompanyInformationView from './views/settings/CompanyInformationView.vue'
 import DepartmentView from './views/settings/DepartmentView.vue'
 import AuthGroupListView from './views/settings/AuthGroupListView.vue'
+import EmployeeView from './views/settings/EmployeeView.vue'
 import { menuData } from './menuData.js'
 
 function generateRoutesFromMenu() {
@@ -128,8 +129,18 @@ const routes = [
       layout: 'default'
     }
   },
+  {
+    path: '/settings/employee-data',
+    component: EmployeeView,
+    meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' }
+  },
   ...dynamicRoutes.map(r => ({ ...r, meta: { ...r.meta, layout: 'default' } })),
-  { path: '/:pathMatch(.*)*', redirect: '/login' }
+  {
+    path: '/:pathMatch(.*)*',
+    component: UnderConstruction,
+    meta: { layout: 'default' }
+    // ← HAPUS redirect: '/login'
+  }
 ]
 
 // Buat pinia dan router
@@ -143,20 +154,22 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
 
-  // Restore session kalau ada token tapi user belum di-load
+  // Restore session sekali saja
   if (auth.accessToken && !auth.user) {
     await auth.restoreSession()
   }
 
-  // Route public (login page) → boleh akses
   if (to.meta.public) {
-    // Kalau sudah login dan mau ke /login → lempar ke home
-    if (auth.isLoggedIn) return next('/')
+    // Sudah login + mau ke /login → ke home
+    if (auth.isLoggedIn && to.path === '/login') {
+      return next('/')
+    }
     return next()
   }
 
-  // Route private → wajib login
-  if (!auth.isLoggedIn) return next('/login')
+  if (!auth.isLoggedIn) {
+    return next('/login')
+  }
 
   next()
 })

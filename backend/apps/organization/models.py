@@ -155,6 +155,10 @@ class Position(models.Model):
 
 # ─── Employee ─────────────────────────────────────────────────────────────────
 
+def signature_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    return f'employees/signatures/{instance.employee_id}.{ext}'
+
 class Employee(models.Model):
     """
     Data karyawan perusahaan.
@@ -190,6 +194,15 @@ class Employee(models.Model):
                       default='active',
                   )
     join_date   = models.DateField(null=True, blank=True)
+    signature_image = models.ImageField(
+                          upload_to=signature_upload_path,
+                          null=True, blank=True,
+                          help_text='Upload gambar tanda tangan'
+                      )
+    signature_draw  = models.TextField(
+                          blank=True,
+                          help_text='Base64 canvas drawing tanda tangan'
+                      )
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
@@ -209,3 +222,31 @@ class Employee(models.Model):
     @property
     def company(self):
         return self.position.department.company
+    
+    @property
+    def has_signature(self):
+        return bool(self.signature_image or self.signature_draw)
+
+    @classmethod
+    def generate_employee_id(cls, company_code):
+        """
+        Generate employee ID: BFS001, BFS002, dst.
+        Thread-safe dengan select_for_update.
+        """
+        from django.db import transaction
+        with transaction.atomic():
+            prefix  = company_code.upper()
+            last    = (
+                cls.objects
+                   .filter(employee_id__startswith=prefix)
+                   .order_by('-employee_id')
+                   .first()
+            )
+            if last:
+                try:
+                    num = int(last.employee_id[len(prefix):]) + 1
+                except ValueError:
+                    num = 1
+            else:
+                num = 1
+            return f"{prefix}{num:03d}"

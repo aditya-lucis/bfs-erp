@@ -162,6 +162,7 @@
               Reset
             </button>
             <button 
+              v-if="canUpdate"
               type="submit"
               :disabled="orgStore.isLoading"
               class="px-5 py-2 text-sm bg-bfs-gold hover:bg-bfs-gold-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60"
@@ -170,6 +171,7 @@
               <Save v-else class="w-3.5 h-3.5" />
               Update
             </button>
+            <input :disabled="!canUpdate" v-model="form.company_name" class="form-input" />
           </div>
         </div>
 
@@ -197,6 +199,8 @@ import {
   Building2, Upload, Save, Loader2,
   CheckCircle, XCircle, AlertCircle
 } from 'lucide-vue-next'
+import { usePermission } from '../../composables/usePermission.js'
+const { canUpdate } = usePermission('SETTINGS-COMPANY-INFORMATION')
 
 const orgStore   = useOrganizationStore()
 const saveStatus = ref(null)   // null | 'success' | 'error'

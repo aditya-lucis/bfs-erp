@@ -18,7 +18,7 @@ from .serializers import (
     UserAuthGroupSerializer, AssignUsersToGroupSerializer,
     PermissionCheckSerializer,
 )
-from .permissions import IsAdminGroupMember, get_user_permissions, invalidate_permission_cache
+from .permissions import HasFunctionPermission, IsAdminGroupMember, get_user_permissions, invalidate_permission_cache
 
 
 # ─── Module ─────────────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ class ModuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
     filterset_fields = ['is_active']
     search_fields = ['code', 'name']
+    pagination_class = None
 
 
 class ModuleDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -48,6 +49,7 @@ class FunctionListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
     filterset_fields = ['module', 'is_active']
     search_fields = ['code', 'name']
+    pagination_class = None
 
 
 class FunctionDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -64,6 +66,8 @@ class AuthGroupListCreateView(generics.ListCreateAPIView):
     GET  /api/v1/rbac/groups/  → list (screenshot 1)
     POST /api/v1/rbac/groups/  → create new group (screenshot 2 form)
     """
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-USER-AUTHORIZATION-GROUP'
     queryset = AuthorizationGroup.objects.all()
     permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
     filterset_fields = ['status']
@@ -88,7 +92,8 @@ class AuthGroupDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = AuthorizationGroup.objects.prefetch_related(
         'group_functions__function__module'
     ).all()
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-USER-AUTHORIZATION-GROUP'
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):
@@ -104,7 +109,9 @@ class GroupFunctionListView(generics.ListAPIView):
     Returns all functions currently assigned to the group.
     """
     serializer_class = GroupFunctionSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-USER-AUTHORIZATION-GROUP'
+    pagination_class   = None
 
     def get_queryset(self):
         group_id = self.kwargs['group_id']
@@ -279,50 +286,26 @@ class CheckPermissionView(APIView):
         return Response({'allowed': allowed})
 
 class MenuTreeView(APIView):
-    """
-    GET /api/v1/rbac/menu-tree/
-
-    Return menu tree yang boleh diakses user yang sedang login.
-    Dipakai Vue buat render sidebar navigation.
-
-    Response shape:
-    [
-      {
-        "module_code": "gl",
-        "module_name": "General Ledger",
-        "children": [
-          {
-            "id": 1,
-            "name": "Chart of Accounts",
-            "code": "GL-CHART-OF-ACCOUNTS",
-            "url_path": "/gl/chart-of-accounts",
-            "children": []
-          },
-          ...
-        ]
-      },
-      ...
-    ]
-    """
     def get(self, request):
         user = request.user
 
-        # Superuser dapat semua
+        # Superuser → langsung dapat semua tanpa cek GroupFunction
         if user.is_superuser:
-            allowed_codes = None
+            allowed_codes = None   # None = semua boleh
         else:
             perms = get_user_permissions(user)
-            # Filter hanya function yang punya can_read=True
             allowed_codes = {
                 code for code, actions in perms.items()
                 if actions.get('can_read', False)
             }
+            # Kalau tidak ada permission sama sekali → return kosong
+            if not allowed_codes:
+                return Response([])
 
         modules = Module.objects.filter(is_active=True).order_by('order')
-        result = []
+        result  = []
 
         for module in modules:
-            # Ambil hanya root functions (parent=None)
             root_functions = module.functions.filter(
                 is_active=True,
                 parent=None,
@@ -333,7 +316,7 @@ class MenuTreeView(APIView):
                 result.append({
                     'module_code': module.code,
                     'module_name': module.name,
-                    'children': module_tree,
+                    'children':   module_tree,
                 })
 
         return Response(result)
@@ -345,14 +328,10 @@ class MenuTreeView(APIView):
                 fn.children.filter(is_active=True).order_by('order'),
                 allowed_codes,
             )
-            # Tampilkan jika:
-            # 1. Superuser (allowed_codes=None)
-            # 2. Function ini sendiri boleh diakses
-            # 3. Atau salah satu anaknya boleh diakses (parent menu tetap tampil)
             is_allowed = (
-                allowed_codes is None
-                or fn.code in allowed_codes
-                or bool(children)
+                allowed_codes is None          # superuser
+                or fn.code in allowed_codes    # punya akses langsung
+                or bool(children)              # parent yang anaknya boleh
             )
             if is_allowed:
                 tree.append({

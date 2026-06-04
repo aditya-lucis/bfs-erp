@@ -24,7 +24,7 @@
           <option value="false">Inactive</option>
         </select>
       </div>
-      <button @click="openForm(null)" class="btn-primary text-sm flex items-center gap-1.5">
+      <button v-if="canCreate" @click="openForm(null)" class="btn-primary text-sm flex items-center gap-1.5">
         <Plus class="w-4 h-4" /> Add Group
       </button>
     </div>
@@ -73,14 +73,14 @@
           </div>
           <div class="col-span-1 flex justify-end">
             <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
+              <button v-if="canUpdate"
                 @click="openForm(group)" 
                 class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Edit"
               >
                 <Pencil class="w-3.5 h-3.5" />
               </button>
-              <button 
+              <button v-if="canDelete"
                 @click="confirmDelete(group)"
                 class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 title="Delete"
@@ -176,6 +176,8 @@ import {
   Search, Plus, Pencil, Trash2, Loader2,
   ShieldOff, ChevronLeft, ChevronRight,
 } from 'lucide-vue-next'
+
+const { canCreate, canUpdate, canDelete } = usePermission('SETTINGS-USER-AUTHORIZATION-GROUP')
 
 const rbacStore = useRbacStore()
 
