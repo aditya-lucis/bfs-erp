@@ -53,17 +53,22 @@ const isOpen = ref(false)
 const hasChildren = computed(() => props.item.children?.length > 0)
 
 const itemUrl = computed(() => {
-  // Prioritas 1: url_path dari backend / menuData
-  if (props.item.url_path?.trim()) {
-    return props.item.url_path
+  // Prioritas 1: url_path dari backend / menuData (pastikan tidak 'undefined' string)
+  const urlPath = props.item.url_path?.trim()
+  if (urlPath && urlPath !== 'undefined') {
+    return urlPath
   }
 
-  // Prioritas 2: module_code
-  const mod = props.item.module_code || props.moduleId
+  // Prioritas 2: pakai module_code dari item, fallback ke moduleId prop
+  const mod = (props.item.module_code?.trim() && props.item.module_code !== 'undefined')
+    ? props.item.module_code.trim()
+    : (props.moduleId?.trim() && props.moduleId !== 'undefined')
+      ? props.moduleId.trim()
+      : null
 
-  if (!mod || mod === 'undefined' || mod.trim() === '') {
-    console.warn('Missing module_code for item:', props.item.name)
-    return '#'  // atau '/'
+  if (!mod) {
+    console.warn('[SidebarMenuItem] Missing module_code for item:', props.item.name, props.item)
+    return '/'
   }
 
   return `/${mod}/${slugify(props.item.name)}`

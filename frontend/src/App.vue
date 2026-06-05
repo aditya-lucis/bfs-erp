@@ -95,14 +95,24 @@ const toggleSidebar = (id) => {
 }
 
 const handleNav = (item) => {
-  const slug = item.name
+  // Jika item punya url_path langsung, pakai itu
+  const urlPath = item.url_path?.trim()
+  if (urlPath && urlPath !== 'undefined') {
+    router.push(urlPath)
+    return
+  }
+
+  const mod = (item.module_code?.trim() && item.module_code !== 'undefined')
+    ? item.module_code.trim()
+    : activeModule.value
+
+  const slug = (item.name || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
 
-  const path = `/${item.moduleId}/${slug}`
-  router.push(path)
+  router.push(`/${mod}/${slug}`)
 }
 </script>

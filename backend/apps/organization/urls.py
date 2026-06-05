@@ -4,15 +4,16 @@ from .views import (
     DepartmentPositionListView, DepartmentTreeView, EmployeeSignatureView,
     PositionListView, EmployeeListCreateView, EmployeeDetailView,
 )
+from apps.authentication.views import CreateUserForEmployeeView
 
 urlpatterns = [
     path('company/',              CompanyDetailView.as_view(),    name='company-detail'),
     path('departments/',          DepartmentTreeView.as_view(),   name='department-tree'),
     path('positions/',            PositionListView.as_view(),     name='position-list'),
     path('employees/',            EmployeeListCreateView.as_view(),name='employee-list'),
-    path('employees/',                        EmployeeListCreateView.as_view()),
     path('employees/<int:pk>/',               EmployeeDetailView.as_view()),
     path('employees/<int:pk>/signature/',     EmployeeSignatureView.as_view()),
+    path('employees/<int:pk>/create-user/',   CreateUserForEmployeeView.as_view(), name='employee-create-user'),
     path('departments/<int:pk>/', DepartmentDetailView.as_view(), name='department-detail'),
     
     path('departments/<int:dept_id>/positions/',

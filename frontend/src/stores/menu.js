@@ -52,12 +52,11 @@ export const useMenuStore = defineStore('menu', () => {
       tree.value = rawTree.map(module => {
         let moduleCode = module.module_code?.trim()
 
-        if (!moduleCode) {
-          // Perbaikan di sini
-          const name = module.module_name?.trim()
-          
-          moduleCode = MODULE_CODE_MAP[name?.toLowerCase()] 
-                    || name?.toLowerCase()?.replace(/\s+/g, '') 
+        // Jangan pakai string 'undefined' atau 'null'
+        if (!moduleCode || moduleCode === 'undefined' || moduleCode === 'null') {
+          const name = module.module_name?.trim() || ''
+          moduleCode = MODULE_CODE_MAP[name.toLowerCase()]
+                    || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
                     || 'unknown'
         }
 

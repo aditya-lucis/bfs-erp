@@ -52,6 +52,34 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         fields = ['email', 'full_name', 'employee_id', 'is_active']
 
 
+class AdminResetPasswordSerializer(serializers.Serializer):
+    """Serializer for admin/superuser resetting another user's password."""
+    new_password  = serializers.CharField(write_only=True, min_length=8)
+    new_password2 = serializers.CharField(write_only=True, label='Confirm new password')
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password2']:
+            raise serializers.ValidationError({'new_password2': 'Passwords do not match.'})
+        return attrs
+
+
+class CreateUserForEmployeeSerializer(serializers.Serializer):
+    """Buat user baru untuk employee yang belum punya user (seed data)."""
+    username  = serializers.CharField()
+    password  = serializers.CharField(write_only=True, min_length=8)
+    password2 = serializers.CharField(write_only=True, label='Confirm password')
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError('Username sudah digunakan.')
+        return value
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs.pop('password2'):
+            raise serializers.ValidationError({'password2': 'Passwords do not match.'})
+        return attrs
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, min_length=8)

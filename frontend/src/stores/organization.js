@@ -137,6 +137,20 @@ export const useOrganizationStore = defineStore('organization', () => {
     return res.data
   }
 
+  async function createUserForEmployee(employeeId, payload) {
+    // POST /org/employees/<id>/create-user/
+    // payload: { username, password, password2 }
+    const res = await api.post(`/org/employees/${employeeId}/create-user/`, payload)
+    return res.data
+  }
+
+  async function adminResetPassword(userId, payload) {
+    // POST /auth/users/<id>/reset-password/
+    // payload: { new_password, new_password2 }
+    const res = await api.post(`/auth/users/${userId}/reset-password/`, payload)
+    return res.data
+  }
+
   // Fetch semua sekaligus
   async function fetchAll() {
     await Promise.all([
@@ -169,7 +183,9 @@ export const useOrganizationStore = defineStore('organization', () => {
     companyName, companyCode, departmentList,
     createDepartment, updateDepartment, deleteDepartment,
     fetchCompany, updateCompany, fetchDepartments,
-    fetchPositions, fetchEmployees, createEmployee, updateEmployee, uploadSignature, fetchAll,
+    fetchPositions, fetchEmployees, createEmployee, updateEmployee,
+    uploadSignature, createUserForEmployee, adminResetPassword,
+    fetchAll,
     fetchPositionsByDept, createPosition, updatePosition, deletePosition,
   }
 })

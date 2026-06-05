@@ -9,6 +9,7 @@ from .models import User
 from .serializers import (
     UserSerializer, UserCreateSerializer, UserUpdateSerializer,
     ChangePasswordSerializer, LoginSerializer,
+    AdminResetPasswordSerializer, CreateUserForEmployeeSerializer,
 )
 
 
@@ -178,3 +179,79 @@ class WhoAmIView(APIView):
                 for ug in user.authorization_groups
             ],
         })
+
+
+class AdminResetPasswordView(APIView):
+    """
+    POST /api/v1/auth/users/<id>/reset-password/
+    Superuser reset password user lain. Tidak perlu old_password.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        # Hanya superuser yang boleh reset password orang lain
+        if not request.user.is_superuser:
+            return Response(
+                {'detail': 'Hanya superuser yang dapat mereset password.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            target_user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({'detail': 'User tidak ditemukan.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AdminResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user.set_password(serializer.validated_data['new_password'])
+        target_user.save()
+        return Response({'detail': f'Password untuk "{target_user.username}" berhasil direset.'})
+
+
+class CreateUserForEmployeeView(APIView):
+    """
+    POST /api/v1/org/employees/<pk>/create-user/
+    Buat user baru untuk employee seed yang belum punya user.
+    Hanya superuser yang boleh.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        if not request.user.is_superuser:
+            return Response(
+                {'detail': 'Hanya superuser yang dapat membuat user untuk employee.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        from apps.organization.models import Employee
+
+        try:
+            employee = Employee.objects.select_related('user').get(pk=pk)
+        except Employee.DoesNotExist:
+            return Response({'detail': 'Employee tidak ditemukan.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if employee.user is not None:
+            return Response(
+                {'detail': 'Employee ini sudah memiliki user account.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = CreateUserForEmployeeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        new_user = User.objects.create_user(
+            username  = serializer.validated_data['username'],
+            password  = serializer.validated_data['password'],
+            email     = employee.email,
+            full_name = employee.full_name,
+        )
+
+        employee.user = new_user
+        employee.save(update_fields=['user'])
+
+        return Response({
+            'detail': f'User "{new_user.username}" berhasil dibuat untuk employee {employee.employee_id}.',
+            'user_id': new_user.id,
+            'username': new_user.username,
+        }, status=status.HTTP_201_CREATED)
