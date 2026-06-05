@@ -1,61 +1,10 @@
-<script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { ChevronDown } from 'lucide-vue-next'
-
-const props = defineProps({
-  item:     { type: Object, required: true },
-  depth:    { type: Number, default: 0     },
-  moduleId: { type: String, default: ''    },
-})
-
-defineEmits(['navigate'])
-
-const router  = useRouter()
-const isOpen  = ref(false)
-
-const hasChildren = computed(() => props.item.children?.length > 0)
-
-// Generate URL dari item
-const itemUrl = computed(() => {
-  // 1. Punya url_path dari backend → pakai langsung
-  if (props.item.url_path && props.item.url_path !== '') {
-    return props.item.url_path
-  }
-  // 2. Punya url dari menuData lama → pakai
-  if (props.item.url && props.item.url !== '') {
-    return props.item.url
-  }
-  // 3. Generate dari module_code + nama item → UnderConstruction
-  const moduleCode = props.moduleId || props.item.module_code || 'app'
-  const slug = slugify(props.item.name)
-  return `/${moduleCode}/${slug}`
-})
-
-function slugify(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-function handleClick() {
-  if (hasChildren.value) {
-    isOpen.value = !isOpen.value
-  }
-}
-</script>
-
 <template>
   <div>
-    <!-- Parent menu -->
     <div
       v-if="hasChildren"
       class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer select-none transition-colors"
       :style="{ paddingLeft: `${16 + depth * 12}px` }"
-      @click="handleClick"
+      @click="isOpen = !isOpen"
     >
       <span class="truncate">{{ item.name }}</span>
       <ChevronDown
@@ -64,7 +13,6 @@ function handleClick() {
       />
     </div>
 
-    <!-- Leaf menu -->
     <router-link
       v-else
       :to="itemUrl"
@@ -76,7 +24,6 @@ function handleClick() {
       <span class="truncate">{{ item.name }}</span>
     </router-link>
 
-    <!-- Children -->
     <Transition name="slide">
       <div v-if="isOpen && hasChildren">
         <SidebarMenuItem
@@ -92,15 +39,52 @@ function handleClick() {
   </div>
 </template>
 
+<script setup>
+import { ref, computed } from 'vue'
+import { ChevronDown } from 'lucide-vue-next'
+
+const props = defineProps({
+  item:     { type: Object, required: true },
+  depth:    { type: Number, default: 0 },
+  moduleId: { type: String, default: '' },
+})
+
+const isOpen = ref(false)
+const hasChildren = computed(() => props.item.children?.length > 0)
+
+const itemUrl = computed(() => {
+  // Prioritas 1: url_path dari backend / menuData
+  if (props.item.url_path?.trim()) {
+    return props.item.url_path
+  }
+
+  // Prioritas 2: module_code
+  const mod = props.item.module_code || props.moduleId
+
+  if (!mod || mod === 'undefined' || mod.trim() === '') {
+    console.warn('Missing module_code for item:', props.item.name)
+    return '#'  // atau '/'
+  }
+
+  return `/${mod}/${slugify(props.item.name)}`
+})
+
+function slugify(text) {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+</script>
+
 <script>
 export default { name: 'SidebarMenuItem' }
 </script>
 
 <style scoped>
-.slide-enter-active, .slide-leave-active {
-  transition: all 0.2s ease;
-  overflow: hidden;
-}
+.slide-enter-active, .slide-leave-active { transition: all 0.2s ease; overflow: hidden; }
 .slide-enter-from, .slide-leave-to { max-height: 0; opacity: 0; }
 .slide-enter-to, .slide-leave-from { max-height: 1000px; opacity: 1; }
 </style>

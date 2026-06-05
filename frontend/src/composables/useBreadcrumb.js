@@ -1,123 +1,88 @@
+// src/composables/useBreadcrumb.js
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { menuData } from '../menuData.js'
+import { useMenuStore } from '../stores/menu.js'
 
 export function useBreadcrumb() {
-  const route = useRoute()
+  const route     = useRoute()
+  const menuStore = useMenuStore()
 
   const breadcrumbs = computed(() => {
     const crumbs = []
-    const path = route.path
+    const path   = route.path
 
-    // Home page
     if (path === '/') {
-      crumbs.push({
-        label: 'Home',
-        path: '/',
-        isLast: true
-      })
+      crumbs.push({ label: 'Home', path: '/', isLast: true })
       return crumbs
     }
 
-    // Dashboard selector page
     if (path === '/dashboard') {
-      crumbs.push({
-        label: 'My Dashboard',
-        path: '/',
-        isLast: false
-      })
-      crumbs.push({
-        label: 'Dashboard',
-        path: null,
-        isLast: true
-      })
+      crumbs.push({ label: 'My Dashboard', path: '/',         isLast: false })
+      crumbs.push({ label: 'Dashboard',    path: null,        isLast: true  })
       return crumbs
     }
 
-    // Default: My Dashboard as first crumb
-    crumbs.push({
-      label: 'My Dashboard',
-      path: '/dashboard',
-      isLast: false
-    })
+    crumbs.push({ label: 'My Dashboard', path: '/dashboard', isLast: false })
 
-    const meta = route.meta
-    if (!meta || !meta.moduleId) {
-      // If no meta, just show current path
+    // Cari item di menu tree backend berdasarkan url_path
+    const found = findInTree(menuStore.tree, path)
+
+    if (found) {
+      // Tambah module name
       crumbs.push({
-        label: route.meta?.title || 'Unknown',
-        path: null,
-        isLast: true
+        label:  found.moduleName,
+        path:   null,
+        isLast: false,
       })
-      return crumbs
-    }
-
-    const moduleId = meta.moduleId
-    const itemName = meta.title
-
-    // Find the item in menuData to get parent info
-    const moduleItems = menuData[moduleId] || []
-    const findItem = (items, targetName, parentName = null) => {
-      for (const item of items) {
-        if (item.name === targetName) {
-          return { item, parentName }
-        }
-        if (item.children) {
-          const found = findItem(item.children, targetName, item.name)
-          if (found) return found
-        }
+      // Tambah parent kalau ada
+      if (found.parentName) {
+        crumbs.push({ label: found.parentName, path: null, isLast: false })
       }
-      return null
-    }
-
-    const found = findItem(moduleItems, itemName)
-
-    // Add module name
-    const moduleNames = {
-      commercial: 'Commercial',
-      gl: 'General Ledger',
-      ar: 'Account Receivable',
-      sales: 'Sales',
-      ap: 'Account Payable',
-      purchases: 'Purchases',
-      finance: 'Finance',
-      assets: 'Assets',
-      inventory: 'Inventory',
-      projects: 'Projects',
-      settings: 'Settings',
-    }
-
-    crumbs.push({
-      label: moduleNames[moduleId] || moduleId,
-      path: null,
-      isLast: false
-    })
-
-    // Add parent if exists (for nested menu items)
-    if (found && found.parentName) {
+      // Tambah item sendiri
+      crumbs.push({ label: found.item.name, path: null, isLast: true })
+    } else {
+      // Fallback ke route meta
+      const meta = route.meta
+      if (meta?.moduleName) {
+        crumbs.push({ label: meta.moduleName, path: null, isLast: false })
+      }
       crumbs.push({
-        label: found.parentName,
-        path: null,
-        isLast: false
+        label:  meta?.title || route.path.split('/').pop()?.replace(/-/g, ' ') || 'Page',
+        path:   null,
+        isLast: true,
       })
     }
-
-    // Add the actual page title
-    crumbs.push({
-      label: itemName || 'Unknown',
-      path: null,
-      isLast: true
-    })
 
     return crumbs
   })
 
   const pageTitle = computed(() => {
-    return route.meta?.title || 'BFS ERP'
+    const path  = route.path
+    const found = findInTree(menuStore.tree, path)
+    return found?.item.name || route.meta?.title || 'BFS ERP'
   })
 
-  return {
-    breadcrumbs,
-    pageTitle
+  return { breadcrumbs, pageTitle }
+}
+
+// Helper: cari item di tree berdasarkan url_path
+function findInTree(tree, targetPath) {
+  for (const module of (tree || [])) {
+    const result = searchChildren(module.children, targetPath, module.module_name, null)
+    if (result) return result
   }
+  return null
+}
+
+function searchChildren(items, targetPath, moduleName, parentName) {
+  for (const item of (items || [])) {
+    if (item.url_path && item.url_path === targetPath) {
+      return { item, moduleName, parentName }
+    }
+    if (item.children?.length) {
+      const found = searchChildren(item.children, targetPath, moduleName, item.name)
+      if (found) return found
+    }
+  }
+  return null
 }
