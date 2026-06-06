@@ -152,9 +152,15 @@ const statusBadge = (s) => ({
 
 const formModal = reactive({ show: false, employee: null })
 
-function openForm(emp) {
-  formModal.employee = emp
-  formModal.show     = true
+async function openForm(emp) {
+  if (emp) {
+    // Fetch detail untuk dapat signature_draw, signature_image_url, dll
+    const detail = await orgStore.fetchEmployeeDetail(emp.id)
+    formModal.employee = detail
+  } else {
+    formModal.employee = null
+  }
+  formModal.show = true
 }
 
 function onSaved() {

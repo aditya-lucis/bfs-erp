@@ -34,7 +34,7 @@
           <div class="flex border-b border-gray-100 flex-shrink-0 bg-white">
             <button
               v-for="tab in tabs" :key="tab.key"
-              @click="activeTab = tab.key"
+              @click="handleTabClick(tab.key)"
               :class="activeTab === tab.key
                 ? 'border-b-2 border-bfs-gold text-bfs-gold'
                 : 'text-gray-500 hover:text-gray-700'"
@@ -327,7 +327,7 @@
               </div>
 
               <!-- Draw mode -->
-              <div v-if="sigMode === 'draw'" class="space-y-3">
+              <div v-show="sigMode === 'draw'" class="space-y-3">
                 <div class="border-2 border-dashed border-gray-200 rounded-xl overflow-hidden bg-gray-50">
                   <canvas
                     ref="canvasRef"
@@ -361,7 +361,7 @@
               </div>
 
               <!-- Upload mode -->
-              <div v-else class="space-y-3">
+              <div v-show="sigMode === 'upload'" class="space-y-3">
                 <label class="block cursor-pointer">
                   <div :class="signatureFile
                     ? 'border-bfs-gold bg-bfs-gold/5'
@@ -581,9 +581,14 @@ const hasDrawn     = ref(false)
 const signatureFile    = ref(null)
 const signaturePreview = ref(null)
 
-const currentSignature = ref(
-  props.employee?.signature_draw || props.employee?.signature_image_url || null
-)
+const currentSignature = ref(null)
+
+// Watch employee prop — bisa datang telat karena parent fetch dulu
+watch(() => props.employee, (emp) => {
+  if (!emp) return
+  currentSignature.value = emp.signature_draw || emp.signature_image_url || null
+  console.log('✅ employee prop arrived:', emp.signature_draw?.slice(0, 30))
+}, { immediate: true })
 
 function getCanvasPos(e) {
   const rect = canvasRef.value.getBoundingClientRect()
@@ -645,38 +650,27 @@ function handleSignatureFile(e) {
   signaturePreview.value = URL.createObjectURL(file)
 }
 
-// ── Load existing signature ke canvas kalau edit ───────────────────────────
-async function loadSignatureToCanvas() {
-  if (!isEdit.value || !props.employee?.signature_draw) return
-  // nextTick dua kali: pertama untuk v-show render, kedua untuk canvas mount
-  await nextTick()
-  await nextTick()
-  if (!canvasRef.value) return
-  const img = new Image()
-  img.onload = () => {
-    if (!canvasRef.value) return
-    const ctx = canvasRef.value.getContext('2d')
-    ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
-    ctx.drawImage(img, 0, 0, canvasRef.value.width, canvasRef.value.height)
-    hasDrawn.value = true
+async function handleTabClick(key) {
+  activeTab.value = key
+  if (key === 'signature' && isEdit.value && currentSignature.value) {
+    setTimeout(() => {
+      if (!canvasRef.value) return
+      const src = props.employee?.signature_draw || currentSignature.value
+      if (!src || !src.startsWith('data:')) return  // skip kalau bukan base64 draw
+      const img = new Image()
+      img.onload = () => {
+        if (!canvasRef.value) return
+        const canvas = canvasRef.value
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        hasDrawn.value = true
+        console.log('✅ Signature drawn to canvas')
+      }
+      img.src = src
+    }, 100)
   }
-  img.src = props.employee.signature_draw
 }
-
-// Trigger saat pindah ke tab signature
-watch(activeTab, async (tab) => {
-  if (tab === 'signature') {
-    sigMode.value = 'draw'
-    await loadSignatureToCanvas()
-  }
-})
-
-// Trigger saat sigMode berubah ke draw (misal dari upload → draw)
-watch(sigMode, async (mode) => {
-  if (mode === 'draw' && activeTab.value === 'signature') {
-    await loadSignatureToCanvas()
-  }
-})
 
 // ── Save ───────────────────────────────────────────────────────────────────
 async function handleSave() {
@@ -778,6 +772,7 @@ async function handleSave() {
 
 // ── Load data saat mount ────────────────────────────────────────────────────
 onMounted(async () => {
+  console.log('MODAL MOUNTED, employee:', props.employee?.signature_draw?.slice(0, 30))
   await Promise.all([
     orgStore.fetchPositions(),
     rbacStore.fetchGroups({ page_size: 999 }),

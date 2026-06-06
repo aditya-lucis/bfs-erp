@@ -112,6 +112,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  async function fetchEmployeeDetail(id) {
+    const res = await api.get(`/org/employees/${id}/`)
+    return res.data
+  }
+
   async function createEmployee(formData) {
     // formData bisa FormData (ada file) atau plain object
     const res = await api.post('/org/employees/', formData, {
@@ -187,7 +192,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     companyName, companyCode, departmentList,
     createDepartment, updateDepartment, deleteDepartment,
     fetchCompany, updateCompany, fetchDepartments,
-    fetchPositions, fetchEmployees, createEmployee, updateEmployee,
+    fetchPositions, fetchEmployees, fetchEmployeeDetail, createEmployee, updateEmployee,
     uploadSignature, createUserForEmployee, adminResetPassword,
     fetchAll,
     fetchPositionsByDept, createPosition, updatePosition, deletePosition,
