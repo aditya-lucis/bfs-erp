@@ -170,6 +170,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRbacStore } from '../../stores/rbac.js'
+import { usePermission } from '../../composables/usePermission.js'
 import Panel from '../../components/Panel.vue'
 import AuthGroupFormModal from '../../components/rbac/AuthGroupFormModal.vue'
 import {

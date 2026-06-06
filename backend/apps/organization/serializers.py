@@ -6,10 +6,21 @@ from .models import Company, Department, Position, Employee
 User = get_user_model()
 
 class CompanySerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
     class Meta:
         model  = Company
-        fields = '__all__'
+        exclude = []   # include semua model fields
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_logo_url(self, obj):
+        if not obj.logo:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.logo.url)
+        return f"http://localhost:8000{obj.logo.url}"
+
 
 class DepartmentSerializer(serializers.ModelSerializer):
     level       = serializers.SerializerMethodField()
@@ -124,15 +135,22 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
 
 class EmployeeDetailSerializer(EmployeeListSerializer):
-    """Untuk detail view — tambah signature info."""
     signature_draw  = serializers.CharField(read_only=True)
     signature_image = serializers.ImageField(read_only=True)
+    signature_image_url = serializers.SerializerMethodField()   # ← tambah
 
     class Meta(EmployeeListSerializer.Meta):
         fields = EmployeeListSerializer.Meta.fields + [
-            'signature_draw', 'signature_image',
+            'signature_draw', 'signature_image', 'signature_image_url',   # ← tambah
         ]
 
+    def get_signature_image_url(self, obj):           # ← tambah method ini
+        if not obj.signature_image:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.signature_image.url)
+        return f"http://localhost:8000{obj.signature_image.url}"
 
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     """Update data employee (tidak termasuk user/password)."""

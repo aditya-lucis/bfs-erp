@@ -23,6 +23,7 @@ class CompanyDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'SETTINGS-COMPANY-INFORMATION'
     serializer_class   = CompanySerializer
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
         from .models import Company
@@ -236,7 +237,13 @@ class EmployeeSignatureView(APIView):
             hasattr(request.user, 'employee_profile') and
             request.user.employee_profile.pk == pk
         )
-        if not is_own and not request.user.is_superuser:
+
+        has_employee_access = request.user.is_superuser or \
+            request.user.user_auth_groups.filter(
+                authorization_group__group_functions__function__function_code='SETTINGS-EMPLOYEE-DATA'
+            ).exists()
+        
+        if not is_own and not has_employee_access:
             return Response(
                 {'detail': 'Tidak diizinkan.'},
                 status=status.HTTP_403_FORBIDDEN

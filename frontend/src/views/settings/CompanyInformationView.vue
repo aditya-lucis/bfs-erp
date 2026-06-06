@@ -27,8 +27,8 @@
         <div class="flex items-start gap-6 pb-6 border-b border-gray-100">
           <div class="w-28 h-28 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center bg-gray-50 overflow-hidden flex-shrink-0">
             <img 
-              v-if="logoPreview || orgStore.company.logo"
-              :src="logoPreview || orgStore.company.logo"
+              v-if="logoPreview || orgStore.company.logo_url"
+              :src="logoPreview || orgStore.company.logo_url"
               class="w-full h-full object-contain p-2"
             />
             <Building2 v-else class="w-10 h-10 text-gray-300" />
@@ -171,7 +171,6 @@
               <Save v-else class="w-3.5 h-3.5" />
               Update
             </button>
-            <input :disabled="!canUpdate" v-model="form.company_name" class="form-input" />
           </div>
         </div>
 
@@ -273,6 +272,14 @@ async function handleSave() {
 
   const result = await orgStore.updateCompany(payload)
   saveStatus.value = result.success ? 'success' : 'error'
+
+  if (result.success) {
+    // Clear preview — biar tampil dari orgStore.company.logo (URL server)
+    logoPreview.value = null
+    logoFile.value    = null
+    // Re-fetch untuk pastiin data terbaru (termasuk logo URL final dari backend)
+    await orgStore.fetchCompany()
+  }
 
   // Auto-hide setelah 3 detik
   setTimeout(() => { saveStatus.value = null }, 3000)

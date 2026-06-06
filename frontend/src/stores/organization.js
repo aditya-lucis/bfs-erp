@@ -65,7 +65,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     isLoading.value = true
     error.value     = null
     try {
-      const res     = await api.patch('/org/company/', payload)
+      const res = await api.patch('/org/company/', payload, {
+        headers: payload instanceof FormData
+          ? { 'Content-Type': 'multipart/form-data' }
+          : { 'Content-Type': 'application/json' }
+      })
       company.value = res.data
       return { success: true }
     } catch (err) {

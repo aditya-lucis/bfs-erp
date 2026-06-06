@@ -98,16 +98,9 @@
             <!-- ── Tab: User & Groups ── -->
             <div v-show="activeTab === 'user'" class="space-y-4">
 
-              <!-- Info kalau edit — username tidak bisa diganti -->
-              <div v-if="isEdit && employee.username"
-                class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <Info class="w-4 h-4 text-blue-500 flex-shrink-0" />
-                <p class="text-xs text-blue-700">
-                  Username: <span class="font-mono font-bold">{{ employee.username }}</span>
-                  — tidak bisa diubah. Reset password dari menu terpisah.
-                </p>
-              </div>
-
+              <!-- ═══════════════════════════════════════════════
+                   CASE A: ADD NEW EMPLOYEE → username + password
+                   ═══════════════════════════════════════════════ -->
               <template v-if="!isEdit">
                 <FormField label="Username" required>
                   <input
@@ -136,8 +129,152 @@
                 </FormField>
               </template>
 
-              <!-- Authorization Groups -->
-              <FormField label="Authorization Groups">
+              <!-- ═══════════════════════════════════════════════
+                   CASE B: EDIT — employee BELUM punya user (seed)
+                   Superuser bisa buatkan user baru
+                   ═══════════════════════════════════════════════ -->
+              <template v-else-if="isEdit && !employee.username">
+                <div v-if="!authStore.isSuperuser"
+                  class="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                  <Info class="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <p class="text-xs text-amber-700">
+                    Employee ini belum memiliki user account. Hubungi superuser untuk membuatkan akun.
+                  </p>
+                </div>
+
+                <template v-else>
+                  <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                    <Info class="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    <p class="text-xs text-blue-700">
+                      Employee ini belum punya user account. Isi username & password untuk membuatkan akun login.
+                    </p>
+                  </div>
+
+                  <FormField label="Username" required>
+                    <input
+                      v-model="newUser.username"
+                      type="text"
+                      class="form-input font-mono"
+                      placeholder="e.g. bfs007"
+                      :class="newUserErrors.username ? 'border-red-300' : ''"
+                    />
+                    <p v-if="newUserErrors.username" class="mt-1 text-xs text-red-500">{{ newUserErrors.username }}</p>
+                  </FormField>
+
+                  <FormField label="Password" required>
+                    <div class="relative">
+                      <input
+                        v-model="newUser.password"
+                        :type="showPwd ? 'text' : 'password'"
+                        class="form-input pr-10"
+                        placeholder="Min. 8 karakter"
+                      />
+                      <button type="button" @click="showPwd = !showPwd"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <component :is="showPwd ? EyeOff : Eye" class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </FormField>
+
+                  <button
+                    type="button"
+                    @click="handleCreateUser"
+                    :disabled="isCreatingUser"
+                    class="w-full btn-primary flex items-center justify-center gap-2"
+                  >
+                    <Loader2 v-if="isCreatingUser" class="w-4 h-4 animate-spin" />
+                    <UserPlus v-else class="w-4 h-4" />
+                    {{ isCreatingUser ? 'Membuat akun...' : 'Buat User Account' }}
+                  </button>
+
+                  <p v-if="createUserSuccess" class="text-xs text-green-600 flex items-center gap-1.5">
+                    <CheckCircle class="w-3.5 h-3.5" /> {{ createUserSuccess }}
+                  </p>
+                </template>
+              </template>
+
+              <!-- ═══════════════════════════════════════════════
+                   CASE C: EDIT — employee SUDAH punya user
+                   Tampilkan info + form reset password (superuser only)
+                   ═══════════════════════════════════════════════ -->
+              <template v-else-if="isEdit && employee.username">
+
+                <!-- Info username -->
+                <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <Info class="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <p class="text-xs text-blue-700">
+                    Username: <span class="font-mono font-bold">{{ employee.username }}</span>
+                    — tidak bisa diubah.
+                  </p>
+                </div>
+
+                <!-- Reset password — hanya superuser -->
+                <div v-if="authStore.isSuperuser" class="border border-gray-200 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    @click="showResetPwd = !showResetPwd"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700"
+                  >
+                    <span class="flex items-center gap-2">
+                      <KeyRound class="w-4 h-4 text-bfs-gold" />
+                      Reset Password
+                    </span>
+                    <ChevronDown class="w-4 h-4 transition-transform" :class="showResetPwd ? 'rotate-180' : ''" />
+                  </button>
+
+                  <div v-if="showResetPwd" class="px-4 py-4 space-y-3 border-t border-gray-100">
+                    <FormField label="Password Baru" required>
+                      <div class="relative">
+                        <input
+                          v-model="resetPwd.new_password"
+                          :type="showPwd ? 'text' : 'password'"
+                          class="form-input pr-10"
+                          placeholder="Min. 8 karakter"
+                        />
+                        <button type="button" @click="showPwd = !showPwd"
+                          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <component :is="showPwd ? EyeOff : Eye" class="w-4 h-4" />
+                        </button>
+                      </div>
+                    </FormField>
+
+                    <FormField label="Konfirmasi Password" required>
+                      <input
+                        v-model="resetPwd.new_password2"
+                        type="password"
+                        class="form-input"
+                        placeholder="Ulangi password baru"
+                      />
+                    </FormField>
+
+                    <button
+                      type="button"
+                      @click="handleResetPassword"
+                      :disabled="isResettingPwd"
+                      class="w-full btn-primary flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Loader2 v-if="isResettingPwd" class="w-3.5 h-3.5 animate-spin" />
+                      <KeyRound v-else class="w-3.5 h-3.5" />
+                      {{ isResettingPwd ? 'Mereset...' : 'Reset Password' }}
+                    </button>
+
+                    <p v-if="resetPwdSuccess" class="text-xs text-green-600 flex items-center gap-1.5">
+                      <CheckCircle class="w-3.5 h-3.5" /> {{ resetPwdSuccess }}
+                    </p>
+                    <p v-if="resetPwdError" class="text-xs text-red-500">{{ resetPwdError }}</p>
+                  </div>
+                </div>
+
+                <div v-else class="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                  <p class="text-xs text-gray-500">Reset password hanya bisa dilakukan oleh superuser.</p>
+                </div>
+              </template>
+
+              <!-- Authorization Groups — tampil di semua case kecuali employee tanpa user & bukan superuser -->
+              <FormField
+                v-if="!isEdit || employee.username || authStore.isSuperuser"
+                label="Authorization Groups"
+              >
                 <div class="border border-gray-200 rounded-xl overflow-hidden">
                   <div class="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Pilih Group User
@@ -217,9 +354,9 @@
                 </div>
 
                 <!-- Preview kalau sudah ada -->
-                <div v-if="existingSignature && !hasDrawn" class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div v-if="currentSignature && !hasDrawn" class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <p class="text-xs text-gray-400 mb-2">Signature saat ini:</p>
-                  <img :src="existingSignature" class="max-h-20 object-contain" />
+                  <img :src="currentSignature" class="max-h-20 object-contain" />
                 </div>
               </div>
 
@@ -246,11 +383,11 @@
                 </label>
 
                 <!-- Preview upload -->
-                <div v-if="signaturePreview || (isEdit && employee.signature_image)"
+                <div v-if="signaturePreview || currentSignature"
                   class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <p class="text-xs text-gray-400 mb-2">Preview:</p>
                   <img
-                    :src="signaturePreview || employee.signature_image"
+                    :src="signaturePreview || currentSignature"
                     class="max-h-24 object-contain"
                   />
                 </div>
@@ -292,11 +429,12 @@
 import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useOrganizationStore } from '../../stores/organization.js'
 import { useRbacStore } from '../../stores/rbac.js'
+import { useAuthStore } from '../../stores/auth.js'
 import FormField from '../FormField.vue'
 import {
   X, UserCircle, Save, Loader2, Eye, EyeOff,
   PenLine, Upload, Eraser, Info, AlertCircle,
-  User, Shield, Pen,
+  User, Shield, Pen, KeyRound, ChevronDown, UserPlus, CheckCircle,
 } from 'lucide-vue-next'
 
 const props  = defineProps({ employee: { type: Object, default: null } })
@@ -304,6 +442,7 @@ const emit   = defineEmits(['close', 'saved'])
 
 const orgStore  = useOrganizationStore()
 const rbacStore = useRbacStore()
+const authStore = useAuthStore()
 
 const isEdit      = computed(() => !!props.employee)
 const companyCode = computed(() => orgStore.companyCode || 'BFS')
@@ -334,6 +473,93 @@ const form = reactive({
 
 const errors = reactive({ username: '', password: '' })
 
+// ── State: buat user baru untuk employee seed ──────────────────────────────
+const newUser = reactive({ username: '', password: '' })
+const newUserErrors  = reactive({ username: '' })
+const isCreatingUser = ref(false)
+const createUserSuccess = ref('')
+
+// ── State: reset password ─────────────────────────────────────────────────
+const showResetPwd  = ref(false)
+const isResettingPwd = ref(false)
+const resetPwdSuccess = ref('')
+const resetPwdError   = ref('')
+const resetPwd = reactive({ new_password: '', new_password2: '' })
+
+// ── Handler: buat user untuk employee seed ─────────────────────────────────
+async function handleCreateUser() {
+  newUserErrors.username = ''
+  createUserSuccess.value = ''
+
+  if (!newUser.username.trim()) {
+    newUserErrors.username = 'Username wajib diisi.'
+    return
+  }
+  if (!newUser.password || newUser.password.length < 8) {
+    serverError.value = 'Password minimal 8 karakter.'
+    return
+  }
+
+  isCreatingUser.value = true
+  try {
+    const res = await orgStore.createUserForEmployee(props.employee.id, {
+      username:  newUser.username.trim(),
+      password:  newUser.password,
+      password2: newUser.password,
+    })
+    createUserSuccess.value = res.detail || 'User account berhasil dibuat!'
+    // Refresh list setelah berhasil
+    emit('saved')
+  } catch (err) {
+    const data = err.response?.data
+    if (data?.username) {
+      newUserErrors.username = data.username[0]
+    } else {
+      serverError.value = data?.detail || 'Gagal membuat user account.'
+    }
+  } finally {
+    isCreatingUser.value = false
+  }
+}
+
+// ── Handler: reset password ────────────────────────────────────────────────
+async function handleResetPassword() {
+  resetPwdSuccess.value = ''
+  resetPwdError.value   = ''
+
+  if (!resetPwd.new_password || resetPwd.new_password.length < 8) {
+    resetPwdError.value = 'Password baru minimal 8 karakter.'
+    return
+  }
+  if (resetPwd.new_password !== resetPwd.new_password2) {
+    resetPwdError.value = 'Konfirmasi password tidak cocok.'
+    return
+  }
+
+  // Dapatkan user_id dari employee — backend serializer expose field 'user' sebagai FK integer
+  const userId = props.employee?.user
+  if (!userId) {
+    resetPwdError.value = 'User ID tidak ditemukan.'
+    return
+  }
+
+  isResettingPwd.value = true
+  try {
+    const res = await orgStore.adminResetPassword(userId, {
+      new_password:  resetPwd.new_password,
+      new_password2: resetPwd.new_password2,
+    })
+    resetPwdSuccess.value = res.detail || 'Password berhasil direset!'
+    resetPwd.new_password  = ''
+    resetPwd.new_password2 = ''
+    showResetPwd.value = false
+  } catch (err) {
+    resetPwdError.value = err.response?.data?.detail || 'Gagal mereset password.'
+  } finally {
+    isResettingPwd.value = false
+  }
+}
+
 // ── Positions grouped by department ────────────────────────────────────────
 const groupedPositions = computed(() => {
   const map = {}
@@ -355,8 +581,8 @@ const hasDrawn     = ref(false)
 const signatureFile    = ref(null)
 const signaturePreview = ref(null)
 
-const existingSignature = computed(() =>
-  props.employee?.signature_draw || props.employee?.signature_image || null
+const currentSignature = ref(
+  props.employee?.signature_draw || props.employee?.signature_image_url || null
 )
 
 function getCanvasPos(e) {
@@ -420,17 +646,35 @@ function handleSignatureFile(e) {
 }
 
 // ── Load existing signature ke canvas kalau edit ───────────────────────────
+async function loadSignatureToCanvas() {
+  if (!isEdit.value || !props.employee?.signature_draw) return
+  // nextTick dua kali: pertama untuk v-show render, kedua untuk canvas mount
+  await nextTick()
+  await nextTick()
+  if (!canvasRef.value) return
+  const img = new Image()
+  img.onload = () => {
+    if (!canvasRef.value) return
+    const ctx = canvasRef.value.getContext('2d')
+    ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+    ctx.drawImage(img, 0, 0, canvasRef.value.width, canvasRef.value.height)
+    hasDrawn.value = true
+  }
+  img.src = props.employee.signature_draw
+}
+
+// Trigger saat pindah ke tab signature
 watch(activeTab, async (tab) => {
-  if (tab === 'signature' && isEdit.value && props.employee.signature_draw) {
-    await nextTick()
+  if (tab === 'signature') {
     sigMode.value = 'draw'
-    const img = new Image()
-    img.onload = () => {
-      const ctx = canvasRef.value.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      hasDrawn.value = true
-    }
-    img.src = props.employee.signature_draw
+    await loadSignatureToCanvas()
+  }
+})
+
+// Trigger saat sigMode berubah ke draw (misal dari upload → draw)
+watch(sigMode, async (mode) => {
+  if (mode === 'draw' && activeTab.value === 'signature') {
+    await loadSignatureToCanvas()
   }
 })
 
@@ -502,12 +746,17 @@ async function handleSave() {
     if (sigMode.value === 'draw' && hasDrawn.value) {
       const dataUrl = getCanvasDataUrl()
       if (dataUrl) {
-        await orgStore.uploadSignature(empId, { signature_draw: dataUrl })
+        const sigResult = await orgStore.uploadSignature(empId, { signature_draw: dataUrl })
+        // Update currentSignature langsung dari response backend
+        currentSignature.value = sigResult?.signature_draw || dataUrl
       }
     } else if (sigMode.value === 'upload' && signatureFile.value) {
       const fd = new FormData()
       fd.append('signature_image', signatureFile.value)
-      await orgStore.uploadSignature(empId, fd)
+      const sigResult = await orgStore.uploadSignature(empId, fd)
+      // Clear preview lama — biar tampil URL dari server
+      signaturePreview.value = sigResult?.signature_image || signaturePreview.value
+      signatureFile.value    = null
     }
 
     emit('saved')
