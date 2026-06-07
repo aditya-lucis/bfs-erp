@@ -39,7 +39,7 @@ export const menuData = {
   ],
 
   gl: [
-    { name: 'Chart of Accounts', url: '' },
+    { name: 'Chart of Accounts', url: '/gl/chart-of-accounts' },
     { name: 'Cost Center', url: '' },
     { name: 'Budget', url: '', children: [
       { name: 'Set COA Budget', url: '' },

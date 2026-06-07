@@ -15,6 +15,7 @@ import CompanyInformationView from './views/settings/CompanyInformationView.vue'
 import DepartmentView from './views/settings/DepartmentView.vue'
 import AuthGroupListView from './views/settings/AuthGroupListView.vue'
 import EmployeeView from './views/settings/EmployeeView.vue'
+import ChartOfAccountView from './views/gl/ChartOfAccountView.vue'
 import { menuData } from './menuData.js'
 
 function generateRoutesFromMenu() {
@@ -133,6 +134,16 @@ const routes = [
     path: '/settings/employee-data',
     component: EmployeeView,
     meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' }
+  },
+  {
+    path: '/gl/chart-of-accounts',
+    component: ChartOfAccountView,
+    meta: {
+      title: 'Chart of Accounts',
+      moduleId: 'gl',
+      moduleName: 'General Ledger',
+      layout: 'default'
+    }
   },
   ...dynamicRoutes.map(r => ({ ...r, meta: { ...r.meta, layout: 'default' } })),
   {

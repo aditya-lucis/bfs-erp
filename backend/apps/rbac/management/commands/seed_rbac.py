@@ -860,6 +860,7 @@ URL_MAP = {
     'SETTINGS-ORGANIZATIONAL-STRUCTURE':  '/settings/organizational-structure',
     'SETTINGS-USER-AUTHORIZATION-GROUP':  '/settings/user-authorization-group',
     'SETTINGS-EMPLOYEE-DATA':             '/settings/employee-data',
+    'GL-CHART-OF-ACCOUNTS':               '/gl/chart-of-accounts',
 }
 
 class Command(BaseCommand):
