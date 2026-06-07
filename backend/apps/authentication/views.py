@@ -3,13 +3,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import User
 from .serializers import (
-    UserSerializer, UserCreateSerializer, UserUpdateSerializer,
+    MeUpdateSerializer, UserSerializer, UserCreateSerializer, UserUpdateSerializer,
     ChangePasswordSerializer, LoginSerializer,
-    AdminResetPasswordSerializer, CreateUserForEmployeeSerializer,
+    AdminResetPasswordSerializer, CreateUserForEmployeeSerializer
 )
 
 
@@ -64,6 +65,8 @@ class MeView(generics.RetrieveUpdateAPIView):
     GET  /api/v1/auth/me/  → current user profile
     PATCH /api/v1/auth/me/ → update profile fields
     """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
     serializer_class = UserSerializer
 
     def get_object(self):
@@ -255,3 +258,21 @@ class CreateUserForEmployeeView(APIView):
             'user_id': new_user.id,
             'username': new_user.username,
         }, status=status.HTTP_201_CREATED)
+    
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+class MeView(generics.RetrieveUpdateAPIView):
+    """
+    GET  /api/v1/auth/me/  → current user profile
+    PATCH /api/v1/auth/me/ → update profile fields
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]   # ← tambah
+
+    def get_object(self):
+        return self.request.user
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return MeUpdateSerializer
+        return MeUpdateSerializer   # pakai yang sama untuk GET juga

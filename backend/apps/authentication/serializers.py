@@ -110,3 +110,26 @@ class TokenResponseSerializer(serializers.Serializer):
     access  = serializers.CharField()
     refresh = serializers.CharField()
     user    = UserSerializer()
+
+class MeUpdateSerializer(serializers.ModelSerializer):
+    profile_photo_url   = serializers.SerializerMethodField()
+    employee_pk       = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = User
+        fields = [
+            'id', 'username', 'email', 'full_name', 'is_superuser',
+            'profile_photo', 'profile_photo_url',
+            'employee_pk',
+        ]
+        read_only_fields = ['id', 'username', 'is_superuser']
+
+    def get_profile_photo_url(self, obj):
+        if not obj.profile_photo: return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.profile_photo.url) if request else None
+    
+    def get_employee_pk(self, obj):
+        # employee_profile adalah related_name dari Employee.user FK
+        emp = getattr(obj, 'employee_profile', None)
+        return emp.pk if emp else None

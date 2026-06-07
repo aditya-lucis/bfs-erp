@@ -90,6 +90,12 @@
         </div>
       </div>
     </div>
+
+    <UserProfileModal
+      v-if="showProfileModal"
+      @close="showProfileModal = false"
+    />
+    
   </header>
 </template>
 
@@ -97,11 +103,12 @@
 import { ref } from 'vue'
 import { Home, User, LogOut, Settings, ChevronDown, LayoutDashboard } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth.js'
+import UserProfileModal from './UserProfileModal.vue'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
 const router    = useRouter()
-
+const showProfileModal = ref(false)
 const props = defineProps({
   activeModule: {
     type: String,
@@ -124,7 +131,10 @@ const selectModule = (id) => {
 const isHomeMenuOpen = ref(false)
 const isUserMenuOpen = ref(false)
 
-const goToSetting = () => { isUserMenuOpen.value = false; alert('Setting') }
+const goToSetting = () => {
+  isUserMenuOpen.value = false
+  showProfileModal.value = true
+}
 
 const handleLogout = async () => {
   isUserMenuOpen.value = false

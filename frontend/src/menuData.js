@@ -458,8 +458,8 @@ export const menuData = {
 
   inventory: [
     { name: 'Item', url: '', children: [
-      { name: 'Item Category', url: '' },
-      { name: 'List of Items', url: '' },
+      { name: 'Item Category', url: '/inventory/item-category' },
+      { name: 'List of Items', url: '/inventory/items' },
       { name: 'Item Barcode', url: '' },
       { name: 'Item Label', url: '' },
       { name: 'Matrix Item', url: '' },
@@ -696,7 +696,7 @@ export const menuData = {
     ] },
     { name: 'Inventory', url: '', children: [
       { name: 'Unit Measurement Group', url: '' },
-      { name: 'Unit Measurement', url: '' },
+      { name: 'Unit Measurement', url: '/inventory/unit-measurement' },
       { name: 'Unit Measurement Converter', url: '' },
       { name: 'Linked Account Alias', url: '' },
       { name: 'Master Color', url: '' },

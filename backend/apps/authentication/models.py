@@ -30,7 +30,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     email           = models.EmailField(unique=True)
     full_name       = models.CharField(max_length=150, blank=True)
     employee_id     = models.CharField(max_length=30, blank=True, null=True, unique=True)
-
+    profile_photo   = models.ImageField(upload_to='users/photos/', blank=True, null=True)
     is_active       = models.BooleanField(default=True)
     is_staff        = models.BooleanField(default=False)   # Django admin access
 
