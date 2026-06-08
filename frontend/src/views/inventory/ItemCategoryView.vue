@@ -229,12 +229,14 @@ import { usePermission } from '../../composables/usePermission.js'
 import { useFormError } from '../../composables/useFormError.js'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
+import { useToast } from '../../composables/useToast.js'
 import { Plus, Pencil, Trash2, Save, X, Loader2, Search, FolderOpen, AlertCircle } from 'lucide-vue-next'
 
 const store = useInventoryStore()
 const { canCreate, canUpdate, canDelete } = usePermission('INV-ITEM-CATEGORY')
 const formError = useFormError()
 const isSaving  = ref(false)
+const toast = useToast()
 
 const activeTab = ref('ALL')
 const search    = ref('')
@@ -319,6 +321,7 @@ async function handleSubmit() {
     await store.fetchCategories()
   } catch (err) {
     formError.parseApiError(err)
+    toast.error('Gagal menyimpan group.')
   } finally {
     isSaving.value = false
   }
@@ -339,9 +342,11 @@ async function handleDelete() {
   try {
     await store.deleteCategory(deleteModal.target.id)
     deleteModal.show = false
+    toast.success('Group berhasil dihapus.')
     await store.fetchCategories()
   } catch (err) {
     deleteModal.error = err?.response?.data?.detail || 'Gagal menghapus group.'
+    toast.error(deleteModal.error)
   } finally {
     isSaving.value = false
   }

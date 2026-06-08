@@ -32,6 +32,27 @@
       </div>
     </div>
   </div>
+ <Teleport to="body">
+  <div class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
+    <TransitionGroup name="toast">
+      <div 
+        v-for="t in toasts"
+          :key="t.id"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium pointer-events-auto min-w-64 max-w-sm"
+          :class="{
+            'bg-green-600 text-white': t.type === 'success',
+            'bg-red-500 text-white':   t.type === 'error',
+            'bg-gray-800 text-white':  t.type === 'info',
+          }"
+      >
+        <CheckCircle v-if="t.type === 'success'" class="w-4 h-4 shrink-0" />
+        <XCircle     v-else-if="t.type === 'error'"   class="w-4 h-4 shrink-0" />
+        <Info        v-else                            class="w-4 h-4 shrink-0" />
+        <span>{{ t.message }}</span>
+      </div>
+    </TransitionGroup>
+  </div>
+ </Teleport>
 </template>
 
 <script setup>
@@ -40,6 +61,10 @@ import { useRouter, useRoute } from 'vue-router'
 import TopNav from './components/TopNav.vue'
 import AppSidebar from './components/AppSidebar.vue'
 import ToolBar from './components/ToolBar.vue'
+
+import { CheckCircle, XCircle, Info } from 'lucide-vue-next'
+import { useToast } from './composables/useToast.js'
+const { toasts } = useToast()
 
 import { 
   ShoppingCart, 
@@ -116,3 +141,10 @@ const handleNav = (item) => {
   router.push(`/${mod}/${slug}`)
 }
 </script>
+
+<style>
+.toast-enter-active { transition: all 0.3s ease; }
+.toast-leave-active { transition: all 0.25s ease; }
+.toast-enter-from   { opacity: 0; transform: translateX(100%); }
+.toast-leave-to     { opacity: 0; transform: translateX(100%); }
+</style>

@@ -253,22 +253,16 @@
                 </div>
 
                 <FormField label="Account (COA)" required>
-                  <select v-model="linkForm.account" class="form-input">
-                    <option :value="null">— Pilih Account —</option>
-                    <optgroup
-                      v-for="group in coaGrouped"
-                      :key="group.label"
-                      :label="group.label"
-                    >
-                      <option
-                        v-for="acc in group.accounts"
-                        :key="acc.id"
-                        :value="acc.id"
-                      >
-                        {{ acc.account_number }} {{ acc.account_name }}
-                      </option>
-                    </optgroup>
-                  </select>
+                  <SearchableSelect
+                    v-model="linkForm.account"
+                    :groups="coaGrouped"
+                    value-key="id"
+                    label-key="account_name"
+                    :search-keys="['account_number', 'account_name']"
+                    placeholder="— Cari account... —"
+                    search-placeholder="Ketik nomor atau nama akun..."
+                    :has-error="!!linkFormError && !linkForm.account"
+                  />
                 </FormField>
 
                 <div class="flex justify-end">
@@ -337,6 +331,8 @@ import { usePermission } from '../../composables/usePermission.js'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import ItemFormModal from '../../components/inventory/ItemFormModal.vue'
+import SearchableSelect from '../../components/SearchableSelect.vue'
+import { useToast } from '../../composables/useToast.js'
 import {
   Plus, Pencil, Trash2, X, Loader2,
   Search, Package, Link, CheckCircle,
@@ -345,6 +341,7 @@ import {
 const store          = useInventoryStore()
 const accountingStore = useAccountingStore()
 const { canCreate, canUpdate, canDelete } = usePermission('INV-ITEM')
+const toast = useToast()
 
 const isSaving    = ref(false)
 const itemModalRef = ref(null)
@@ -398,24 +395,26 @@ async function openEditModal(item) {
   }
 }
 
-async function handleSaved(payload, hasFile) {
+async function handleSaved(payload) {
   itemModalRef.value?.setLoading(true)
   try {
     if (modal.mode === 'add') {
       await store.createItem(payload)
+      toast.success('Item berhasil ditambahkan.')
     } else {
       await store.updateItem(modal.editId, payload)
+      toast.success('Item berhasil diperbarui.')
     }
     modal.show = false
     await store.fetchItems()
   } catch (err) {
     itemModalRef.value?.setErrors(err)
+    toast.error('Gagal menyimpan item. Periksa isian form.')
   } finally {
     itemModalRef.value?.setLoading(false)
   }
 }
 
-// ── Delete ─────────────────────────────────────────────────────────────────
 const deleteModal = reactive({ show: false, target: null, error: '' })
 
 function confirmDelete(item) {
@@ -430,9 +429,11 @@ async function handleDelete() {
   try {
     await store.deleteItem(deleteModal.target.id)
     deleteModal.show = false
+    toast.success('Item berhasil dinonaktifkan.')
     await store.fetchItems()
   } catch (err) {
     deleteModal.error = err?.response?.data?.detail || 'Gagal menonaktifkan item.'
+    toast.error(deleteModal.error)
   } finally {
     isSaving.value = false
   }
@@ -454,7 +455,8 @@ const coaGrouped = computed(() => {
     if (!groups[gname]) groups[gname] = []
     groups[gname].push(acc)
   })
-  return Object.entries(groups).map(([label, accounts]) => ({ label, accounts }))
+  // PERBAIKAN: Ubah 'accounts' yang kanan menjadi 'options'
+  return Object.entries(groups).map(([label, accounts]) => ({ label, options: accounts }))
 })
 
 async function openAccountModal(item) {
@@ -485,13 +487,14 @@ async function handleAddLink() {
     await store.createAccountLink(accountModal.item.id, { ...linkForm })
     accountLinks.value = await store.fetchAccountLinks(accountModal.item.id)
     Object.assign(linkForm, { purpose: '', currency: 'ALL', account: null })
+    toast.success('Account link berhasil ditambahkan.')
   } catch (err) {
     const data = err?.response?.data
     if (data && typeof data === 'object') {
       const msgs = Object.values(data).flat()
       linkFormError.value = msgs[0] || 'Gagal menambah link.'
     } else {
-      linkFormError.value = 'Gagal menambah link. Silakan coba lagi.'
+      toast.error('Gagal menambah account link.')
     }
   } finally {
     isLinkSaving.value = false
@@ -502,8 +505,10 @@ async function handleDeleteLink(link) {
   try {
     await store.deleteAccountLink(accountModal.item.id, link.id)
     accountLinks.value = await store.fetchAccountLinks(accountModal.item.id)
+    toast.success('Account link berhasil dihapus.')
   } catch (err) {
     linkFormError.value = err?.response?.data?.detail || 'Gagal menghapus link.'
+    toast.error(linkFormError.value)
   }
 }
 

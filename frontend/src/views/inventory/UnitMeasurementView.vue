@@ -248,12 +248,14 @@ import { usePermission } from '../../composables/usePermission.js'
 import { useFormError } from '../../composables/useFormError.js'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
+import { useToast } from '../../composables/useToast.js'
 import { Plus, Pencil, Trash2, Save, X, Loader2, Search, Ruler, AlertCircle } from 'lucide-vue-next'
 
 const store = useInventoryStore()
 const { canCreate, canUpdate, canDelete } = usePermission('INV-UNIT-MEASUREMENT')
 const formError = useFormError()
 const isSaving  = ref(false)
+const toast = useToast()
 
 // ── Filter & Search ────────────────────────────────────────────────────────
 const activeTab = ref('ALL')
@@ -328,13 +330,16 @@ async function handleSubmit() {
   try {
     if (modal.mode === 'add') {
       await store.createUnit({ ...form })
+      toast.success('Unit berhasil ditambahkan.')
     } else {
       await store.updateUnit(modal.editId, { ...form })
+      toast.success('Unit berhasil diperbarui.')
     }
     modal.show = false
     await store.fetchUnits()
   } catch (err) {
     formError.parseApiError(err)
+    toast.error('Gagal menyimpan unit.')
   } finally {
     isSaving.value = false
   }
@@ -355,10 +360,11 @@ async function handleDelete() {
   try {
     await store.deleteUnit(deleteModal.target.id)
     deleteModal.show = false
+    toast.success('Unit berhasil dihapus.')
     await store.fetchUnits()
   } catch (err) {
-    const msg = err?.response?.data?.detail || 'Gagal menghapus unit. Silakan coba lagi.'
-    deleteModal.error = msg
+    deleteModal.error = err?.response?.data?.detail || 'Gagal menghapus unit.'
+    toast.error(deleteModal.error)
   } finally {
     isSaving.value = false
   }

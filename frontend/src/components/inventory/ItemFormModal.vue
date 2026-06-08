@@ -335,7 +335,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { X, Save, Loader2, AlertCircle, Upload, Trash2, Image as ImageIcon } from 'lucide-vue-next'
 import FormField from '../FormField.vue'
 
@@ -350,7 +350,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved'])
 
-// ── Enum options ───────────────────────────────────────────────────────────
 const itemTypes = [
   { value: 'RM', label: 'Raw Material' },
   { value: 'SP', label: 'Supplies' },
@@ -381,51 +380,52 @@ const serverError  = ref('')
 const errors       = reactive({})
 const selectedFile = ref(null)
 const imagePreview = ref('')
+const isPopulating = ref(false)  // ← flag untuk cegah race condition
 
 const form = reactive({
-  item_name:                '',
-  item_type:                'RM',
-  category:                 null,
-  unit:                     null,
-  secondary_rr_unit:        null,
-  secondary_sndo_unit:      null,
+  item_name:                 '',
+  item_type:                 'RM',
+  category:                  null,
+  unit:                      null,
+  secondary_rr_unit:         null,
+  secondary_sndo_unit:       null,
   secondary_production_unit: null,
-  is_production:            false,
-  is_purchase:              true,
-  price_type:               'EDITABLE',
-  unit_price:               0,
-  is_last_purchase_price:   false,
-  costing_method:           'FIFO',
-  default_currency:         'IDR',
-  is_automatic_pr:          false,
-  view_buy:                 true,
-  view_sell:                true,
-  view_inventory:           false,
-  is_active:                true,
-  is_service:               false,
-  is_new:                   true,
+  is_production:             false,
+  is_purchase:               true,
+  price_type:                'EDITABLE',
+  unit_price:                0,
+  is_last_purchase_price:    false,
+  costing_method:            'FIFO',
+  default_currency:          'IDR',
+  is_automatic_pr:           false,
+  view_buy:                  true,
+  view_sell:                 true,
+  view_inventory:            false,
+  is_active:                 true,
+  is_service:                false,
+  is_new:                    true,
 })
 
 // ── Computed ───────────────────────────────────────────────────────────────
 const filteredCategories = computed(() =>
-  props.categories.filter(c => c.item_type === form.item_type && c.is_active !== false)
+  props.categories.filter(c => c.item_type === form.item_type)
 )
 
 const filteredUnits = computed(() =>
-  props.units.filter(u => u.item_type === form.item_type && u.is_active !== false)
+  props.units.filter(u => u.item_type === form.item_type)
 )
 
-// Preview kode item (add mode)
 const codePreview = computed(() => {
   const cat = props.categories.find(c => c.id === form.category)
   if (!cat) return '—'
-  const year = new Date().getFullYear()
-  return `${year}_${cat.name}_XXXX`
+  return `${new Date().getFullYear()}_${cat.name}_XXXX`
 })
 
 // ── Watchers ───────────────────────────────────────────────────────────────
-// Reset category & units saat item_type berubah
+
+// Reset category & units saat item_type berubah — SKIP kalau lagi populate
 watch(() => form.item_type, () => {
+  if (isPopulating.value) return
   form.category                  = null
   form.unit                      = null
   form.secondary_rr_unit         = null
@@ -433,37 +433,48 @@ watch(() => form.item_type, () => {
   form.secondary_production_unit = null
 })
 
-// Populate form saat modal dibuka
-watch(() => props.show, (val) => {
-  if (!val) return
+// Watch KEDUANYA: show + props data (units/categories bisa datang async)
+watch(
+  [() => props.show, () => props.units, () => props.categories],
+  ([show, units, cats]) => {
+    if (!show) return
+    // Tunggu units dan categories tersedia
+    if (!units?.length || !cats?.length) return
+    populateForm()
+  }
+)
+
+// ── Populate ───────────────────────────────────────────────────────────────
+function populateForm() {
   activeTab.value   = 'info'
   serverError.value = ''
   Object.keys(errors).forEach(k => delete errors[k])
   selectedFile.value = null
+  isPopulating.value = true
 
   if (props.mode === 'edit' && props.initialData) {
     Object.assign(form, {
-      item_name:                props.initialData.item_name,
-      item_type:                props.initialData.item_type,
-      category:                 props.initialData.category,
-      unit:                     props.initialData.unit,
-      secondary_rr_unit:        props.initialData.secondary_rr_unit,
-      secondary_sndo_unit:      props.initialData.secondary_sndo_unit,
-      secondary_production_unit: props.initialData.secondary_production_unit,
-      is_production:            props.initialData.is_production,
-      is_purchase:              props.initialData.is_purchase,
-      price_type:               props.initialData.price_type,
-      unit_price:               props.initialData.unit_price,
-      is_last_purchase_price:   props.initialData.is_last_purchase_price,
-      costing_method:           props.initialData.costing_method,
-      default_currency:         props.initialData.default_currency,
-      is_automatic_pr:          props.initialData.is_automatic_pr,
-      view_buy:                 props.initialData.view_buy,
-      view_sell:                props.initialData.view_sell,
-      view_inventory:           props.initialData.view_inventory,
-      is_active:                props.initialData.is_active,
-      is_service:               props.initialData.is_service,
-      is_new:                   props.initialData.is_new,
+      item_name:                 props.initialData.item_name                ?? '',
+      item_type:                 props.initialData.item_type                ?? 'RM',
+      category:                  props.initialData.category                 ?? null,
+      unit:                      props.initialData.unit                     ?? null,
+      secondary_rr_unit:         props.initialData.secondary_rr_unit        ?? null,
+      secondary_sndo_unit:       props.initialData.secondary_sndo_unit      ?? null,
+      secondary_production_unit: props.initialData.secondary_production_unit ?? null,
+      is_production:             props.initialData.is_production             ?? false,
+      is_purchase:               props.initialData.is_purchase               ?? true,
+      price_type:                props.initialData.price_type                ?? 'EDITABLE',
+      unit_price:                props.initialData.unit_price                ?? 0,
+      is_last_purchase_price:    props.initialData.is_last_purchase_price    ?? false,
+      costing_method:            props.initialData.costing_method            ?? 'FIFO',
+      default_currency:          props.initialData.default_currency          ?? 'IDR',
+      is_automatic_pr:           props.initialData.is_automatic_pr           ?? false,
+      view_buy:                  props.initialData.view_buy                  ?? true,
+      view_sell:                 props.initialData.view_sell                 ?? true,
+      view_inventory:            props.initialData.view_inventory             ?? false,
+      is_active:                 props.initialData.is_active                 ?? true,
+      is_service:                props.initialData.is_service                ?? false,
+      is_new:                    props.initialData.is_new                    ?? true,
     })
     imagePreview.value = props.initialData.image_url || ''
   } else {
@@ -480,14 +491,15 @@ watch(() => props.show, (val) => {
     })
     imagePreview.value = ''
   }
-})
 
-// ── Image handling ─────────────────────────────────────────────────────────
+  // Lepas flag setelah semua reactive selesai
+  nextTick(() => { isPopulating.value = false })
+}
+
+// ── Image ──────────────────────────────────────────────────────────────────
 function handleFileSelect(e) {
   const file = e.target.files[0]
   if (!file) return
-
-  // Validasi ukuran max 5MB
   if (file.size > 5 * 1024 * 1024) {
     errors.image = 'Ukuran file maksimal 5MB.'
     return
@@ -508,42 +520,19 @@ function validate() {
   serverError.value = ''
   let valid = true
 
-  if (!form.item_type) {
-    errors.item_type = 'Item type wajib dipilih.'
-    valid = false
-  }
-  if (!form.category) {
-    errors.category = 'Category wajib dipilih.'
-    valid = false
-  }
-  if (!form.item_name.trim()) {
-    errors.item_name = 'Item name wajib diisi.'
-    valid = false
-  }
-  if (!form.unit) {
-    errors.unit = 'Item unit wajib dipilih.'
-    valid = false
-  }
-  if (!form.secondary_rr_unit) {
-    errors.secondary_rr_unit = 'Secondary RR unit wajib dipilih.'
-    valid = false
-  }
-  if (!form.secondary_sndo_unit) {
-    errors.secondary_sndo_unit = 'Secondary SN/DO unit wajib dipilih.'
-    valid = false
-  }
-  if (!form.secondary_production_unit) {
-    errors.secondary_production_unit = 'Secondary production unit wajib dipilih.'
-    valid = false
-  }
+  if (!form.item_type) { errors.item_type = 'Item type wajib dipilih.'; valid = false }
+  if (!form.category)  { errors.category  = 'Category wajib dipilih.'; valid = false }
+  if (!form.item_name.trim()) { errors.item_name = 'Item name wajib diisi.'; valid = false }
+  if (!form.unit)                      { errors.unit                      = 'Item unit wajib dipilih.'; valid = false }
+  if (!form.secondary_rr_unit)         { errors.secondary_rr_unit         = 'Wajib dipilih.'; valid = false }
+  if (!form.secondary_sndo_unit)       { errors.secondary_sndo_unit       = 'Wajib dipilih.'; valid = false }
+  if (!form.secondary_production_unit) { errors.secondary_production_unit = 'Wajib dipilih.'; valid = false }
   if (!form.is_production && !form.is_purchase) {
-    errors.source = 'Minimal satu source harus dipilih (Production atau Purchase).'
+    errors.source = 'Minimal satu source harus dipilih.'
     valid = false
   }
 
-  // Kalau ada error, switch ke tab info biar user liat
   if (!valid) activeTab.value = 'info'
-
   return valid
 }
 
@@ -564,7 +553,6 @@ function setErrors(err) {
       }
     }
     if (hasField && !serverError.value) serverError.value = 'Periksa kembali isian form.'
-    // Switch ke tab info kalau ada field error di sana
     if (hasField) activeTab.value = 'info'
   } else {
     serverError.value = String(data)
@@ -579,14 +567,11 @@ defineExpose({ setErrors, setLoading })
 function handleSubmit() {
   if (!validate()) return
 
-  // Build payload — pakai FormData kalau ada file, JSON kalau tidak
   let payload
   if (selectedFile.value) {
     payload = new FormData()
     for (const [key, val] of Object.entries(form)) {
-      if (val !== null && val !== undefined) {
-        payload.append(key, val)
-      }
+      if (val !== null && val !== undefined) payload.append(key, val)
     }
     payload.append('image', selectedFile.value)
   } else {
