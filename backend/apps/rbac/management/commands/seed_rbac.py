@@ -857,10 +857,15 @@ GROUPS = [
 
 URL_MAP = {
     'SETTINGS-COMPANY-INFORMATION':       '/settings/company-information',
-    'SETTINGS-ORGANIZATIONAL-STRUCTURE':  '/settings/organizational-structure',
+    'SETTINGS-ORGANIZATIONAL-STRUCTURE':  '/settings/organizational-level',
     'SETTINGS-USER-AUTHORIZATION-GROUP':  '/settings/user-authorization-group',
     'SETTINGS-EMPLOYEE-DATA':             '/settings/employee-data',
     'GL-CHART-OF-ACCOUNTS':               '/gl/chart-of-accounts',
+    'INV-UNIT-MEASUREMENT':               '/inventory/unit-measurement',
+    'INV-ITEM-CATEGORY':                  '/inventory/item-category',
+    'INV-ITEM':                           '/inventory/items',
+    'COMMERCIAL-CUSTOMERS':               '/commercial/customers',
+    'SALES-CUSTOMERS':                    '/sales/customers',
 }
 
 class Command(BaseCommand):

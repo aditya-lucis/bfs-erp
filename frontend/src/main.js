@@ -19,7 +19,25 @@ import ChartOfAccountView from './views/gl/ChartOfAccountView.vue'
 import UnitMeasurementView from './views/inventory/UnitMeasurementView.vue'
 import ItemCategoryView    from './views/inventory/ItemCategoryView.vue'
 import ItemView            from './views/inventory/ItemView.vue'
+import CustomerView            from './views/sales/CustomerView.vue'
 import { menuData } from './menuData.js'
+
+// Route yang sudah punya halaman nyata — jangan generate UnderConstruction
+const implementedRoutes = [
+  { path: '/settings/company-information',      component: CompanyInformationView, meta: { title: 'Company Information', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/organizational-level',   component: DepartmentView,         meta: { title: 'Organizational Level', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/user-authorization-group', component: AuthGroupListView,      meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/employee-data',         component: EmployeeView,           meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/gl/chart-of-accounts',            component: ChartOfAccountView,     meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/inventory/unit-measurement',     component: UnitMeasurementView,    meta: { title: 'Unit Measurement', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/inventory/item-category',        component: ItemCategoryView,       meta: { title: 'Item Category', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/inventory/items',                component: ItemView,               meta: { title: 'List of Items', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/sales/customers',                component: CustomerView,           meta: { title: 'Customers', moduleId: 'sales', moduleName: 'Sales', layout: 'default' } },
+  { path: '/commercial/customers',           component: CustomerView,           meta: { title: 'Customers', moduleId: 'commercial', moduleName: 'Commercial', layout: 'default' } },
+  { path: '/finance/penyerapan-rap',         component: FinanceView,            meta: { title: 'Penyerapan RAP', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+]
+
+const implementedPaths = new Set(implementedRoutes.map(r => r.path))
 
 function generateRoutesFromMenu() {
   const routes = []
@@ -30,19 +48,23 @@ function generateRoutesFromMenu() {
         if (item.children && item.children.length > 0) {
           flatten(item.children, parentPath)
         } else {
+          const explicitUrl = item.url?.trim()
           const slug = slugify(item.name)
-          const path = parentPath 
+          const path = explicitUrl || (parentPath
             ? `${parentPath}/${slug}`
-            : `/${moduleId}/${slug}`
+            : `/${moduleId}/${slug}`)
+
+          if (implementedPaths.has(path)) return
 
           routes.push({
-            path: path,
+            path,
             component: UnderConstruction,
             meta: {
               title: item.name,
               moduleId: moduleId,
-              moduleName: getModuleName(moduleId)
-            }
+              moduleName: getModuleName(moduleId),
+              layout: 'default',
+            },
           })
         }
       })
@@ -83,84 +105,29 @@ function getModuleName(moduleId) {
 const dynamicRoutes = generateRoutesFromMenu()
 
 const routes = [
-  { 
-    path: '/login', 
+  {
+    path: '/login',
     component: LoginView,
-     meta: { layout: 'auth', public: true }
+    meta: { layout: 'auth', public: true },
   },
-  { 
-    path: '/', 
+  {
+    path: '/',
     component: HomeView,
-    meta: { layout: 'default' }
+    meta: { layout: 'default' },
   },
-  { 
-    path: '/dashboard', 
+  {
+    path: '/dashboard',
     component: DashboardView,
-    meta: { layout: 'default' }
+    meta: { layout: 'default' },
   },
-  { 
-    path: '/finance/penyerapan-rap', 
-    component: FinanceView,
-    meta: { title: 'Penyerapan RAP', moduleId: 'finance', moduleName: 'Finance', layout: 'default' }
-  },
-  {
-    path: '/settings/company-information',
-    component: CompanyInformationView,
-    meta: { 
-      title: 'Company Information', 
-      moduleId: 'settings', 
-      moduleName: 'Settings',
-      layout: 'default' 
-    }
-  },
-  {
-    path: '/settings/organizational-level',
-    component: DepartmentView,
-    meta: {
-      title: 'Organizational Level',
-      moduleId: 'settings',
-      moduleName: 'Settings',
-      layout: 'default'
-    }
-  },
-  {
-    path: '/settings/user-authorization-group',
-    component: AuthGroupListView,
-    meta: {
-      title: 'User Authorization Group',
-      moduleId: 'settings',
-      moduleName: 'Settings',
-      layout: 'default'
-    }
-  },
-  {
-    path: '/settings/employee-data',
-    component: EmployeeView,
-    meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' }
-  },
-  {
-    path: '/gl/chart-of-accounts',
-    component: ChartOfAccountView,
-    meta: {
-      title: 'Chart of Accounts',
-      moduleId: 'gl',
-      moduleName: 'General Ledger',
-      layout: 'default'
-    }
-  },
-  { path: '/inventory/unit-measurement', component: UnitMeasurementView,
-    meta: { title: 'Unit Measurement', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  { path: '/inventory/item-category',    component: ItemCategoryView,
-    meta: { title: 'Item Category',    moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  { path: '/inventory/items',            component: ItemView,
-    meta: { title: 'List of Items',    moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  ...dynamicRoutes.map(r => ({ ...r, meta: { ...r.meta, layout: 'default' } })),
+  // Halaman yang sudah diimplementasi — HARUS sebelum dynamicRoutes
+  ...implementedRoutes,
+  ...dynamicRoutes,
   {
     path: '/:pathMatch(.*)*',
     component: UnderConstruction,
-    meta: { layout: 'default' }
-    // ← HAPUS redirect: '/login'
-  }
+    meta: { layout: 'default' },
+  },
 ]
 
 // Buat pinia dan router

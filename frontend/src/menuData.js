@@ -1,6 +1,6 @@
 export const menuData = {
   commercial: [
-    { name: 'Customers', url: '' },
+    { name: 'Customers', url: '/commercial/customers' },
     { name: 'Work Order', url: '', children: [
       { name: 'Work Order', url: '' },
       { name: 'Work Order Inbox', url: '' },
@@ -141,7 +141,7 @@ export const menuData = {
   sales: [
     { name: 'Customer Category', url: '' },
     { name: 'Customers Group', url: '' },
-    { name: 'Customers', url: '' },
+    { name: 'Customers', url: '/sales/customers' },
     { name: 'Introduction Letter', url: '', children: [
       { name: 'Introduction Letter', url: '' },
       { name: 'Introduction Letter Inbox', url: '' },
