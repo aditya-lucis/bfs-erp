@@ -203,7 +203,7 @@ const hasGroups = computed(() => props.groups.length > 0)
 
 // Semua options dalam satu flat array (untuk keyboard nav)
 const allOptions = computed(() => {
-  if (hasGroups.value) return props.groups.flatMap(g => g.options)
+  if (hasGroups.value) return props.groups.flatMap(g => g.options ?? [])
   return props.options
 })
 
@@ -214,11 +214,11 @@ const filteredOptions = computed(() => {
 })
 
 const filteredGroups = computed(() => {
-  if (!searchQuery.value.trim()) return props.groups
+  if (!searchQuery.value.trim()) return props.groups.map(g => ({ ...g, options: g.options ?? [] }))
   const q = searchQuery.value.toLowerCase()
   return props.groups.map(group => ({
     ...group,
-    options: group.options.filter(opt => matchesSearch(opt, q)),
+    options: (group.options ?? []).filter(opt => matchesSearch(opt, q)),
   })).filter(g => g.options.length > 0)
 })
 

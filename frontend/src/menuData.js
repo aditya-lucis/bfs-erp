@@ -257,9 +257,9 @@ export const menuData = {
   ],
 
   purchases: [
-    { name: 'Vendor Category', url: '' },
-    { name: 'Vendor Group', url: '' },
-    { name: 'Vendor', url: '' },
+    { name: 'Vendor Category', url: '/purchases/vendor-category' },
+    { name: 'Vendor Group', url: '/purchases/vendor-group' },
+    { name: 'Vendor', url: '/purchases/vendor' },
     { name: 'Term And Condition', url: '' },
     { name: 'Price List', url: '' },
     { name: 'Purchase Requisition', url: '', children: [

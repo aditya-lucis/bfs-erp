@@ -866,6 +866,9 @@ URL_MAP = {
     'INV-ITEM':                           '/inventory/items',
     'COMMERCIAL-CUSTOMERS':               '/commercial/customers',
     'SALES-CUSTOMERS':                    '/sales/customers',
+    'PURCHASES-VENDOR-CATEGORY':          '/purchases/vendor-category',
+    'PURCHASES-VENDOR-GROUP':             '/purchases/vendor-group',
+    'PURCHASES-VENDOR':                   '/purchases/vendor',
 }
 
 class Command(BaseCommand):

@@ -17,24 +17,30 @@ import AuthGroupListView from './views/settings/AuthGroupListView.vue'
 import EmployeeView from './views/settings/EmployeeView.vue'
 import ChartOfAccountView from './views/gl/ChartOfAccountView.vue'
 import UnitMeasurementView from './views/inventory/UnitMeasurementView.vue'
-import ItemCategoryView    from './views/inventory/ItemCategoryView.vue'
-import ItemView            from './views/inventory/ItemView.vue'
-import CustomerView            from './views/sales/CustomerView.vue'
+import ItemCategoryView from './views/inventory/ItemCategoryView.vue'
+import ItemView from './views/inventory/ItemView.vue'
+import CustomerView from './views/sales/CustomerView.vue'
+import VendorCategoryView from './views/purchase/VendorCategoryView.vue'
+import VendorGroupView from './views/purchase/VendorGroupView.vue'
+import VendorView from './views/purchase/VendorView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
 const implementedRoutes = [
-  { path: '/settings/company-information',      component: CompanyInformationView, meta: { title: 'Company Information', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
-  { path: '/settings/organizational-level',   component: DepartmentView,         meta: { title: 'Organizational Level', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
-  { path: '/settings/user-authorization-group', component: AuthGroupListView,      meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
-  { path: '/settings/employee-data',         component: EmployeeView,           meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
-  { path: '/gl/chart-of-accounts',            component: ChartOfAccountView,     meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
-  { path: '/inventory/unit-measurement',     component: UnitMeasurementView,    meta: { title: 'Unit Measurement', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  { path: '/inventory/item-category',        component: ItemCategoryView,       meta: { title: 'Item Category', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  { path: '/inventory/items',                component: ItemView,               meta: { title: 'List of Items', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
-  { path: '/sales/customers',                component: CustomerView,           meta: { title: 'Customers', moduleId: 'sales', moduleName: 'Sales', layout: 'default' } },
-  { path: '/commercial/customers',           component: CustomerView,           meta: { title: 'Customers', moduleId: 'commercial', moduleName: 'Commercial', layout: 'default' } },
-  { path: '/finance/penyerapan-rap',         component: FinanceView,            meta: { title: 'Penyerapan RAP', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/settings/company-information', component: CompanyInformationView, meta: { title: 'Company Information', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/organizational-level', component: DepartmentView, meta: { title: 'Organizational Level', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/user-authorization-group', component: AuthGroupListView, meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/employee-data', component: EmployeeView, meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/gl/chart-of-accounts', component: ChartOfAccountView, meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/inventory/unit-measurement', component: UnitMeasurementView, meta: { title: 'Unit Measurement', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/inventory/item-category', component: ItemCategoryView, meta: { title: 'Item Category', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/inventory/items', component: ItemView, meta: { title: 'List of Items', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
+  { path: '/sales/customers', component: CustomerView, meta: { title: 'Customers', moduleId: 'sales', moduleName: 'Sales', layout: 'default' } },
+  { path: '/commercial/customers', component: CustomerView, meta: { title: 'Customers', moduleId: 'commercial', moduleName: 'Commercial', layout: 'default' } },
+  { path: '/finance/penyerapan-rap', component: FinanceView, meta: { title: 'Penyerapan RAP', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/purchases/vendor-category', component: VendorCategoryView, meta: { title: 'Vendor Category', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/vendor-group', component: VendorGroupView, meta: { title: 'Vendor Group', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/vendor', component: VendorView, meta: { title: 'List Of Vendors', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))
@@ -131,7 +137,7 @@ const routes = [
 ]
 
 // Buat pinia dan router
-const pinia  = createPinia()
+const pinia = createPinia()
 const router = createRouter({
   history: createWebHistory(),
   routes,
