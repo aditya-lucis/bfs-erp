@@ -31,9 +31,25 @@
             </div>
 
             <div class="panel-header-right">
+              <!-- Lock / Unlock Button -->
+              <button
+                v-if="canApprove"
+                class="btn-outline flex items-center gap-1.5"
+                @click="handleLockToggle"
+                :disabled="isTogglingLock"
+                title="Kunci / Buka Kunci Budget"
+              >
+                <Loader2 v-if="isTogglingLock" class="w-4 h-4 animate-spin" />
+                <template v-else>
+                  <Lock v-if="!header.is_locked" class="w-4 h-4 text-amber-400" />
+                  <Unlock v-else class="w-4 h-4 text-emerald-400" />
+                </template>
+                {{ header.is_locked ? 'Unlock' : 'Lock' }}
+              </button>
+
               <!-- Init Lines Button -->
               <button
-                v-if="!header.is_locked"
+                v-if="!header.is_locked && canCreate"
                 class="btn-outline"
                 @click="handleInitLines"
                 :disabled="initLoading"
@@ -46,7 +62,7 @@
 
               <!-- Add Component Button -->
               <button
-                v-if="!header.is_locked"
+                v-if="!header.is_locked && canCreate"
                 class="btn-secondary"
                 @click="openAddComponentModal"
               >
@@ -56,7 +72,7 @@
 
               <!-- Save All Button -->
               <button
-                v-if="!header.is_locked && hasChanges"
+                v-if="!header.is_locked && canUpdate && hasChanges"
                 class="btn-primary"
                 @click="handleSaveAll"
                 :disabled="store.saving"
@@ -149,7 +165,7 @@
                           :value="getLineMonth(line, m.num)"
                           @change="onMonthInput(line, m.num, $event.target.value)"
                           @focus="$event.target.select()"
-                          :disabled="header.is_locked"
+                          :disabled="header.is_locked || !canUpdate"
                           type="number"
                           min="0"
                           step="1000"
@@ -178,7 +194,7 @@
                           <History class="w-3.5 h-3.5" />
                         </button>
                         <button
-                          v-if="!header.is_locked"
+                          v-if="!header.is_locked && canDelete"
                           class="action-btn delete-btn"
                           @click="confirmDeleteLine(line)"
                           title="Hapus Component"
@@ -393,6 +409,7 @@ import {
 } from 'lucide-vue-next'
 import { useAnnualBudgetStore } from '../../stores/annualBudget.js'
 import { useToast } from '../../composables/useToast.js'
+import { usePermission } from '../../composables/usePermission.js'
 
 const props  = defineProps({ header: { type: Object, required: true } })
 const emit   = defineEmits(['close', 'saved'])
@@ -400,8 +417,27 @@ const emit   = defineEmits(['close', 'saved'])
 const budgetStore = useAnnualBudgetStore()
 const store       = budgetStore   // alias used in template :disabled="store.saving"
 const toast  = useToast()
+const { canCreate, canUpdate, canDelete, canApprove } = usePermission('FINANCE-ANNUAL-BUDGET')
 
 const visible = ref(true)
+const isTogglingLock = ref(false)
+
+async function handleLockToggle() {
+  isTogglingLock.value = true
+  const newLockState = !props.header.is_locked
+  try {
+    const updated = await budgetStore.updateHeader(props.header.id, {
+      is_locked: newLockState
+    })
+    props.header.is_locked = updated.is_locked
+    toast.success(newLockState ? 'Budget berhasil dikunci.' : 'Budget berhasil dibuka kunci.')
+    emit('saved')
+  } catch (err) {
+    toast.error(err?.response?.data?.is_locked?.[0] || err?.response?.data?.detail || 'Gagal mengubah status kunci.')
+  } finally {
+    isTogglingLock.value = false
+  }
+}
 
 // ── Month config ─────────────────────────────────────────────────────────────
 const MONTHS = [

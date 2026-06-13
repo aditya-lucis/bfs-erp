@@ -182,6 +182,16 @@ class AnnualBudgetHeaderWriteSerializer(serializers.ModelSerializer):
         fields = ['id', 'company', 'department', 'year', 'notes', 'is_locked']
 
     def validate(self, data):
+        # Check if is_locked is being changed
+        if 'is_locked' in data:
+            request = self.context.get('request')
+            if request and request.user:
+                from apps.rbac.permissions import user_has_permission
+                if not user_has_permission(request.user, 'FINANCE-ANNUAL-BUDGET', 'can_approve'):
+                    raise serializers.ValidationError({
+                        'is_locked': 'Anda tidak memiliki izin (Approve) untuk mengunci/membuka budget.'
+                    })
+
         department = data.get('department')
         company    = data.get('company')
 
@@ -198,4 +208,26 @@ class AnnualBudgetHeaderWriteSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'department': 'Department tidak berasal dari company yang dipilih.'
                 })
+
+        # Check unique constraint manually to return a clean 400 Bad Request
+        year = data.get('year')
+        if year is None and self.instance:
+            year = self.instance.year
+        if department is None and self.instance:
+            department = self.instance.department
+
+        if department and company and year:
+            instance_id = self.instance.id if self.instance else None
+            qs = AnnualBudgetHeader.objects.filter(
+                company=company,
+                department=department,
+                year=year
+            )
+            if instance_id:
+                qs = qs.exclude(id=instance_id)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    'non_field_errors': f'Annual budget untuk department {department.name} di tahun {year} sudah ada.'
+                })
+
         return data

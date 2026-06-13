@@ -32,7 +32,7 @@
           <BarChart3 class="w-4 h-4" />
           Summary
         </button>
-        <button class="btn-primary" @click="openCreateModal">
+        <button v-if="canCreate" class="btn-primary" @click="openCreateModal">
           <Plus class="w-4 h-4" />
           New Budget
         </button>
@@ -70,7 +70,7 @@
       </div>
       <p class="text-gray-500 font-medium">Belum ada Annual Budget untuk {{ selectedYear }}</p>
       <p class="text-gray-400 text-sm mt-1">Klik "New Budget" untuk membuat budget baru per departemen.</p>
-      <button class="btn-primary mt-4" @click="openCreateModal">
+      <button v-if="canCreate" class="btn-primary mt-4" @click="openCreateModal">
         <Plus class="w-4 h-4" /> Buat Budget Pertama
       </button>
     </div>
@@ -130,7 +130,7 @@
             class="card-action-btn"
             @click.stop="openProcessView(header)"
           >
-            Edit <ArrowRight class="w-3 h-3" />
+            {{ canUpdate && !header.is_locked ? 'Edit' : 'View' }} <ArrowRight class="w-3 h-3" />
           </button>
         </div>
       </div>
@@ -181,9 +181,11 @@
                 <FormField label="Department" required>
                   <div class="select-wrap">
                     <Building2 class="select-icon" />
-                    <select v-model="createForm.department" class="form-input pl-8">
-                      <option :value="null">— Pilih Department —</option>
-                      <option v-for="d in orgStore.departmentList" :key="d.id" :value="d.id">
+                    <select v-model="createForm.department" class="form-input pl-8" :disabled="isFetchingExistingHeaders">
+                      <option :value="null">
+                        {{ isFetchingExistingHeaders ? 'Loading departments...' : '— Pilih Department —' }}
+                      </option>
+                      <option v-for="d in availableDepartments" :key="d.id" :value="d.id">
                         {{ d.name }}
                       </option>
                     </select>
@@ -228,7 +230,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   Plus, X, Save, Loader2, Building2, Wallet, Lock, Unlock,
   FileText, ArrowRight, BarChart3, ChevronLeft, ChevronRight, AlertCircle
@@ -236,6 +238,8 @@ import {
 import { useAnnualBudgetStore } from '../../stores/annualBudget.js'
 import { useOrganizationStore } from '../../stores/organization.js'
 import { useToast } from '../../composables/useToast.js'
+import { usePermission } from '../../composables/usePermission.js'
+import api from '../../services/api.js'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import AnnualBudgetProcess from './AnnualBudgetProcess.vue'
@@ -243,6 +247,7 @@ import AnnualBudgetProcess from './AnnualBudgetProcess.vue'
 const store    = useAnnualBudgetStore()
 const orgStore = useOrganizationStore()
 const toast    = useToast()
+const { canCreate, canUpdate } = usePermission('FINANCE-ANNUAL-BUDGET')
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 const selectedYear = ref(new Date().getFullYear())
@@ -289,13 +294,49 @@ function progressWidth(total) {
 // ── Create Modal ─────────────────────────────────────────────────────────────
 const createModal = reactive({ show: false, error: '' })
 const createForm  = reactive({ year: new Date().getFullYear(), department: null, notes: '' })
+const existingHeadersForYear = ref([])
+const isFetchingExistingHeaders = ref(false)
 
-function openCreateModal() {
+async function fetchExistingHeadersForYear(year) {
+  if (!year || year < 2020 || year > 2099) {
+    existingHeadersForYear.value = []
+    return
+  }
+  isFetchingExistingHeaders.value = true
+  try {
+    const res = await api.get('/annual-budget/headers/', { params: { year } })
+    existingHeadersForYear.value = res.data.results ?? res.data
+    // Reset selected department if it is no longer available in the new list
+    const existingDeptIds = existingHeadersForYear.value.map(h => h.department)
+    if (createForm.department && existingDeptIds.includes(createForm.department)) {
+      createForm.department = null
+    }
+  } catch (err) {
+    console.error(err)
+  } finally {
+    isFetchingExistingHeaders.value = false
+  }
+}
+
+// Watch createForm.year to fetch list of existing budgets for that year
+watch(() => createForm.year, (newYear) => {
+  fetchExistingHeadersForYear(newYear)
+})
+
+// Filter department list to exclude departments that already have a budget for this year
+const availableDepartments = computed(() => {
+  if (!orgStore.departmentList) return []
+  const existingDeptIds = existingHeadersForYear.value.map(h => h.department)
+  return orgStore.departmentList.filter(d => !existingDeptIds.includes(d.id))
+})
+
+async function openCreateModal() {
   createModal.show  = true
   createModal.error = ''
   createForm.year   = selectedYear.value
   createForm.department = null
   createForm.notes  = ''
+  await fetchExistingHeadersForYear(createForm.year)
 }
 
 async function handleCreate() {

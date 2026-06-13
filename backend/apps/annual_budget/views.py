@@ -21,6 +21,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from apps.rbac.permissions import HasFunctionPermission
 
 from apps.organization.models import Company
 from apps.budget_component.models import BudgetComponent
@@ -49,7 +50,8 @@ class AnnualBudgetHeaderListView(generics.ListCreateAPIView):
     GET  /annual-budget/headers/?year=2026&department=5
     POST /annual-budget/headers/
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -83,7 +85,8 @@ class AnnualBudgetHeaderDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PUT/PATCH/DELETE /annual-budget/headers/<pk>/
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
     queryset           = AnnualBudgetHeader.objects.select_related(
                              'company', 'department', 'created_by'
                          ).prefetch_related('lines')
@@ -112,7 +115,8 @@ class InitBudgetLinesView(APIView):
     Auto-create AnnualBudgetLine untuk setiap active CostCategory.
     Idempotent (skip jika sudah ada).
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def post(self, request, pk):
         try:
@@ -154,7 +158,8 @@ class BudgetComponentPickerView(APIView):
     """
     GET /annual-budget/budget-components/?department=<id>&header=<header_id>
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def get(self, request):
         header_id = request.query_params.get('header')
@@ -195,7 +200,8 @@ class AnnualBudgetLineListView(generics.ListCreateAPIView):
     GET  /annual-budget/lines/?header=<id>
     POST /annual-budget/lines/
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -225,7 +231,8 @@ class AnnualBudgetLineDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET/PUT/PATCH/DELETE /annual-budget/lines/<pk>/
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
     queryset           = AnnualBudgetLine.objects.select_related(
                              'header__department'
                          )
@@ -254,7 +261,8 @@ class UpdateMonthBudgetView(APIView):
     Body: { "month": 6, "budget": 20000000.00, "note": "Revisi" }
     Updates one month's budget and creates an audit log entry.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def patch(self, request, pk):
         try:
@@ -315,7 +323,8 @@ class BulkUpdateMonthsView(APIView):
         "note": "Input awal"
     }
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def patch(self, request, pk):
         try:
@@ -380,7 +389,8 @@ class AnnualBudgetLineLogsView(generics.ListAPIView):
     """
     GET /annual-budget/lines/<pk>/logs/
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
     serializer_class   = AnnualBudgetLogSerializer
 
     def get_queryset(self):
@@ -397,7 +407,8 @@ class AnnualBudgetSummaryView(APIView):
 
     Returns per-department budget totals for a given year.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-ANNUAL-BUDGET'
 
     def get(self, request):
         year = request.query_params.get('year')

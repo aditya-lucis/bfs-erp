@@ -304,6 +304,7 @@ async function savePassword() {
     await api.post('/auth/change-password/', {
       old_password: pwd.old_password,
       new_password: pwd.new_password,
+      new_password2: pwd.new_password2,
     })
     pwdSuccess.value   = 'Password berhasil diubah!'
     pwd.old_password   = ''
