@@ -23,6 +23,7 @@ import CustomerView from './views/sales/CustomerView.vue'
 import VendorCategoryView from './views/purchase/VendorCategoryView.vue'
 import VendorGroupView from './views/purchase/VendorGroupView.vue'
 import VendorView from './views/purchase/VendorView.vue'
+import BudgetComponentView from './views/budgetcomponent/BudgetComponentView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
@@ -41,6 +42,7 @@ const implementedRoutes = [
   { path: '/purchases/vendor-category', component: VendorCategoryView, meta: { title: 'Vendor Category', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/vendor-group', component: VendorGroupView, meta: { title: 'Vendor Group', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/vendor', component: VendorView, meta: { title: 'List Of Vendors', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/finance/budget-component', component: BudgetComponentView, meta: { title: 'Budget Component', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))
