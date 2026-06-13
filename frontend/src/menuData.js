@@ -785,9 +785,15 @@ export const menuData = {
             { name: 'Closing Adjustment Period', url: '' },
           ]
         },
-        { name: 'Annual Accounting Period', url: '' },
-        { name: 'Quarter Accounting Period', url: '' },
-        { name: 'Accounting Period', url: '' },
+        {
+          name: 'Financial Period Open Close', url: '', children: [
+            { name: 'Accounting Period', url: '/settings/accounting-period' },
+            { name: 'Annual Accounting Period', url: '/settings/annual-period' },
+            { name: 'Quarter Accounting Period', url: '/settings/quarter-period' },
+            { name: 'Monthly Accounting Period', url: '/settings/monthly-period' },
+            { name: 'Period Activity Log', url: '/settings/period-activity-log' },
+          ]
+        },
         { name: 'Consolidation Worksheet', url: '' },
         {
           name: 'Account Match', url: '', children: [

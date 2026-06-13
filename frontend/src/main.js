@@ -24,6 +24,11 @@ import VendorCategoryView from './views/purchase/VendorCategoryView.vue'
 import VendorGroupView from './views/purchase/VendorGroupView.vue'
 import VendorView from './views/purchase/VendorView.vue'
 import BudgetComponentView from './views/budgetcomponent/BudgetComponentView.vue'
+import AnnualPeriodView from './views/gl/AnnualPeriodView.vue'
+import QuarterPeriodView from './views/gl/QuarterPeriodView.vue'
+import MonthlyPeriodView from './views/gl/MonthlyPeriodView.vue'
+import AccountingPeriodView from './views/gl/AccountingPeriodView.vue'
+import PeriodActivityLogView from './views/gl/PeriodActivityLogView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
@@ -43,6 +48,11 @@ const implementedRoutes = [
   { path: '/purchases/vendor-group', component: VendorGroupView, meta: { title: 'Vendor Group', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/vendor', component: VendorView, meta: { title: 'List Of Vendors', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/finance/budget-component', component: BudgetComponentView, meta: { title: 'Budget Component', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/settings/annual-period', component: AnnualPeriodView, meta: { title: 'Annual Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/quarter-period', component: QuarterPeriodView, meta: { title: 'Quarter Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/monthly-period', component: MonthlyPeriodView, meta: { title: 'Monthly Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/accounting-period', component: AccountingPeriodView, meta: { title: 'Accounting Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/period-activity-log', component: PeriodActivityLogView, meta: { title: 'Period Activity Log', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))

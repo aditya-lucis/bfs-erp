@@ -681,9 +681,13 @@ MENU_DATA = {
                     {'name': 'Start New Financial Year Balance'},
                     {'name': 'Closing Adjustment Period'},
                 ]},
-                {'name': 'Annual Accounting Period'},
-                {'name': 'Quarter Accounting Period'},
-                {'name': 'Accounting Period'},
+                {'name': 'Financial Period Open Close', 'children': [
+                    {'name': 'Annual Accounting Period'},
+                    {'name': 'Quarter Accounting Period'},
+                    {'name': 'Monthly Accounting Period'},
+                    {'name': 'Accounting Period'},
+                    {'name': 'Period Activity Log'},
+                ]},
                 {'name': 'Consolidation Worksheet'},
                 {'name': 'Account Match', 'children': [
                     {'name': 'Match Template'},

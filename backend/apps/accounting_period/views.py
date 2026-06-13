@@ -43,7 +43,7 @@ from .models import (
     AccountingPeriod, PeriodActivityLog, PeriodStatus,
     MONTH_CHOICES,
 )
-from .serializers import (
+from .serielizers import (
     AnnualPeriodSerializer,
     AnnualPeriodWithQuartersSerializer,
     AnnualPeriodWithMonthsSerializer,
@@ -132,6 +132,40 @@ def _generate_periods_for_year(company, annual, user):
             status=PeriodStatus.OPEN,
             created_by=user,
         )
+def _heal_periods(company):
+    """
+    Heal dirty database state: if an AnnualPeriod is closed, 
+    all its sub-periods (quarters, months, accounting periods) must be CLOSE.
+    If an AnnualPeriod is open, and is NOT the only open year (e.g. dirty data from before),
+    we should keep only the latest year open and close the rest.
+    """
+    # 1. Enforce only one open annual period at a time
+    open_years = AnnualPeriod.objects.filter(company=company, status=PeriodStatus.OPEN).order_by('-year')
+    if open_years.count() > 1:
+        active_year = open_years.first()
+        other_years = open_years[1:]
+        for yr in other_years:
+            yr.status = PeriodStatus.CLOSE
+            yr.save()
+            
+            # Cascade close
+            yr.quarters.all().update(status=PeriodStatus.CLOSE)
+            yr.months.all().update(status=PeriodStatus.CLOSE)
+            AccountingPeriod.objects.filter(monthly_period__annual_period=yr).update(status=PeriodStatus.CLOSE)
+            
+            _log(company, 'ANNUAL', yr, PeriodStatus.CLOSE,
+                 '[AUTO-HEAL] Closed to enforce single active year rule.',
+                 None, str(yr.year))
+
+    # 2. Cascade close to all sub-periods of CLOSED years
+    closed_years = AnnualPeriod.objects.filter(company=company, status=PeriodStatus.CLOSE)
+    for yr in closed_years:
+        # Close any open quarters
+        yr.quarters.filter(status=PeriodStatus.OPEN).update(status=PeriodStatus.CLOSE)
+        # Close any open months
+        yr.months.filter(status=PeriodStatus.OPEN).update(status=PeriodStatus.CLOSE)
+        # Close any open accounting periods
+        AccountingPeriod.objects.filter(monthly_period__annual_period=yr).exclude(status=PeriodStatus.CLOSE).update(status=PeriodStatus.CLOSE)
 
 
 # ─── Annual Period Views ───────────────────────────────────────────────────────
@@ -146,6 +180,7 @@ class AnnualPeriodListCreateView(APIView):
 
     def get(self, request):
         company = get_company(request)
+        _heal_periods(company)
         qs = AnnualPeriod.objects.filter(company=company).prefetch_related(
             'quarters', 'months'
         ).order_by('-year')
@@ -195,6 +230,7 @@ class AnnualPeriodToggleView(APIView):
     rbac_function_code = 'GL-PERIOD-ANNUAL'
 
     def patch(self, request, pk):
+        from django.db import transaction
         company = get_company(request)
         annual  = get_object_or_404(AnnualPeriod, pk=pk, company=company)
 
@@ -205,10 +241,43 @@ class AnnualPeriodToggleView(APIView):
         new_status = (
             PeriodStatus.CLOSE if annual.status == PeriodStatus.OPEN else PeriodStatus.OPEN
         )
-        annual.status = new_status
-        annual.save()
 
-        _log(company, 'ANNUAL', annual, new_status, reason, request.user, str(annual.year))
+        with transaction.atomic():
+            if new_status == PeriodStatus.OPEN:
+                # Close all other annual periods and their sub-periods
+                other_open_years = AnnualPeriod.objects.filter(company=company, status=PeriodStatus.OPEN).exclude(pk=annual.pk)
+                for other_yr in other_open_years:
+                    other_yr.status = PeriodStatus.CLOSE
+                    other_yr.save()
+                    
+                    # Cascade close to sub-periods
+                    other_yr.quarters.all().update(status=PeriodStatus.CLOSE)
+                    other_yr.months.all().update(status=PeriodStatus.CLOSE)
+                    AccountingPeriod.objects.filter(monthly_period__annual_period=other_yr).update(status=PeriodStatus.CLOSE)
+                    
+                    _log(company, 'ANNUAL', other_yr, PeriodStatus.CLOSE, 
+                         f'[AUTO-CLOSE] Closed because year {annual.year} was activated.', 
+                         request.user, str(other_yr.year))
+                
+                # Open this annual period and all of its sub-periods
+                annual.status = PeriodStatus.OPEN
+                annual.save()
+                
+                annual.quarters.all().update(status=PeriodStatus.OPEN)
+                annual.months.all().update(status=PeriodStatus.OPEN)
+                AccountingPeriod.objects.filter(monthly_period__annual_period=annual).update(status=PeriodStatus.OPEN)
+                
+                _log(company, 'ANNUAL', annual, PeriodStatus.OPEN, reason, request.user, str(annual.year))
+            else:
+                # Close this annual period and all of its sub-periods
+                annual.status = PeriodStatus.CLOSE
+                annual.save()
+                
+                annual.quarters.all().update(status=PeriodStatus.CLOSE)
+                annual.months.all().update(status=PeriodStatus.CLOSE)
+                AccountingPeriod.objects.filter(monthly_period__annual_period=annual).update(status=PeriodStatus.CLOSE)
+                
+                _log(company, 'ANNUAL', annual, PeriodStatus.CLOSE, reason, request.user, str(annual.year))
 
         return Response(
             AnnualPeriodSerializer(annual, context={'request': request}).data
@@ -243,6 +312,7 @@ class QuarterPeriodListView(APIView):
 
     def get(self, request):
         company = get_company(request)
+        _heal_periods(company)
         annuals = AnnualPeriod.objects.filter(company=company).prefetch_related(
             'quarters'
         ).order_by('-year')
@@ -268,6 +338,13 @@ class QuarterPeriodToggleView(APIView):
         new_status = (
             PeriodStatus.CLOSE if quarter.status == PeriodStatus.OPEN else PeriodStatus.OPEN
         )
+
+        if new_status == PeriodStatus.OPEN and quarter.annual_period.status == PeriodStatus.CLOSE:
+            return Response(
+                {'detail': f'Cannot open quarter period because the fiscal year {quarter.year} is closed. Please open the annual period first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         quarter.status = new_status
         quarter.save()
 
@@ -304,6 +381,7 @@ class MonthlyPeriodListView(APIView):
 
     def get(self, request):
         company = get_company(request)
+        _heal_periods(company)
         annuals = AnnualPeriod.objects.filter(company=company).prefetch_related(
             'months'
         ).order_by('-year')
@@ -329,6 +407,13 @@ class MonthlyPeriodToggleView(APIView):
         new_status = (
             PeriodStatus.CLOSE if monthly.status == PeriodStatus.OPEN else PeriodStatus.OPEN
         )
+
+        if new_status == PeriodStatus.OPEN and monthly.annual_period.status == PeriodStatus.CLOSE:
+            return Response(
+                {'detail': f'Cannot open monthly period because the fiscal year {monthly.year} is closed. Please open the annual period first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         monthly.status = new_status
         monthly.save()
 
@@ -376,6 +461,7 @@ class AccountingPeriodListView(generics.ListAPIView):
 
     def get_queryset(self):
         company = get_company(self.request)
+        _heal_periods(company)
         qs = AccountingPeriod.objects.filter(company=company).select_related(
             'monthly_period'
         ).order_by('-year', '-month')
@@ -407,6 +493,13 @@ class AccountingPeriodToggleView(APIView):
         new_status = (
             PeriodStatus.CLOSE if ap.status == PeriodStatus.OPEN else PeriodStatus.OPEN
         )
+
+        if new_status == PeriodStatus.OPEN and ap.monthly_period.annual_period.status == PeriodStatus.CLOSE:
+            return Response(
+                {'detail': f'Cannot open accounting period because the fiscal year {ap.year} is closed. Please open the annual period first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         ap.status = new_status
         ap.save()
 
