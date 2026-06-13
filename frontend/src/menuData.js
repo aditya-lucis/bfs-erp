@@ -431,7 +431,7 @@ export const menuData = {
     },
     { name: 'Cash Flow Projection', url: '' },
     { name: 'Budget Component', url: '/finance/budget-component' },
-    { name: 'Annual Budget', url: '' },
+    { name: 'Annual Budget', url: '/finance/annual-budget' },
     { name: 'Company Loan Board', url: '' },
     { name: 'Banks', url: '' },
     { name: 'Bank Product', url: '' },
