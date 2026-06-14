@@ -56,6 +56,11 @@ export const usePurchaseStore = defineStore('purchase', {
       return res.data
     },
 
+    async activateVendor(id) {
+      const res = await api.post(`/purchase/vendors/${id}/activate/`)
+      return res.data
+    },
+
     // ── Linked Accounts ────────────────────────────────────────
     async saveLinkedAccounts(vendorId, payload) {
       const res = await api.post(

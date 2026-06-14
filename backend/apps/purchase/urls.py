@@ -34,6 +34,9 @@ urlpatterns = [
     path('vendors/<int:pk>/delete/',
          views.VendorDeleteView.as_view(),
          name='vendor-delete'),
+    path('vendors/<int:pk>/activate/',
+         views.VendorActivateView.as_view(),
+         name='vendor-activate'),
 
     # ── Linked Accounts ───────────────────────────────────────────
     path('vendors/<int:pk>/linked-accounts/',

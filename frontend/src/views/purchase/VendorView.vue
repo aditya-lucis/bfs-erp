@@ -72,7 +72,20 @@
                   <button v-if="canUpdate" @click="openEdit(row)" class="p-1.5 text-gray-400 hover:text-bfs-gold rounded" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
-                  <button v-if="canDelete" @click="confirmDelete(row)" class="p-1.5 text-gray-400 hover:text-red-500 rounded" title="Nonaktifkan">
+                  <button
+                    v-if="canUpdate && row.status === 'closed'"
+                    @click="confirmActivate(row)"
+                    class="p-1.5 text-gray-400 hover:text-green-600 rounded"
+                    title="Aktifkan kembali"
+                  >
+                    <RotateCcw class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    v-if="canDelete && row.status !== 'closed'"
+                    @click="confirmDelete(row)"
+                    class="p-1.5 text-gray-400 hover:text-red-500 rounded"
+                    title="Nonaktifkan"
+                  >
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -95,7 +108,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Swal from 'sweetalert2'
-import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Search, Loader2, RotateCcw } from 'lucide-vue-next'
 import { usePurchaseStore } from '../../stores/purchase.js'
 import { usePermission } from '../../composables/usePermission.js'
 import { useToast } from '../../composables/useToast.js'
@@ -141,6 +154,26 @@ async function confirmDelete(row) {
     load()
   } catch {
     toast.error('Gagal menonaktifkan vendor.')
+  }
+}
+
+async function confirmActivate(row) {
+  const result = await Swal.fire({
+    title: `Aktifkan ${row.code}?`,
+    text: 'Status vendor akan di-set Open.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, aktifkan',
+    cancelButtonText: 'Batal',
+  })
+  if (!result.isConfirmed) return
+  try {
+    await store.activateVendor(row.id)
+    toast.success('Vendor berhasil diaktifkan kembali.')
+    load()
+  } catch (e) {
+    const msg = e.response?.data?.detail || 'Gagal mengaktifkan vendor.'
+    toast.error(msg)
   }
 }
 

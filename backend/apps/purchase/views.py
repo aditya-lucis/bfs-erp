@@ -128,6 +128,24 @@ class VendorDeleteView(generics.DestroyAPIView):
         return Response({'detail': 'Vendor berhasil dinonaktifkan.'}, status=status.HTTP_200_OK)
 
 
+class VendorActivateView(APIView):
+    """POST /api/v1/purchase/vendors/<pk>/activate/ — set status kembali ke Open."""
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-VENDOR'
+    rbac_action_map = {'POST': 'can_update'}
+
+    def post(self, request, pk):
+        vendor = get_object_or_404(Vendor, pk=pk)
+        if vendor.status == Vendor.Status.OPEN:
+            return Response(
+                {'detail': 'Vendor sudah aktif.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        vendor.status = Vendor.Status.OPEN
+        vendor.save(update_fields=['status', 'updated_at'])
+        return Response({'detail': 'Vendor berhasil diaktifkan kembali.'})
+
+
 # ── Linked Accounts ──────────────────────────────────────────────
 
 class VendorLinkedAccountListView(generics.ListAPIView):
