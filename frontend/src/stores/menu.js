@@ -135,6 +135,9 @@ export const useMenuStore = defineStore('menu', () => {
       if (['INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'].includes(functionCode)) {
         normalizedCodes.push('INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT')
       }
+      if (['GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2'].includes(functionCode)) {
+        normalizedCodes.push('GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2')
+      }
     }
     
     let result = false

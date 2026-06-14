@@ -124,6 +124,8 @@ def user_has_permission(user, function_code: str, action: str) -> bool:
             
         if function_code in ('INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'):
             normalized_codes.extend(['INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'])
+        if function_code in ('GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2'):
+            normalized_codes.extend(['GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2'])
             
     has_perm = False
     for code in normalized_codes:
