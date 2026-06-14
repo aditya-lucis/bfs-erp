@@ -127,6 +127,11 @@ def user_has_permission(user, function_code: str, action: str) -> bool:
         if function_code in ('GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2'):
             normalized_codes.extend(['GL-CHART-OF-ACCOUNT', 'GL-CHART-OF-ACCOUNTS', 'GL-CHART-OF-ACCOUNTS-2'])
             
+        if function_code.endswith('-2'):
+            normalized_codes.append(function_code[:-2])
+        else:
+            normalized_codes.append(f"{function_code}-2")
+            
     has_perm = False
     for code in normalized_codes:
         if perms.get(code, {}).get(action, False):

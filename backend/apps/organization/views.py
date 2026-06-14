@@ -77,9 +77,13 @@ class EmployeeListCreateView(APIView):
     GET  /api/v1/org/employees/  → list
     POST /api/v1/org/employees/  → create employee + user sekaligus
     """
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'SETTINGS-EMPLOYEE-DATA'
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
 
     def get(self, request):
         qs = Employee.objects.select_related(
@@ -172,9 +176,13 @@ class EmployeeDetailView(APIView):
     PATCH  /api/v1/org/employees/<id>/
     DELETE /api/v1/org/employees/<id>/
     """
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'SETTINGS-EMPLOYEE-DATA'
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
 
     def get_object(self, pk):
         return get_object_or_404(
