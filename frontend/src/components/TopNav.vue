@@ -66,6 +66,24 @@
           </div>
         </div>
 
+        <!-- Notification Bell -->
+        <div class="relative">
+          <button 
+            @click="isNotificationModalOpen = !isNotificationModalOpen"
+            class="p-2 rounded-lg transition-colors flex items-center gap-1.5 relative"
+            :class="isNotificationModalOpen ? 'bg-white/20' : 'hover:bg-white/10'"
+            title="Notification Inbox"
+          >
+            <Bell class="w-5 h-5 text-white" />
+            <span 
+              v-if="pendingCount > 0" 
+              class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4 h-4 flex items-center justify-center animate-bounce"
+            >
+              {{ pendingCount }}
+            </span>
+          </button>
+        </div>
+
         <!-- User Dropdown -->
         <div class="relative">
           <button 
@@ -95,20 +113,117 @@
       v-if="showProfileModal"
       @close="showProfileModal = false"
     />
-    
+
+    <!-- Active Request Available Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="isNotificationModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/55 backdrop-blur-sm" @click="isNotificationModalOpen = false" />
+          <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 border border-gray-100 flex flex-col max-h-[85vh]">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-bfs-navy text-white rounded-t-2xl">
+              <h3 class="text-base font-bold flex items-center gap-2 uppercase tracking-wide">
+                <Bell class="w-5 h-5 text-bfs-gold" />
+                Active Request Available
+              </h3>
+              <button @click="isNotificationModalOpen = false" class="text-white/80 hover:text-white transition-colors">
+                <X class="w-5 h-5" />
+              </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto flex-1 space-y-4">
+              <div v-if="pendingCount === 0" class="text-center py-10 text-gray-400 text-sm">
+                <CheckCircle class="w-12 h-12 text-green-400 mx-auto mb-3" />
+                <span>Tidak ada request pending di inbox Anda.</span>
+              </div>
+              <div v-else class="space-y-4">
+                <div 
+                  v-for="group in groupedRequests" 
+                  :key="group.name" 
+                  class="border border-gray-100 rounded-xl p-3 bg-gray-50/50"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-bold text-gray-700">
+                      {{ group.items.length }} {{ group.name }}
+                    </span>
+                    <button 
+                      @click="toggleGroupDetails(group.name)"
+                      class="text-xs text-bfs-gold-dark hover:text-bfs-gold font-semibold transition-colors cursor-pointer"
+                    >
+                      {{ expandedGroups[group.name] ? '-- hide details --' : '-- show details --' }}
+                    </button>
+                  </div>
+
+                  <!-- Details Table (expanded) -->
+                  <div v-if="expandedGroups[group.name]" class="mt-3 overflow-x-auto border-t border-gray-100 pt-3">
+                    <table class="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr class="bg-gray-100/80 text-gray-600 font-semibold uppercase tracking-wider">
+                          <th class="py-1.5 px-3 border border-gray-200 w-16 text-center">No</th>
+                          <th class="py-1.5 px-3 border border-gray-200">Document No</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr 
+                          v-for="(item, idx) in group.items" 
+                          :key="item.id"
+                          class="hover:bg-bfs-gold/5 transition-colors"
+                        >
+                          <td class="py-1.5 px-3 border border-gray-200 text-center font-mono text-gray-500">
+                            {{ idx + 1 }}
+                          </td>
+                          <td class="py-1.5 px-3 border border-gray-200">
+                            <a 
+                              href="#"
+                              @click.prevent="handleNotificationClick(item)"
+                              class="text-bfs-gold-dark hover:text-bfs-gold hover:underline font-semibold font-mono"
+                            >
+                              {{ item.document_number }}
+                            </a>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end">
+              <button 
+                @click="isNotificationModalOpen = false" 
+                class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl text-sm transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </header>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { Home, User, LogOut, Settings, ChevronDown, LayoutDashboard } from 'lucide-vue-next'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { Home, User, LogOut, Settings, ChevronDown, LayoutDashboard, Bell, X, CheckCircle } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth.js'
+import { useApprovalRequestStore } from '../stores/approvalRequest.js'
 import UserProfileModal from './UserProfileModal.vue'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const approvalStore = useApprovalRequestStore()
 const router    = useRouter()
 const showProfileModal = ref(false)
+const isNotificationModalOpen = ref(false)
+const expandedGroups = ref({})
+
 const props = defineProps({
   activeModule: {
     type: String,
@@ -141,4 +256,47 @@ const handleLogout = async () => {
   await authStore.logout()
   router.push('/login')
 }
+
+// Notifications logic
+const pendingCount = computed(() => {
+  return approvalStore.requests.length
+})
+
+const groupedRequests = computed(() => {
+  const groups = {}
+  approvalStore.requests.forEach(req => {
+    const docName = req.document_name || req.document_code
+    if (!groups[docName]) {
+      groups[docName] = {
+        name: docName,
+        code: req.document_code,
+        items: []
+      }
+    }
+    groups[docName].items.push(req)
+  })
+  return Object.values(groups)
+})
+
+const toggleGroupDetails = (groupName) => {
+  expandedGroups.value[groupName] = !expandedGroups.value[groupName]
+}
+
+const handleNotificationClick = (item) => {
+  isNotificationModalOpen.value = false
+  approvalStore.currentRequest = item
+  router.push('/projects/rap-inbox')
+}
+
+let fetchInterval = null
+onMounted(() => {
+  approvalStore.fetchRequests({ inbox: 'true' }).catch(() => {})
+  fetchInterval = setInterval(() => {
+    approvalStore.fetchRequests({ inbox: 'true' }).catch(() => {})
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (fetchInterval) clearInterval(fetchInterval)
+})
 </script>

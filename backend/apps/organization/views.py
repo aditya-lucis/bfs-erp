@@ -20,33 +20,53 @@ from .serializers import (
 
 class CompanyDetailView(generics.RetrieveUpdateAPIView):
     """GET/PATCH /api/v1/org/company/ — single-tenant, selalu 1 record."""
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'SETTINGS-COMPANY-INFORMATION'
     serializer_class   = CompanySerializer
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'SETTINGS-COMPANY-INFORMATION'
 
     def get_object(self):
         from .models import Company
         return Company.get_default()
 
 
-class DepartmentTreeView(generics.ListAPIView):
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
+class DepartmentTreeView(generics.ListCreateAPIView):
     serializer_class   = DepartmentSerializer
     pagination_class   = None
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
 
     def get_queryset(self):
         return Department.objects.filter(
             parent=None, is_active=True
         ).order_by('order')
 
+    def perform_create(self, serializer):
+        company = Company.get_default()
+        if not company:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': 'Company belum dikonfigurasi.'})
+        serializer.save(company=company)
+
 
 class PositionListView(generics.ListCreateAPIView):
     """GET /api/v1/org/positions/"""
     queryset           = Position.objects.filter(is_active=True).select_related('department')
     serializer_class   = PositionSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
     filterset_fields   = ['department']
     search_fields      = ['code', 'name']
     pagination_class   = None
@@ -209,7 +229,8 @@ class DepartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PATCH/DELETE /api/v1/org/departments/<id>/"""
     queryset           = Department.objects.all()
     serializer_class   = DepartmentSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -282,7 +303,8 @@ class DepartmentPositionListView(generics.ListCreateAPIView):
     POST /api/v1/org/departments/<dept_id>/positions/
     """
     serializer_class   = PositionSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
 
     def get_queryset(self):
         dept_id = self.kwargs['dept_id']
@@ -304,7 +326,8 @@ class DepartmentPositionDetailView(generics.RetrieveUpdateDestroyAPIView):
     GET/PATCH/DELETE /api/v1/org/departments/<dept_id>/positions/<pk>/
     """
     serializer_class   = PositionSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'SETTINGS-ORGANIZATIONAL-STRUCTURE'
 
     def get_queryset(self):
         return Position.objects.filter(

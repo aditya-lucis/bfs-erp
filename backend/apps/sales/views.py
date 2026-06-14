@@ -31,9 +31,15 @@ from .serializers import (
 class CustomerCategoryListView(generics.ListCreateAPIView):
     queryset           = CustomerCategory.objects.all().order_by('code')
     serializer_class   = CustomerCategorySerializer
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'SALES-CUSTOMER'
     pagination_class   = None
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'SALES-CUSTOMER'
 
 
 class CustomerCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -46,9 +52,15 @@ class CustomerCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
 class CustomerGroupListView(generics.ListCreateAPIView):
     queryset           = CustomerGroup.objects.all().order_by('name')
     serializer_class   = CustomerGroupSerializer
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'SALES-CUSTOMER'
     pagination_class   = None
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'SALES-CUSTOMER'
 
 
 class CustomerGroupDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -62,9 +74,15 @@ class CustomerGroupDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class CustomerListView(generics.ListAPIView):
     serializer_class   = CustomerListSerializer
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'SALES-CUSTOMER'
     pagination_class   = None
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'SALES-CUSTOMER'
 
     def get_queryset(self):
         qs = Customer.objects.select_related('category', 'group').order_by('code')

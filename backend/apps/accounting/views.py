@@ -118,13 +118,18 @@ class AccountListCreateView(generics.ListCreateAPIView):
 
     POST /api/v1/accounting/coa/    create new account
     """
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'GL-CHART-OF-ACCOUNT'
-
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return AccountCreateSerializer
         return AccountListSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'GL-CHART-OF-ACCOUNT'
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()

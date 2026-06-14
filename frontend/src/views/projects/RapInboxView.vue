@@ -293,6 +293,18 @@
               </div>
 
               <div class="flex items-center gap-3 justify-end">
+                <!-- Revise Button -->
+                <button
+                  type="button"
+                  class="px-5 py-2 border border-amber-200 text-amber-600 rounded-lg text-sm font-medium hover:bg-amber-50/50 disabled:opacity-50 transition-colors"
+                  :disabled="isLoadingAction"
+                  @click="handleRevise"
+                >
+                  <FileText v-if="!isLoadingAction" class="w-4 h-4 inline-block mr-1" />
+                  <Loader2 v-else class="w-4 h-4 animate-spin inline-block mr-1" />
+                  Revisi (Revise)
+                </button>
+
                 <!-- Reject Button -->
                 <button
                   type="button"
@@ -381,11 +393,12 @@ async function loadInbox() {
     
     // Auto-select first request if available and none selected
     if (filteredRequests.value.length > 0) {
-      // If we already have a selected request, try to keep it selected
-      const currentId = selectedRequest.value?.id
-      const found = filteredRequests.value.find(r => r.id === currentId)
+      // If we came from notification/external routing, check currentRequest in store
+      const targetId = requestStore.currentRequest?.id || selectedRequest.value?.id
+      const found = filteredRequests.value.find(r => r.id === targetId)
       if (found) {
         selectRequest(found)
+        requestStore.currentRequest = null
       } else {
         selectRequest(filteredRequests.value[0])
       }
@@ -459,6 +472,25 @@ async function handleReject() {
     await loadInbox()
   } catch (err) {
     showToast(err.response?.data?.detail || 'Gagal menolak dokumen.', 'error')
+  } finally {
+    isLoadingAction.value = false
+  }
+}
+
+async function handleRevise() {
+  if (!selectedRequest.value) return
+  if (!actionRemarks.value.trim()) {
+    showToast('Catatan alasan revisi wajib diisi.', 'error')
+    return
+  }
+  isLoadingAction.value = true
+  try {
+    await requestStore.reviseRequest(selectedRequest.value.id, actionRemarks.value)
+    showToast('Dokumen berhasil dikembalikan untuk revisi.', 'success')
+    actionRemarks.value = ''
+    await loadInbox()
+  } catch (err) {
+    showToast(err.response?.data?.detail || 'Gagal meminta revisi dokumen.', 'error')
   } finally {
     isLoadingAction.value = false
   }

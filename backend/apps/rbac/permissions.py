@@ -99,7 +99,39 @@ def user_has_permission(user, function_code: str, action: str) -> bool:
     if user.is_superuser:
         return True
     perms = get_user_permissions(user)
-    return perms.get(function_code, {}).get(action, False)
+    
+    normalized_codes = [function_code]
+    if isinstance(function_code, str):
+        if function_code.startswith('INV-'):
+            normalized_codes.append(function_code.replace('INV-', 'INVENTORY-', 1))
+        if function_code in ('SALES-CUSTOMER', 'SALES-CUSTOMERS', 'COMMERCIAL-CUSTOMERS'):
+            normalized_codes.extend(['SALES-CUSTOMER', 'SALES-CUSTOMERS', 'COMMERCIAL-CUSTOMERS'])
+        if function_code == 'BUDGET-COMPONENT':
+            normalized_codes.append('FINANCE-BUDGET-COMPONENT')
+            
+        period_map = {
+            'GL-PERIOD-ANNUAL': 'SETTINGS-ANNUAL-ACCOUNTING-PERIOD',
+            'GL-PERIOD-QUARTER': 'SETTINGS-QUARTER-ACCOUNTING-PERIOD',
+            'GL-PERIOD-MONTHLY': 'SETTINGS-MONTHLY-ACCOUNTING-PERIOD',
+            'GL-PERIOD-ACCOUNTING': 'SETTINGS-ACCOUNTING-PERIOD',
+            'GL-PERIOD-LOG': 'SETTINGS-PERIOD-ACTIVITY-LOG',
+        }
+        if function_code in period_map:
+            normalized_codes.append(period_map[function_code])
+        reverse_period_map = {v: k for k, v in period_map.items()}
+        if function_code in reverse_period_map:
+            normalized_codes.append(reverse_period_map[function_code])
+            
+        if function_code in ('INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'):
+            normalized_codes.extend(['INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'])
+            
+    has_perm = False
+    for code in normalized_codes:
+        if perms.get(code, {}).get(action, False):
+            has_perm = True
+            break
+            
+    return has_perm
 
 
 class HasFunctionPermission(BasePermission):
@@ -119,7 +151,12 @@ class HasFunctionPermission(BasePermission):
         if request.user.is_superuser:
             return True
 
-        function_code = getattr(view, 'rbac_function_code', None)
+        function_code = None
+        if hasattr(view, 'get_rbac_function_code'):
+            function_code = view.get_rbac_function_code()
+        else:
+            function_code = getattr(view, 'rbac_function_code', None)
+            
         if not function_code:
             # No code declared → deny by default (fail-safe)
             return False

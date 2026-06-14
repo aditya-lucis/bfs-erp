@@ -104,7 +104,47 @@ export const useMenuStore = defineStore('menu', () => {
   }
 
   function can(functionCode, action = 'can_read') {
-    return myPerms.value?.[functionCode]?.[action] ?? false
+    if (!functionCode) return false
+    
+    const normalizedCodes = [functionCode]
+    if (typeof functionCode === 'string') {
+      if (functionCode.startsWith('INV-')) {
+        normalizedCodes.push(functionCode.replace('INV-', 'INVENTORY-'))
+      }
+      if (['SALES-CUSTOMER', 'SALES-CUSTOMERS', 'COMMERCIAL-CUSTOMERS'].includes(functionCode)) {
+        normalizedCodes.push('SALES-CUSTOMER', 'SALES-CUSTOMERS', 'COMMERCIAL-CUSTOMERS')
+      }
+      if (functionCode === 'BUDGET-COMPONENT') {
+        normalizedCodes.push('FINANCE-BUDGET-COMPONENT')
+      }
+      
+      const periodMap = {
+        'GL-PERIOD-ANNUAL': 'SETTINGS-ANNUAL-ACCOUNTING-PERIOD',
+        'GL-PERIOD-QUARTER': 'SETTINGS-QUARTER-ACCOUNTING-PERIOD',
+        'GL-PERIOD-MONTHLY': 'SETTINGS-MONTHLY-ACCOUNTING-PERIOD',
+        'GL-PERIOD-ACCOUNTING': 'SETTINGS-ACCOUNTING-PERIOD',
+        'GL-PERIOD-LOG': 'SETTINGS-PERIOD-ACTIVITY-LOG',
+      }
+      if (periodMap[functionCode]) {
+        normalizedCodes.push(periodMap[functionCode])
+      }
+      const reversePeriodMap = Object.fromEntries(Object.entries(periodMap).map(([k, v]) => [v, k]))
+      if (reversePeriodMap[functionCode]) {
+        normalizedCodes.push(reversePeriodMap[functionCode])
+      }
+      if (['INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT'].includes(functionCode)) {
+        normalizedCodes.push('INV-UNIT-MEASUREMENT', 'INVENTORY-UNIT-MEASUREMENT', 'SETTINGS-UNIT-MEASUREMENT')
+      }
+    }
+    
+    let result = false
+    for (const code of normalizedCodes) {
+      if (myPerms.value?.[code]?.[action]) {
+        result = true
+        break
+      }
+    }
+    return result
   }
 
   function reset() {

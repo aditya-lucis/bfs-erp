@@ -251,6 +251,12 @@ def create_approval_request(
         document_id=document_id
     ).delete()
     
+    DocumentSignature.objects.filter(
+        company=company,
+        document_code=document_code,
+        document_id=document_id
+    ).delete()
+    
     # Create request header
     request = ApprovalRequest.objects.create(
         company=company,
@@ -429,4 +435,57 @@ def get_document_signatures(document_code: str, document_id: str):
         document_code=document_code,
         document_id=document_id
     ).select_related('position', 'user__employee_profile').order_by('step_number')
+
+
+@transaction.atomic
+def revise_request(
+    approval_request_id: int,
+    user,
+    remarks: str,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> ApprovalRequest:
+    """
+    Request a revision at the current step. Skips remaining steps and sets request status to CANCELLED.
+    """
+    if not remarks:
+        raise ApprovalMatrixError("Alasan revisi (remarks) wajib diisi.")
+        
+    request = ApprovalRequest.objects.select_for_update().get(id=approval_request_id)
+    if request.status != ApprovalStatus.PENDING:
+        raise ApprovalMatrixError("Request approval tidak dalam status PENDING.")
+        
+    current_step = request.steps.filter(
+        step_number=request.current_step_number,
+        status=StepStatus.PENDING
+    ).first()
+    
+    if not current_step:
+        raise ApprovalMatrixError("Step pending saat ini tidak ditemukan.")
+        
+    # Check authorization
+    employee = getattr(user, 'employee_profile', None)
+    if not employee and not user.is_superuser:
+        raise ApprovalMatrixError("User tidak memiliki profile Employee.")
+        
+    if not user.is_superuser and employee.position_id != current_step.position_id:
+        raise ApprovalMatrixError("Posisi Anda tidak berwenang meminta revisi step ini.")
+        
+    # Mark step as rejected with revision comment
+    current_step.status = StepStatus.REJECTED
+    current_step.approved_by = user
+    current_step.approved_at = timezone.now()
+    current_step.remarks = f"[REVISI] {remarks}"
+    current_step.save()
+    
+    # Skip remaining steps
+    request.steps.filter(step_number__gt=request.current_step_number).update(
+        status=StepStatus.SKIPPED
+    )
+    
+    # Cancel request (representing Revised)
+    request.status = ApprovalStatus.CANCELLED
+    request.save()
+    
+    return request
 

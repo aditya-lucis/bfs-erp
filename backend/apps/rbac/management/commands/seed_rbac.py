@@ -875,6 +875,7 @@ URL_MAP = {
     'PURCHASES-VENDOR':                   '/purchases/vendor',
     'SETTINGS-REQUEST-APPROVAL-SETTING':  '/settings/request-approval-setting',
     'PROJECTS-RAP-INBOX':                 '/projects/rap-inbox',
+    'PROJECTS-RAP':                       '/projects/rap',
 }
 
 class Command(BaseCommand):

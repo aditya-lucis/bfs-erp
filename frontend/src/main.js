@@ -34,6 +34,7 @@ import RequestApprovalSettingView from './views/settings/RequestApprovalSettingV
 import RapInboxView from './views/projects/RapInboxView.vue'
 import RapTypeView from './views/projects/RapTypeView.vue'
 import ProjectListView from './views/projects/ProjectListView.vue'
+import RapView from './views/projects/RapView.vue'
 import ProjectCategoryView from './views/settings/ProjectCategoryView.vue'
 import { menuData } from './menuData.js'
 
@@ -63,6 +64,7 @@ const implementedRoutes = [
   { path: '/settings/request-approval-setting', component: RequestApprovalSettingView, meta: { title: 'Request Approval Setting', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/projects/rap-inbox', component: RapInboxView, meta: { title: 'RAP Inbox', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
   { path: '/projects/rap-type', component: RapTypeView, meta: { title: 'RAP Type', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
+  { path: '/projects/rap', component: RapView, meta: { title: 'RAP', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
   { path: '/projects/list-of-projects', component: ProjectListView, meta: { title: 'List of Projects', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
   { path: '/commercial/list-of-projects', component: ProjectListView, meta: { title: 'List of Projects', moduleId: 'commercial', moduleName: 'Commercial', layout: 'default' } },
   { path: '/settings/project-category', component: ProjectCategoryView, meta: { title: 'Project Category', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },

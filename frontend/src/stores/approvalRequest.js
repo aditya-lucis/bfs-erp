@@ -76,6 +76,24 @@ export const useApprovalRequestStore = defineStore('approvalRequest', () => {
     }
   }
 
+  async function reviseRequest(id, remarks) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const res = await api.post(`/approval/requests/${id}/revise/`, { remarks })
+      if (currentRequest.value?.id === id) {
+        currentRequest.value = res.data
+      }
+      requests.value = requests.value.map(r => r.id === id ? res.data : r)
+      return res.data
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Gagal meminta revisi request approval.'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function fetchSignatures(documentCode, documentId) {
     isLoading.value = true
     error.value = null
@@ -120,6 +138,7 @@ export const useApprovalRequestStore = defineStore('approvalRequest', () => {
     fetchRequestDetail,
     approveRequest,
     rejectRequest,
+    reviseRequest,
     fetchSignatures,
     submitApprovalRequest,
   }

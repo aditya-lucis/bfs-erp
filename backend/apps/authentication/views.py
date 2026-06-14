@@ -158,11 +158,13 @@ class WhoAmIView(APIView):
         if hasattr(user, 'employee_profile'):
             emp = user.employee_profile
             employee_data = {
-                'id':          emp.id,
-                'employee_id': emp.employee_id,
-                'position':    emp.position.name,
-                'department':  emp.position.department.name,
-                'status':      emp.status,
+                'id':            emp.id,
+                'employee_id':   emp.employee_id,
+                'position':      emp.position.name,
+                'position_id':   emp.position_id,
+                'department':    emp.position.department.name,
+                'department_id': emp.position.department_id,
+                'status':        emp.status,
             }
 
         return Response({

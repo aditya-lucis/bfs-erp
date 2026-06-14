@@ -305,7 +305,7 @@ class PeriodChecker:
 
     @classmethod
     def _check_annual(cls, txn_date: date, company) -> dict:
-        from .models_period import AnnualPeriod
+        from .models import AnnualPeriod
         try:
             annual = AnnualPeriod.objects.get(company=company, year=txn_date.year)
             return {
@@ -319,7 +319,7 @@ class PeriodChecker:
 
     @classmethod
     def _check_quarter(cls, txn_date: date, company) -> dict:
-        from .models_period import QuarterPeriod
+        from .models import QuarterPeriod
         quarter_num = QUARTER_MAP[txn_date.month]
         label       = f'{txn_date.year} Q{quarter_num}'
         try:
@@ -337,7 +337,7 @@ class PeriodChecker:
 
     @classmethod
     def _check_monthly(cls, txn_date: date, company) -> dict:
-        from .models_period import MonthlyPeriod
+        from .models import MonthlyPeriod
         label = f'{MONTH_NAMES[txn_date.month]} {txn_date.year}'
         try:
             mp = MonthlyPeriod.objects.get(
@@ -354,7 +354,7 @@ class PeriodChecker:
 
     @classmethod
     def _check_accounting(cls, txn_date: date, company) -> dict:
-        from .models_period import AccountingPeriod
+        from .models import AccountingPeriod
         label = f'{MONTH_NAMES[txn_date.month]} {txn_date.year}'
         try:
             ap = AccountingPeriod.objects.get(

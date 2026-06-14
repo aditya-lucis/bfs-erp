@@ -21,7 +21,7 @@ from .serializers import (
 )
 from .services import (
     get_document_types, get_approval_roles, get_matrix_queryset,
-    create_approval_request, approve_step, reject_request,
+    create_approval_request, approve_step, reject_request, revise_request,
     get_document_signatures, ApprovalMatrixError
 )
 
@@ -299,4 +299,40 @@ class DocumentSignatureListView(APIView):
         sigs = get_document_signatures(doc_code, doc_id)
         serializer = DocumentSignatureSerializer(sigs, many=True)
         return Response(serializer.data)
+
+
+class ApprovalRequestReviseView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        serializer = ApprovalActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        remarks = serializer.validated_data.get('remarks', '').strip()
+        if not remarks:
+            return Response(
+                {'detail': 'Alasan revisi (remarks) wajib diisi.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get client IP & User Agent
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
+        try:
+            req = revise_request(
+                approval_request_id=pk,
+                user=request.user,
+                remarks=remarks,
+                ip_address=ip,
+                user_agent=user_agent,
+            )
+            detail = ApprovalRequestSerializer(req, context={'request': request})
+            return Response(detail.data)
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

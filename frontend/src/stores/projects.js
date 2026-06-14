@@ -7,6 +7,7 @@ export const useProjectsStore = defineStore('projects', {
     projects: [],
     projectTypes: [],
     projectCategories: [],
+    raps: [],
     loading: false,
     error: null,
   }),
@@ -123,6 +124,49 @@ export const useProjectsStore = defineStore('projects', {
 
     async deleteProjectCategory(id) {
       const res = await api.delete(`/projects/project-categories/${id}/`)
+      return res.data
+    },
+
+    // ── RAP (Rencana Anggaran Pelaksana) ──
+    async fetchRaps(params = {}) {
+      this.loading = true
+      this.error = null
+      try {
+        const res = await api.get('/projects/raps/', { params })
+        this.raps = res.data.results ?? res.data
+      } catch (e) {
+        this.error = e
+        this.raps = []
+        throw e
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createRap(payload) {
+      const res = await api.post('/projects/raps/', payload)
+      return res.data
+    },
+
+    async updateRap(id, payload) {
+      const res = await api.put(`/projects/raps/${id}/`, payload)
+      return res.data
+    },
+
+    async deleteRap(id) {
+      const res = await api.delete(`/projects/raps/${id}/`)
+      return res.data
+    },
+
+    async submitRap(id) {
+      const res = await api.post(`/projects/raps/${id}/submit/`)
+      return res.data
+    },
+
+    async fetchTemplateRap(budgetComponentId) {
+      const res = await api.get('/projects/raps/get-template/', {
+        params: { budget_component_id: budgetComponentId }
+      })
       return res.data
     },
   },

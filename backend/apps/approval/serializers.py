@@ -167,7 +167,7 @@ class ApprovalMatrixWriteSerializer(serializers.Serializer):
                     range=range_obj,
                     step_number=step_data['step_number'],
                     role=step_data['role'],
-                    position_id=step_data['position'],
+                    position=step_data['position'],
                 )
 
         return matrix

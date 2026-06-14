@@ -43,10 +43,16 @@ from .serializers import (
 # ─── Unit Measurement ─────────────────────────────────────────────────────────
 
 class UnitListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'INV-UNIT-MEASUREMENT'
     serializer_class   = UnitMeasurementSerializer
     pagination_class   = None
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), HasFunctionPermission()]
+
+    def get_rbac_function_code(self):
+        return 'INV-UNIT-MEASUREMENT'
 
     def get_queryset(self):
         qs     = UnitMeasurement.objects.all()

@@ -75,7 +75,7 @@
               </td>
               <td class="px-4 py-2.5 text-gray-600 text-xs">
                 <button
-                  v-if="canAccessTemplateRAP"
+                  v-if="canManageTemplateRAP(row)"
                   @click="openTemplateRAP(row)"
                   class="inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
                   :class="row.template_rap === 'added' 
@@ -285,10 +285,10 @@ function canManageTemplateRAP(row) {
   if (authStore.user?.is_superuser) return true
   
   // Check if user has employee profile and position matches
-  const userPosition = authStore.user?.employee_profile?.position
-  if (!userPosition) return false
+  const userPositionId = authStore.user?.employee?.position_id
+  if (!userPositionId) return false
   
-  return userPosition === row.position
+  return userPositionId === row.position
 }
 
 function load() {
@@ -483,8 +483,8 @@ const canAccessTemplateRAP = computed(() => {
   // Superuser can access all
   if (authStore.user?.is_superuser) return true
   // Check if user's position matches
-  const userPosition = authStore.user?.employee_profile?.position
-  if (!userPosition) return false
+  const userPositionId = authStore.user?.employee?.position_id
+  if (!userPositionId) return false
   return true // Will be checked per-row in the view
 })
 
