@@ -49,6 +49,7 @@ class PositionListView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminGroupMember]
     filterset_fields   = ['department']
     search_fields      = ['code', 'name']
+    pagination_class   = None
 
 
 class EmployeeListCreateView(APIView):
@@ -289,7 +290,7 @@ class DepartmentPositionListView(generics.ListCreateAPIView):
         return Position.objects.filter(
             department_id=dept_id
         ).annotate(
-            employee_count=Count('employees', filter=Q(employees__status='active'))
+            employee_count=django_models.Count('employees', filter=django_models.Q(employees__status='active'))
         )
 
     def perform_create(self, serializer):

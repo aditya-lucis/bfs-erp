@@ -40,6 +40,8 @@ LOCAL_APPS = [
     'apps.budget_component',
     'apps.accounting_period',
     'apps.annual_budget',
+    'apps.approval',
+    'apps.projects',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

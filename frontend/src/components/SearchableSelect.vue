@@ -172,6 +172,9 @@ const props = defineProps({
   // Field name untuk value dan label dari setiap option
   valueKey:         { type: String, default: 'id' },
   labelKey:         { type: String, default: 'label' },
+  
+  // Custom function to format label display
+  labelFn:          { type: Function, default: null },
 
   // Custom search function — default: search by labelKey
   searchKeys:       { type: Array, default: () => [] }, // field tambahan yang disearch
@@ -239,6 +242,9 @@ function getOptionValue(opt) {
 
 function displayLabel(opt) {
   if (!opt) return ''
+  if (props.labelFn) {
+    return props.labelFn(opt)
+  }
   // Untuk COA: tampilkan account_number + account_name
   if (opt.account_number && opt.account_name) {
     return `${opt.account_number} ${opt.account_name}`

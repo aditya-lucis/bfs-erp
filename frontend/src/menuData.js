@@ -760,7 +760,7 @@ export const menuData = {
     {
       name: 'Document Setting', url: '', children: [
         { name: 'Item Inspection Template', url: '' },
-        { name: 'Request Approval Setting', url: '' },
+        { name: 'Request Approval Setting', url: '/settings/request-approval-setting' },
         { name: 'Document Pattern', url: '' },
         { name: 'Letter Template', url: '' },
         { name: 'Close Open Document', url: '' },
@@ -899,7 +899,7 @@ export const menuData = {
         { name: 'Project Stage', url: '' },
         { name: 'Payment Terms', url: '' },
         { name: 'Project Component', url: '' },
-        { name: 'Project Category', url: '' },
+        { name: 'Project Category', url: '/settings/project-category' },
       ]
     },
     {

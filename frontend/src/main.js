@@ -30,6 +30,11 @@ import QuarterPeriodView from './views/gl/QuarterPeriodView.vue'
 import MonthlyPeriodView from './views/gl/MonthlyPeriodView.vue'
 import AccountingPeriodView from './views/gl/AccountingPeriodView.vue'
 import PeriodActivityLogView from './views/gl/PeriodActivityLogView.vue'
+import RequestApprovalSettingView from './views/settings/RequestApprovalSettingView.vue'
+import RapInboxView from './views/projects/RapInboxView.vue'
+import RapTypeView from './views/projects/RapTypeView.vue'
+import ProjectListView from './views/projects/ProjectListView.vue'
+import ProjectCategoryView from './views/settings/ProjectCategoryView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
@@ -55,6 +60,12 @@ const implementedRoutes = [
   { path: '/settings/monthly-period', component: MonthlyPeriodView, meta: { title: 'Monthly Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/accounting-period', component: AccountingPeriodView, meta: { title: 'Accounting Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/period-activity-log', component: PeriodActivityLogView, meta: { title: 'Period Activity Log', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/request-approval-setting', component: RequestApprovalSettingView, meta: { title: 'Request Approval Setting', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/projects/rap-inbox', component: RapInboxView, meta: { title: 'RAP Inbox', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
+  { path: '/projects/rap-type', component: RapTypeView, meta: { title: 'RAP Type', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
+  { path: '/projects/list-of-projects', component: ProjectListView, meta: { title: 'List of Projects', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
+  { path: '/commercial/list-of-projects', component: ProjectListView, meta: { title: 'List of Projects', moduleId: 'commercial', moduleName: 'Commercial', layout: 'default' } },
+  { path: '/settings/project-category', component: ProjectCategoryView, meta: { title: 'Project Category', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))

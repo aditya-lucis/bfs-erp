@@ -873,6 +873,8 @@ URL_MAP = {
     'PURCHASES-VENDOR-CATEGORY':          '/purchases/vendor-category',
     'PURCHASES-VENDOR-GROUP':             '/purchases/vendor-group',
     'PURCHASES-VENDOR':                   '/purchases/vendor',
+    'SETTINGS-REQUEST-APPROVAL-SETTING':  '/settings/request-approval-setting',
+    'PROJECTS-RAP-INBOX':                 '/projects/rap-inbox',
 }
 
 class Command(BaseCommand):
