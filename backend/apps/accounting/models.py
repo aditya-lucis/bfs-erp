@@ -46,6 +46,14 @@ class AccountGroup(models.Model):
     def __str__(self):
         return f"[{self.code}] {self.name}"
 
+    @property
+    def total_amount(self):
+        import numpy as np
+        amounts = list(self.accounts.filter(is_active=True).exclude(account_type=AccountType.HEADER).values_list('amount', flat=True))
+        if not amounts:
+            return 0.00
+        return float(np.sum([float(x) for x in amounts]))
+
 # ─── Account (COA) ────────────────────────────────────────────────────────────
  
 class AccountType(models.TextChoices):
@@ -114,8 +122,9 @@ class Account(models.Model):
                           max_length=6,
                           choices=DefaultPosition.choices,
                           default=DefaultPosition.DEBET,
-                      )
+                       )
     currency        = models.CharField(max_length=10, default='IDR')
+    amount          = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
  
     # ── Flags — available for DETAIL / DETAIL_BANK / DETAIL_CASH / DETAIL_CHEQUE ─
     is_inter_company  = models.BooleanField(
@@ -168,8 +177,58 @@ class Account(models.Model):
     # ── Helpers ───────────────────────────────────────────────────────────────
  
     @property
+    def computed_amount(self):
+        if self.account_type != AccountType.HEADER:
+            return float(self.amount)
+        
+        # Sum all detail descendant accounts
+        descendants = self.get_descendants()
+        postables = [d for d in descendants if d.account_type != AccountType.HEADER]
+        if not postables:
+            return 0.00
+        
+        import numpy as np
+        amounts = [float(p.amount) for p in postables]
+        return float(np.sum(amounts))
+
+    def get_descendants(self):
+        descendants = []
+        for child in self.children.filter(is_active=True):
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+
+    @property
     def is_postable(self):
         return self.account_type != AccountType.HEADER
+ 
+    @property
+    def is_header(self):
+        return self.account_type == AccountType.HEADER
+ 
+    @property
+    def has_children(self):
+        return self.children.exists()
+ 
+    @property
+    def level(self):
+        """Tree depth (0 = root)."""
+        depth = 0
+        node = self.parent
+        while node:
+            depth += 1
+            node = node.parent
+        return depth
+ 
+    def get_ancestors(self):
+        """Return list of ancestors from root to self (exclusive)."""
+        ancestors = []
+        node = self.parent
+        while node:
+            ancestors.insert(0, node)
+            node = node.parent
+        return ancestors
+
  
     @property
     def is_header(self):

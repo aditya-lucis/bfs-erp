@@ -5,7 +5,7 @@
     :style="{ paddingLeft: `${16 + node.level * 20}px` }"
   >
     <!-- Nama akun + toggle -->
-    <div class="col-span-6 flex items-center gap-2 min-w-0">
+    <div class="col-span-5 flex items-center gap-2 min-w-0">
       <!-- Toggle expand jika punya children -->
       <button
         v-if="node.children?.length"
@@ -47,9 +47,12 @@
       {{ node.default_position }}
     </div>
 
-    <!-- Currency -->
-    <div class="col-span-1 text-xs text-gray-500">
-      {{ node.currency }}
+    <!-- Currency & Amount -->
+    <div class="col-span-2 text-xs text-slate-500 flex items-center gap-1.5 min-w-0">
+      <span class="font-medium shrink-0">{{ node.currency }}</span>
+      <span class="font-bold text-slate-700 truncate" :class="{ 'text-bfs-navy font-semibold': !node.is_postable }">
+        Rp {{ Number(node.amount || 0).toLocaleString('id-ID') }}
+      </span>
     </div>
 
     <!-- Actions -->

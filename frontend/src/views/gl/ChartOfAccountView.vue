@@ -49,18 +49,21 @@
               {{ section.group.name }}
             </span>
             <span class="text-xs text-gray-400 font-mono">[{{ section.group.number_prefix }}]</span>
+            <span class="text-xs font-bold text-bfs-gold bg-black/30 px-2 py-0.5 rounded ml-3">
+              Total: Rp {{ Number(section.group.amount || 0).toLocaleString('id-ID') }}
+            </span>
           </div>
-          <span class="text-xs text-gray-400">
+          <span class="text-xs text-gray-400 font-semibold">
             {{ section.group.default_position }}
           </span>
         </div>
-
+ 
         <!-- Column Headers -->
         <div class="bg-gray-50 border-b border-gray-200 px-4 py-2 grid grid-cols-12 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-          <div class="col-span-6">Account Name</div>
+          <div class="col-span-5">Account Name</div>
           <div class="col-span-2">Type</div>
           <div class="col-span-1">Position</div>
-          <div class="col-span-1">Currency</div>
+          <div class="col-span-2">Currency / Amount</div>
           <div class="col-span-2 text-right">Action</div>
         </div>
 

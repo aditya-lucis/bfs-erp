@@ -9,14 +9,17 @@ from .models import Account, AccountGroup, AccountType, BankType, DefaultPositio
 # ─── Account Group ────────────────────────────────────────────────────────────
 
 class AccountGroupSerializer(serializers.ModelSerializer):
+    amount = serializers.DecimalField(source='total_amount', read_only=True, max_digits=18, decimal_places=2)
+
     class Meta:
         model  = AccountGroup
         fields = [
             'id', 'code', 'name', 'number_prefix',
             'default_position', 'order', 'is_active',
+            'amount',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'amount', 'created_at', 'updated_at']
 
     def validate_code(self, value):
         qs = AccountGroup.objects.filter(
@@ -40,6 +43,7 @@ class AccountListSerializer(serializers.ModelSerializer):
     account_type_label = serializers.CharField(source='get_account_type_display', read_only=True)
     is_postable        = serializers.BooleanField(read_only=True)
     level              = serializers.IntegerField(read_only=True)
+    amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -48,7 +52,7 @@ class AccountListSerializer(serializers.ModelSerializer):
             'account_type', 'account_type_label',
             'account_group', 'account_group_name', 'account_group_code',
             'parent', 'parent_number',
-            'default_position', 'currency',
+            'default_position', 'currency', 'amount',
             'is_postable', 'is_linked', 'is_active',
             'bank_type', 'level',
         ]
@@ -60,6 +64,7 @@ class AccountTreeSerializer(serializers.ModelSerializer):
     account_type_label = serializers.CharField(source='get_account_type_display', read_only=True)
     is_postable        = serializers.BooleanField(read_only=True)
     level              = serializers.IntegerField(read_only=True)
+    amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -68,7 +73,7 @@ class AccountTreeSerializer(serializers.ModelSerializer):
             'account_type', 'account_type_label',
             'account_group', 'parent',
             'is_inter_company', 'is_cost_component', 'is_on_duty',
-            'default_position', 'currency',
+            'default_position', 'currency', 'amount',
             'is_postable', 'is_linked', 'is_active',
             'bank_type', 'level', 'children',
         ]
@@ -88,6 +93,7 @@ class AccountDetailSerializer(serializers.ModelSerializer):
     level              = serializers.IntegerField(read_only=True)
     has_children       = serializers.BooleanField(read_only=True)
     created_by_name    = serializers.CharField(source='created_by.full_name', read_only=True)
+    amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -97,7 +103,7 @@ class AccountDetailSerializer(serializers.ModelSerializer):
             'account_type', 'account_type_label',
             'account_group', 'account_group_name',
             'parent', 'parent_number', 'parent_name',
-            'language', 'default_position', 'currency',
+            'language', 'default_position', 'currency', 'amount',
             'is_inter_company', 'is_cost_component', 'is_on_duty',
             'bank_type',
             'is_linked', 'is_postable', 'has_children',
@@ -115,7 +121,7 @@ class AccountCreateSerializer(serializers.ModelSerializer):
             'account_number', 'account_name',
             'account_type',
             'account_group', 'parent',
-            'language', 'default_position', 'currency',
+            'language', 'default_position', 'currency', 'amount',
             'is_inter_company', 'is_cost_component', 'is_on_duty',
             'bank_type',
             'is_linked', 'is_active',
