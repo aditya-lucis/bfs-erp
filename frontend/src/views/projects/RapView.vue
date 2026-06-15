@@ -1004,7 +1004,7 @@ async function loadTemplateRAP() {
         unit_name: d.unit_name,
         remarks: d.remarks || '',
         volume: 0,
-        unit_price: 0,
+        unit_price: Number(d.unit_price) || 0,
         total_cost: 0,
         order_no: d.order_no,
         display_number: d.display_number

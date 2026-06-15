@@ -56,6 +56,7 @@ class TemplateRAPDetailSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.item_name', read_only=True)
     item_code = serializers.CharField(source='item.item_code', read_only=True)
     unit_name = serializers.CharField(source='item.unit.unit_name', read_only=True)
+    unit_price = serializers.DecimalField(source='item.unit_price', read_only=True, max_digits=18, decimal_places=2, allow_null=True)
     # parent harus return ID (integer) bukan object
     parent = serializers.IntegerField(source='parent_id', read_only=True, allow_null=True)
 
@@ -63,7 +64,7 @@ class TemplateRAPDetailSerializer(serializers.ModelSerializer):
         model = TemplateRAPDetail
         fields = [
             'id', 'template', 'parent', 'item_type',
-            'description', 'item', 'item_name', 'item_code', 'unit_name',
+            'description', 'item', 'item_name', 'item_code', 'unit_name', 'unit_price',
             'remarks', 'order_no', 'display_number',
             'children', 'created_at',
         ]
