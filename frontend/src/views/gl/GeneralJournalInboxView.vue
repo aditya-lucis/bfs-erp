@@ -1,5 +1,5 @@
 <template>
-  <Panel title="Rencana Anggaran Pelaksana (RAP) Inbox" subtitle="Projects | RAP Inbox">
+  <Panel title="General Journal (GEJ) Inbox" subtitle="General Ledger | GEJ Inbox">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       
       <!-- LEFT PANEL: INBOX LIST (col-span-4) -->
@@ -20,7 +20,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Cari nomor RAP..."
+            placeholder="Cari nomor GEJ..."
             class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-bfs-gold focus:border-bfs-gold"
           />
         </div>
@@ -33,7 +33,7 @@
 
         <div v-else-if="filteredRequests.length === 0" class="text-center py-12 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
           <Inbox class="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p class="text-xs text-gray-400">Tidak ada RAP yang membutuhkan persetujuan Anda saat ini.</p>
+          <p class="text-xs text-gray-400">Tidak ada Jurnal Umum yang membutuhkan persetujuan Anda saat ini.</p>
         </div>
 
         <div v-else class="space-y-3 overflow-y-auto max-h-[600px] pr-1">
@@ -93,7 +93,7 @@
               class="text-bfs-gold focus:ring-bfs-gold rounded"
               @change="loadAllRequests"
             />
-            Tampilkan semua riwayat pengajuan RAP
+            Tampilkan semua riwayat pengajuan Jurnal Umum
           </label>
         </div>
       </div>
@@ -103,7 +103,7 @@
         
         <div v-if="!selectedRequest" class="flex-1 flex flex-col items-center justify-center text-gray-400 py-20 bg-gray-50/30 rounded-2xl border border-dashed border-gray-100">
           <FileText class="w-12 h-12 text-gray-200 mb-3" />
-          <p class="text-sm font-medium">Pilih dokumen RAP dari panel kiri untuk memproses persetujuan.</p>
+          <p class="text-sm font-medium">Pilih dokumen Jurnal Umum dari panel kiri untuk memproses persetujuan.</p>
         </div>
 
         <div v-else class="space-y-6">
@@ -117,16 +117,16 @@
                 </span>
               </div>
               <p class="text-xs text-gray-500">
-                Persetujuan untuk dokumen Rencana Anggaran Pelaksana (RAP)
+                Persetujuan untuk dokumen General Journal Transaction (GEJ)
               </p>
             </div>
 
             <div class="text-left md:text-right border-l md:border-l-0 md:border-r border-gray-200 pl-4 md:pl-0 md:pr-4">
-              <span class="text-xs text-gray-400 uppercase tracking-wider block font-medium">Total Anggaran (RAP)</span>
+              <span class="text-xs text-gray-400 uppercase tracking-wider block font-medium">Total Balance</span>
               <button 
                 @click="openDetailModal" 
                 class="text-xl font-extrabold text-bfs-gold hover:text-bfs-gold-dark hover:underline focus:outline-none transition-colors"
-                title="Klik untuk melihat detail RAP"
+                title="Klik untuk melihat detail Jurnal"
               >
                 {{ formatCurrency(selectedRequest.amount) }}
               </button>
@@ -203,7 +203,7 @@
           <div class="border border-gray-100 rounded-2xl p-5 bg-gray-50/30">
             <h5 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <PenTool class="w-4 h-4 text-bfs-gold" />
-              Tanda Tangan Dokumen RAP (Signature Blocks)
+              Tanda Tangan Dokumen Jurnal (Signature Blocks)
             </h5>
 
             <div v-if="isLoadingSignatures" class="flex items-center justify-center py-8">
@@ -349,7 +349,7 @@
           <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl p-6 z-10 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between mb-5">
               <div>
-                <h3 class="text-lg font-semibold text-gray-800">Detail RAP</h3>
+                <h3 class="text-lg font-semibold text-gray-800">Detail General Journal</h3>
                 <p class="text-sm text-gray-500">{{ selectedRequest?.document_number }}</p>
               </div>
               <button @click="closeDetailModal" class="text-gray-400 hover:text-gray-600">
@@ -362,30 +362,33 @@
               </div>
               <div v-else-if="documentDetail">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-white p-4 rounded-xl border border-gray-100">
+                  <div class="col-span-2 md:col-span-4"><span class="text-xs text-gray-500 block">Memo / Description</span><span class="font-medium text-sm">{{ documentDetail.memo || '-' }}</span></div>
+                  <div><span class="text-xs text-gray-500 block">Date</span><span class="font-medium text-sm">{{ documentDetail.date || '-' }}</span></div>
                   <div><span class="text-xs text-gray-500 block">Project</span><span class="font-medium text-sm">{{ documentDetail.project_name || '-' }}</span></div>
-                  <div><span class="text-xs text-gray-500 block">Department</span><span class="font-medium text-sm">{{ documentDetail.department_name || '-' }}</span></div>
-                  <div><span class="text-xs text-gray-500 block">Activity</span><span class="font-medium text-sm">{{ documentDetail.activity || '-' }}</span></div>
-                  <div><span class="text-xs text-gray-500 block">Total Cost</span><span class="font-medium text-bfs-gold">{{ formatCurrency(documentDetail.total_cost) }}</span></div>
+                  <div><span class="text-xs text-gray-500 block">Status</span><span class="font-medium text-sm">{{ documentDetail.status }}</span></div>
+                  <div></div>
+                  <div><span class="text-xs text-gray-500 block">Total Debit</span><span class="font-medium text-bfs-gold">{{ formatCurrency(documentDetail.details?.reduce((acc, curr) => acc + Number(curr.debit || 0), 0)) }}</span></div>
+                  <div><span class="text-xs text-gray-500 block">Total Credit</span><span class="font-medium text-bfs-gold">{{ formatCurrency(documentDetail.details?.reduce((acc, curr) => acc + Number(curr.credit || 0), 0)) }}</span></div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
                   <table class="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr class="bg-gray-50 border-b border-gray-200">
-                        <th class="px-4 py-3 font-semibold text-gray-600">Item Description</th>
-                        <th class="px-4 py-3 font-semibold text-gray-600">Volume</th>
-                        <th class="px-4 py-3 font-semibold text-gray-600 text-right">Price</th>
-                        <th class="px-4 py-3 font-semibold text-gray-600 text-right">Total</th>
+                        <th class="px-4 py-3 font-semibold text-gray-600">Account</th>
+                        <th class="px-4 py-3 font-semibold text-gray-600">Currency</th>
+                        <th class="px-4 py-3 font-semibold text-gray-600 text-right">Debit</th>
+                        <th class="px-4 py-3 font-semibold text-gray-600 text-right">Credit</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="d in documentDetail.details" :key="d.id" class="border-b border-gray-100 last:border-none hover:bg-gray-50/50">
                         <td class="px-4 py-3">
-                          <div class="font-medium text-gray-800">{{ d.item_name || d.description }}</div>
-                          <div v-if="d.remarks" class="text-xs text-gray-400 mt-0.5">{{ d.remarks }}</div>
+                          <div class="font-medium text-gray-800">{{ d.account_name }}</div>
+                          <div class="text-xs text-gray-400 mt-0.5">{{ d.account_number }}</div>
                         </td>
-                        <td class="px-4 py-3 text-gray-600">{{ d.volume }} {{ d.unit_name }}</td>
-                        <td class="px-4 py-3 text-right text-gray-600">{{ formatCurrency(d.unit_price) }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-gray-800">{{ formatCurrency(d.total_cost) }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ d.currency }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600">{{ formatCurrency(d.debit) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-600">{{ formatCurrency(d.credit) }}</td>
                       </tr>
                       <tr v-if="!documentDetail.details?.length">
                         <td colspan="4" class="px-4 py-8 text-center text-gray-400 text-sm">Tidak ada detail item</td>
@@ -454,7 +457,7 @@ const signatureList = computed(() => {
 async function loadInbox() {
   isLoadingRequests.value = true
   try {
-    const filters = { document_code: 'RAP' }
+    const filters = { document_code: 'GEJ' }
     if (!showAllRequests.value) {
       filters.inbox = 'true'
     }
@@ -570,7 +573,7 @@ async function openDetailModal() {
   showDetailModal.value = true
   isLoadingDetail.value = true
   try {
-    const res = await api.get(`/projects/raps/${selectedRequest.value.document_id}/`)
+    const res = await api.get(`/accounting/general-journals/${selectedRequest.value.document_id}/`)
     documentDetail.value = res.data
   } catch (err) {
     console.error('Failed to load detail', err)

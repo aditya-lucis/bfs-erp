@@ -1,11 +1,13 @@
 <template>
   <!-- Baris akun -->
   <div
-    class="grid grid-cols-12 items-center px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-    :style="{ paddingLeft: `${16 + node.level * 20}px` }"
+    class="grid grid-cols-12 gap-x-4 items-center pr-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
   >
     <!-- Nama akun + toggle -->
-    <div class="col-span-5 flex items-center gap-2 min-w-0">
+    <div 
+      class="col-span-4 flex items-center gap-2 min-w-0"
+      :style="{ paddingLeft: `${16 + (node.level || 0) * 20}px` }"
+    >
       <!-- Toggle expand jika punya children -->
       <button
         v-if="node.children?.length"
@@ -33,7 +35,7 @@
     </div>
 
     <!-- Tipe -->
-    <div class="col-span-2">
+    <div class="col-span-1">
       <span
         class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
         :class="typeBadgeClass"
@@ -42,21 +44,30 @@
       </span>
     </div>
 
-    <!-- Default Position -->
-    <div class="col-span-1 text-xs text-gray-500">
-      {{ node.default_position }}
+    <!-- Beginning -->
+    <div class="col-span-2 text-right text-xs font-mono text-gray-500 truncate">
+      {{ Number(node.month_opening_balance || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 }) }}
     </div>
 
-    <!-- Currency & Amount -->
-    <div class="col-span-2 text-xs text-slate-500 flex items-center gap-1.5 min-w-0">
-      <span class="font-medium shrink-0">{{ node.currency }}</span>
-      <span class="font-bold text-slate-700 truncate" :class="{ 'text-bfs-navy font-semibold': !node.is_postable }">
-        Rp {{ Number(node.amount || 0).toLocaleString('id-ID') }}
+    <!-- Debit -->
+    <div class="col-span-1 text-right text-xs font-mono text-gray-500 truncate">
+      {{ Number(node.month_debet || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 }) }}
+    </div>
+
+    <!-- Credit -->
+    <div class="col-span-1 text-right text-xs font-mono text-gray-500 truncate">
+      {{ Number(node.month_kredit || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 }) }}
+    </div>
+
+    <!-- Current Balance -->
+    <div class="col-span-2 justify-end text-xs text-slate-500 flex items-center gap-1.5 min-w-0">
+      <span class="font-bold text-slate-700 truncate font-mono" :class="{ 'text-bfs-navy font-semibold': !node.is_postable }">
+        {{ Number(node.amount || 0).toLocaleString('id-ID', { minimumFractionDigits: 2 }) }}
       </span>
     </div>
 
     <!-- Actions -->
-    <div class="col-span-2 flex items-center justify-end gap-1">
+    <div class="col-span-1 flex items-center justify-end gap-1">
       <button
         v-if="canCreate && node.is_header"
         @click="$emit('add-child', node)"

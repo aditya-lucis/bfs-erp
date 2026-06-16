@@ -59,12 +59,14 @@
         </div>
  
         <!-- Column Headers -->
-        <div class="bg-gray-50 border-b border-gray-200 px-4 py-2 grid grid-cols-12 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-          <div class="col-span-5">Account Name</div>
-          <div class="col-span-2">Type</div>
-          <div class="col-span-1">Position</div>
-          <div class="col-span-2">Currency / Amount</div>
-          <div class="col-span-2 text-right">Action</div>
+        <div class="bg-gray-50 border-b border-gray-200 pr-4 py-2 grid grid-cols-12 gap-x-4 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+          <div class="col-span-4 pl-4">Account Name</div>
+          <div class="col-span-1">Type</div>
+          <div class="col-span-2 text-right">Beginning</div>
+          <div class="col-span-1 text-right">Debit</div>
+          <div class="col-span-1 text-right">Credit</div>
+          <div class="col-span-2 text-right">Current Balance</div>
+          <div class="col-span-1 text-right">Action</div>
         </div>
 
         <!-- Account rows -->

@@ -285,14 +285,22 @@ const toggleGroupDetails = (groupName) => {
 const handleNotificationClick = (item) => {
   isNotificationModalOpen.value = false
   approvalStore.currentRequest = item
-  router.push('/projects/rap-inbox')
+  if (item.document_code === 'GEJ') {
+    router.push('/gl/general-journal-inbox')
+  } else {
+    router.push('/projects/rap-inbox')
+  }
 }
 
 let fetchInterval = null
 onMounted(() => {
-  approvalStore.fetchRequests({ inbox: 'true' }).catch(() => {})
-  fetchInterval = setInterval(() => {
+  if (authStore.isLoggedIn) {
     approvalStore.fetchRequests({ inbox: 'true' }).catch(() => {})
+  }
+  fetchInterval = setInterval(() => {
+    if (authStore.isLoggedIn) {
+      approvalStore.fetchRequests({ inbox: 'true' }).catch(() => {})
+    }
   }, 30000)
 })
 

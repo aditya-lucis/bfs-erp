@@ -3,17 +3,25 @@ BFS ERP — Accounting URL Configuration
 
 Base: /api/v1/accounting/
 """
-from django.urls import path
+from django.urls import path, include
 from .views import (
     AccountGroupListCreateView,
     AccountGroupDetailView,
     AccountListCreateView,
     AccountTreeView,
     AccountDetailView,
+    AccountRealtimeBalanceView,
     AccountChoicesView,
+    GeneralJournalTransactionViewSet,
 )
 
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'general-journals', GeneralJournalTransactionViewSet, basename='general-journal')
+
 urlpatterns = [
+    path('', include(router.urls)),
     # ── Account Groups ────────────────────────────────────────────────────────
     path('account-groups/',
          AccountGroupListCreateView.as_view(),
@@ -39,4 +47,8 @@ urlpatterns = [
     path('coa/<int:pk>/',
          AccountDetailView.as_view(),
          name='coa-detail'),
+
+    path('coa/<int:pk>/realtime_balance/',
+         AccountRealtimeBalanceView.as_view(),
+         name='coa-realtime-balance'),
 ]

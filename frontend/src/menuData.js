@@ -61,8 +61,8 @@ export const menuData = {
       name: 'General Journal', url: '', children: [
         { name: 'General Journal Template', url: '' },
         { name: 'General Journal', url: '' },
-        { name: 'General Journal Transaction', url: '' },
-        { name: 'General Journal Inbox', url: '' },
+        { name: 'General Journal Transaction', url: '/gl/general-journal-transaction' },
+        { name: 'General Journal Inbox', url: '/gl/general-journal-inbox' },
       ]
     },
     { name: 'Job List', url: '' },

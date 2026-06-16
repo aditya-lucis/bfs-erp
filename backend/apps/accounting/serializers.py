@@ -44,6 +44,9 @@ class AccountListSerializer(serializers.ModelSerializer):
     is_postable        = serializers.BooleanField(read_only=True)
     level              = serializers.IntegerField(read_only=True)
     amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
+    month_opening_balance = serializers.DecimalField(read_only=True, max_digits=18, decimal_places=2)
+    month_debet        = serializers.DecimalField(source='computed_month_debet', read_only=True, max_digits=18, decimal_places=2)
+    month_kredit       = serializers.DecimalField(source='computed_month_kredit', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -53,6 +56,7 @@ class AccountListSerializer(serializers.ModelSerializer):
             'account_group', 'account_group_name', 'account_group_code',
             'parent', 'parent_number',
             'default_position', 'currency', 'amount',
+            'month_opening_balance', 'month_debet', 'month_kredit',
             'is_postable', 'is_linked', 'is_active',
             'bank_type', 'level',
         ]
@@ -65,6 +69,9 @@ class AccountTreeSerializer(serializers.ModelSerializer):
     is_postable        = serializers.BooleanField(read_only=True)
     level              = serializers.IntegerField(read_only=True)
     amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
+    month_opening_balance = serializers.DecimalField(read_only=True, max_digits=18, decimal_places=2)
+    month_debet        = serializers.DecimalField(source='computed_month_debet', read_only=True, max_digits=18, decimal_places=2)
+    month_kredit       = serializers.DecimalField(source='computed_month_kredit', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -74,6 +81,7 @@ class AccountTreeSerializer(serializers.ModelSerializer):
             'account_group', 'parent',
             'is_inter_company', 'is_cost_component', 'is_on_duty',
             'default_position', 'currency', 'amount',
+            'month_opening_balance', 'month_debet', 'month_kredit',
             'is_postable', 'is_linked', 'is_active',
             'bank_type', 'level', 'children',
         ]
@@ -94,6 +102,9 @@ class AccountDetailSerializer(serializers.ModelSerializer):
     has_children       = serializers.BooleanField(read_only=True)
     created_by_name    = serializers.CharField(source='created_by.full_name', read_only=True)
     amount             = serializers.DecimalField(source='computed_amount', read_only=True, max_digits=18, decimal_places=2)
+    month_opening_balance = serializers.DecimalField(read_only=True, max_digits=18, decimal_places=2)
+    month_debet        = serializers.DecimalField(source='computed_month_debet', read_only=True, max_digits=18, decimal_places=2)
+    month_kredit       = serializers.DecimalField(source='computed_month_kredit', read_only=True, max_digits=18, decimal_places=2)
 
     class Meta:
         model  = Account
@@ -104,6 +115,7 @@ class AccountDetailSerializer(serializers.ModelSerializer):
             'account_group', 'account_group_name',
             'parent', 'parent_number', 'parent_name',
             'language', 'default_position', 'currency', 'amount',
+            'month_opening_balance', 'month_debet', 'month_kredit',
             'is_inter_company', 'is_cost_component', 'is_on_duty',
             'bank_type',
             'is_linked', 'is_postable', 'has_children',
@@ -211,4 +223,66 @@ class AccountCreateSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        return instance
+
+# ─── General Journal Transaction ──────────────────────────────────────────────
+
+from .models import GeneralJournalTransaction, GeneralJournalTransactionDetail, JournalHeader, JournalDetail
+
+class GeneralJournalTransactionDetailSerializer(serializers.ModelSerializer):
+    account_number = serializers.CharField(source='account.account_number', read_only=True)
+    account_name = serializers.CharField(source='account.account_name', read_only=True)
+    
+    class Meta:
+        model = GeneralJournalTransactionDetail
+        fields = [
+            'id', 'account', 'account_number', 'account_name', 
+            'currency', 'debit', 'credit', 'period_from', 'period_to'
+        ]
+
+class GeneralJournalTransactionSerializer(serializers.ModelSerializer):
+    details = GeneralJournalTransactionDetailSerializer(many=True, required=False)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+
+    class Meta:
+        model = GeneralJournalTransaction
+        fields = [
+            'id', 'transaction_number', 'date', 'memo', 'project', 'project_name',
+            'vendor', 'vendor_name',
+            'tax_rectification', 'is_adjustment_pph', 'status', 'status_label',
+            'created_at', 'updated_at', 'details'
+        ]
+        read_only_fields = ['transaction_number', 'status', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        details_data = validated_data.pop('details', [])
+        company = self.context['company']
+        user = self.context['request'].user
+        
+        transaction = GeneralJournalTransaction.objects.create(
+            company=company,
+            created_by=user,
+            **validated_data
+        )
+        
+        for detail_data in details_data:
+            GeneralJournalTransactionDetail.objects.create(header=transaction, **detail_data)
+            
+        return transaction
+
+    def update(self, instance, validated_data):
+        details_data = validated_data.pop('details', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if details_data is not None:
+            # Delete existing details and recreate
+            instance.details.all().delete()
+            for detail_data in details_data:
+                GeneralJournalTransactionDetail.objects.create(header=instance, **detail_data)
+                
         return instance

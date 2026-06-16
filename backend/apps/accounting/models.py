@@ -48,11 +48,11 @@ class AccountGroup(models.Model):
 
     @property
     def total_amount(self):
-        import numpy as np
-        amounts = list(self.accounts.filter(is_active=True).exclude(account_type=AccountType.HEADER).values_list('amount', flat=True))
-        if not amounts:
-            return 0.00
-        return float(np.sum([float(x) for x in amounts]))
+        from django.db.models import Sum
+        total = self.accounts.filter(
+            is_active=True
+        ).exclude(account_type=AccountType.HEADER).aggregate(total=Sum('amount'))['total']
+        return float(total or 0.00)
 
 # ─── Account (COA) ────────────────────────────────────────────────────────────
  
@@ -125,7 +125,11 @@ class Account(models.Model):
                        )
     currency        = models.CharField(max_length=10, default='IDR')
     amount          = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
- 
+    month_debet     = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    month_kredit    = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    month_opening_balance = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    path            = models.CharField(max_length=500, db_index=True, blank=True)
     # ── Flags — available for DETAIL / DETAIL_BANK / DETAIL_CASH / DETAIL_CHEQUE ─
     is_inter_company  = models.BooleanField(
                             default=False,
@@ -181,15 +185,49 @@ class Account(models.Model):
         if self.account_type != AccountType.HEADER:
             return float(self.amount)
         
-        # Sum all detail descendant accounts
-        descendants = self.get_descendants()
-        postables = [d for d in descendants if d.account_type != AccountType.HEADER]
-        if not postables:
+        if not self.path:
             return 0.00
+            
+        # Rollup from detail descendants using Materialized Path
+        from django.db.models import Sum
+        total = Account.objects.filter(
+            path__startswith=self.path,
+            is_active=True
+        ).exclude(account_type=AccountType.HEADER).aggregate(total=Sum('amount'))['total']
         
-        import numpy as np
-        amounts = [float(p.amount) for p in postables]
-        return float(np.sum(amounts))
+        return float(total or 0.00)
+
+    @property
+    def computed_month_debet(self):
+        if self.account_type != AccountType.HEADER:
+            return float(self.month_debet)
+        
+        if not self.path:
+            return 0.00
+            
+        from django.db.models import Sum
+        total = Account.objects.filter(
+            path__startswith=self.path,
+            is_active=True
+        ).exclude(account_type=AccountType.HEADER).aggregate(total=Sum('month_debet'))['total']
+        
+        return float(total or 0.00)
+
+    @property
+    def computed_month_kredit(self):
+        if self.account_type != AccountType.HEADER:
+            return float(self.month_kredit)
+        
+        if not self.path:
+            return 0.00
+            
+        from django.db.models import Sum
+        total = Account.objects.filter(
+            path__startswith=self.path,
+            is_active=True
+        ).exclude(account_type=AccountType.HEADER).aggregate(total=Sum('month_kredit'))['total']
+        
+        return float(total or 0.00)
 
     def get_descendants(self):
         descendants = []
@@ -257,6 +295,19 @@ class Account(models.Model):
             node = node.parent
         return ancestors
  
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if self.parent:
+            new_path = self.parent.path + str(self.pk) + '.'
+        else:
+            new_path = str(self.pk) + '.'
+            
+        if self.path != new_path:
+            self.path = new_path
+            self.save(update_fields=['path'])
+
     def clean(self):
         from django.core.exceptions import ValidationError
  
@@ -281,3 +332,95 @@ class Account(models.Model):
         # but children's parent must be same company
         if self.parent_id and self.parent.company_id != self.company_id:
             raise ValidationError('Parent account must belong to the same company.')
+
+
+# ─── General Journal Transaction (Approval Phase) ─────────────────────────────
+
+class DocumentStatus(models.TextChoices):
+    DRAFT = 'DRAFT', 'Draft'
+    IN_REVIEW = 'IN_REVIEW', 'In Review'
+    APPROVED = 'APPROVED', 'Approved'
+    REJECTED = 'REJECTED', 'Rejected'
+    CANCELLED = 'CANCELLED', 'Cancelled'
+
+
+class GeneralJournalTransaction(models.Model):
+    company = models.ForeignKey('organization.Company', on_delete=models.CASCADE)
+    transaction_number = models.CharField(max_length=50, unique=True)
+    date = models.DateField()
+    memo = models.CharField(max_length=255)
+    project = models.ForeignKey('projects.Project', null=True, blank=True, on_delete=models.SET_NULL)
+    vendor = models.ForeignKey('purchase.Vendor', null=True, blank=True, on_delete=models.SET_NULL)
+    
+    # Header fields shown in UI
+    tax_rectification = models.CharField(max_length=50, null=True, blank=True)
+    is_adjustment_pph = models.BooleanField(default=False)
+    
+    status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        db_table = 'acc_general_journal_transaction'
+        ordering = ['-date', '-transaction_number']
+
+    @staticmethod
+    def _generate_transaction_number():
+        from django.utils import timezone
+        timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
+        prefix = f"GEJ{timestamp}-"
+        last = GeneralJournalTransaction.objects.order_by('id').last()
+        next_seq = (int(last.transaction_number.split('-')[-1]) + 1) if last and '-' in last.transaction_number else 1
+        return f"{prefix}{next_seq:05d}"
+
+    def save(self, *args, **kwargs):
+        if not self.transaction_number:
+            self.transaction_number = self._generate_transaction_number()
+        super().save(*args, **kwargs)
+
+
+class GeneralJournalTransactionDetail(models.Model):
+    header = models.ForeignKey(GeneralJournalTransaction, related_name='details', on_delete=models.CASCADE)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT)
+    currency = models.CharField(max_length=10, default='IDR')
+    debit = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    credit = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    period_from = models.DateField(null=True, blank=True)
+    period_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'acc_general_journal_transaction_detail'
+
+
+# ─── Journal (General Ledger - After Approval) ────────────────────────────────
+
+class JournalHeader(models.Model):
+    company = models.ForeignKey('organization.Company', on_delete=models.CASCADE)
+    journal_number = models.CharField(max_length=50, unique=True)
+    date = models.DateField() # mapped from general journal date
+    memo = models.CharField(max_length=255)
+    project = models.ForeignKey('projects.Project', null=True, blank=True, on_delete=models.SET_NULL)
+    vendor = models.ForeignKey('purchase.Vendor', null=True, blank=True, on_delete=models.SET_NULL)
+    type = models.CharField(max_length=10, default='GEN')
+    
+    is_verified = models.BooleanField(default=True)
+    is_adjustment = models.BooleanField(default=False)
+    pattern_type = models.CharField(max_length=50, default='STANDARD')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        db_table = 'acc_journal_header'
+
+class JournalDetail(models.Model):
+    journal_header = models.ForeignKey(JournalHeader, related_name='details', on_delete=models.CASCADE)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT)
+    currency = models.CharField(max_length=10, default='IDR')
+    base_debet = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    base_kredit = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = 'acc_journal_detail'

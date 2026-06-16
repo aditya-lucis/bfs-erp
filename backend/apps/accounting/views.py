@@ -297,6 +297,32 @@ class AccountDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class AccountRealtimeBalanceView(APIView):
+    """
+    GET /api/v1/accounting/coa/<id>/realtime_balance/
+    Placeholder for Real-Time Calculation (Cara 2) from journals.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'GL-CHART-OF-ACCOUNT'
+
+    def get(self, request, pk=None):
+        company = get_company(request)
+        account = get_object_or_404(Account, pk=pk, company=company)
+        
+        # Placeholder logic: Since JournalHeader/JournalDetail models are not yet implemented,
+        # we will just return the `computed_amount` property.
+        # This endpoint should be updated when the journal models are ready.
+        balance = account.computed_amount
+
+        return Response({
+            'account_id': account.id,
+            'account_number': account.account_number,
+            'balance': str(balance),
+            'start_date': '2000-01-01',  # Placeholder
+            'calculation_method': 'realtime (placeholder)'
+        })
+
+
 class AccountChoicesView(APIView):
     """
     GET /api/v1/accounting/coa/choices/
@@ -330,3 +356,76 @@ class AccountChoicesView(APIView):
 
 # ─── Fix missing import ───────────────────────────────────────────────────────
 from django.db.models import Q as models_Q
+
+# ─── General Journal Transaction Views ────────────────────────────────────────
+
+from rest_framework import viewsets
+from .models import GeneralJournalTransaction, DocumentStatus
+from .serializers import GeneralJournalTransactionSerializer
+from apps.approval.services import create_approval_request
+
+class GeneralJournalTransactionViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for General Journal Transactions.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'GL-GENERAL-JOURNAL'
+    serializer_class = GeneralJournalTransactionSerializer
+
+    def get_queryset(self):
+        company = get_company(self.request)
+        qs = GeneralJournalTransaction.objects.filter(company=company).select_related('project')
+        
+        # Filtering
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        search = self.request.query_params.get('search')
+        doc_status = self.request.query_params.get('document_status')
+        app_status = self.request.query_params.get('approval_status')
+        
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        if search:
+            qs = qs.filter(models_Q(transaction_number__icontains=search) | models_Q(memo__icontains=search))
+        if doc_status:
+            qs = qs.filter(status=doc_status)
+        if app_status:
+            qs = qs.filter(status=app_status) # They share the same status field mapped to DocumentStatus
+            
+        return qs.order_by('-date', '-id')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['company'] = get_company(self.request)
+        return ctx
+
+    from rest_framework.decorators import action
+
+    @action(detail=True, methods=['post'])
+    def submit_approval(self, request, pk=None):
+        """Submit the transaction for approval."""
+        transaction = self.get_object()
+        
+        if transaction.status not in [DocumentStatus.DRAFT, DocumentStatus.CANCELLED]:
+            return Response({'detail': 'Only draft or revised transactions can be submitted.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            # calculate total amount
+            total_amount = sum([d.debit for d in transaction.details.all()])
+            
+            create_approval_request(
+                document_code='GEJ',
+                document_id=str(transaction.id),
+                document_number=transaction.transaction_number,
+                creator_user=request.user,
+                amount=total_amount,
+                company=transaction.company
+            )
+            
+            transaction.status = DocumentStatus.IN_REVIEW
+            transaction.save()
+            return Response({'status': 'Submitted for approval'})
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)

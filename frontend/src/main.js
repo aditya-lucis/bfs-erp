@@ -16,6 +16,9 @@ import DepartmentView from './views/settings/DepartmentView.vue'
 import AuthGroupListView from './views/settings/AuthGroupListView.vue'
 import EmployeeView from './views/settings/EmployeeView.vue'
 import ChartOfAccountView from './views/gl/ChartOfAccountView.vue'
+import GeneralJournalListView from './views/gl/GeneralJournalListView.vue'
+import GeneralJournalFormView from './views/gl/GeneralJournalFormView.vue'
+import GeneralJournalInboxView from './views/gl/GeneralJournalInboxView.vue'
 import UnitMeasurementView from './views/inventory/UnitMeasurementView.vue'
 import ItemCategoryView from './views/inventory/ItemCategoryView.vue'
 import ItemView from './views/inventory/ItemView.vue'
@@ -45,6 +48,10 @@ const implementedRoutes = [
   { path: '/settings/user-authorization-group', component: AuthGroupListView, meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/employee-data', component: EmployeeView, meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/gl/chart-of-accounts', component: ChartOfAccountView, meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/gl/general-journal-transaction', component: GeneralJournalListView, meta: { title: 'General Journal Transaction', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/gl/general-journal-transaction/entry', component: GeneralJournalFormView, meta: { title: 'General Journal Entry', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/gl/general-journal-transaction/entry/:id', component: GeneralJournalFormView, meta: { title: 'General Journal Entry', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/gl/general-journal-inbox', component: GeneralJournalInboxView, meta: { title: 'General Journal Inbox', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/inventory/unit-measurement', component: UnitMeasurementView, meta: { title: 'Unit Measurement', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
   { path: '/inventory/item-category', component: ItemCategoryView, meta: { title: 'Item Category', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
   { path: '/inventory/items', component: ItemView, meta: { title: 'List of Items', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },

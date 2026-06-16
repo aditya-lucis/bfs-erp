@@ -85,9 +85,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function hasPermission(permString) {
+    if (isSuperuser.value) return true
+    
+    try {
+      const menuStore = useMenuStore()
+      
+      const lastUnderscoreIndex = permString.lastIndexOf('_')
+      if (lastUnderscoreIndex === -1) {
+        return menuStore.can(permString, 'can_read')
+      }
+      
+      const code = permString.substring(0, lastUnderscoreIndex)
+      const actionSuffix = permString.substring(lastUnderscoreIndex + 1).toLowerCase()
+      const action = `can_${actionSuffix}`
+      
+      return menuStore.can(code, action)
+    } catch (err) {
+      return false
+    }
+  }
+
   return {
     user, accessToken, isLoading, error,
     isLoggedIn, isSuperuser, fullName, employee,
-    login, logout, fetchMe, restoreSession,
+    login, logout, fetchMe, restoreSession, hasPermission
   }
 })

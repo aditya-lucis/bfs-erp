@@ -23,7 +23,9 @@ api.interceptors.response.use(
       const refresh = localStorage.getItem('refresh_token')
       if (!refresh) {
         localStorage.clear()
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
         return Promise.reject(error)
       }
       try {
@@ -34,9 +36,12 @@ api.interceptors.response.use(
         localStorage.setItem('access_token', res.data.access)
         original.headers.Authorization = `Bearer ${res.data.access}`
         return api(original)
-      } catch {
+      } catch (refreshErr) {
         localStorage.clear()
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+        return Promise.reject(refreshErr)
       }
     }
     return Promise.reject(error)
