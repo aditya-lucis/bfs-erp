@@ -370,7 +370,7 @@ class GeneralJournalTransactionViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
     CRUD for General Journal Transactions.
     """
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    rbac_function_code = 'GL-GENERAL-JOURNAL'
+    rbac_function_code = 'GL-GENERAL-JOURNAL-TRANSACTION'
     serializer_class = GeneralJournalTransactionSerializer
     period_date_field = 'date'
 

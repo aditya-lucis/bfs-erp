@@ -18,8 +18,8 @@ const isEdit = computed(() => !!route.params.id)
 const isSubmitting = ref(false)
 const error = ref(null)
 
-const canCreate = computed(() => authStore.hasPermission('GL-GENERAL-JOURNAL_CREATE'))
-const canUpdate = computed(() => authStore.hasPermission('GL-GENERAL-JOURNAL_UPDATE'))
+const canCreate = computed(() => authStore.hasPermission('GL-GENERAL-JOURNAL-TRANSACTION_CREATE'))
+const canUpdate = computed(() => authStore.hasPermission('GL-GENERAL-JOURNAL-TRANSACTION_UPDATE'))
 
 const form = ref({
   date: new Date().toISOString().substring(0, 10),
