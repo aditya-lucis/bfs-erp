@@ -363,14 +363,16 @@ from rest_framework import viewsets
 from .models import GeneralJournalTransaction, DocumentStatus
 from .serializers import GeneralJournalTransactionSerializer
 from apps.approval.services import create_approval_request
+from apps.accounting_period.period_decorators import PeriodCheckMixin
 
-class GeneralJournalTransactionViewSet(viewsets.ModelViewSet):
+class GeneralJournalTransactionViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
     """
     CRUD for General Journal Transactions.
     """
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'GL-GENERAL-JOURNAL'
     serializer_class = GeneralJournalTransactionSerializer
+    period_date_field = 'date'
 
     def get_queryset(self):
         company = get_company(self.request)
