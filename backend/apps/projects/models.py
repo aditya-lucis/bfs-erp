@@ -194,8 +194,8 @@ class RAP(models.Model):
         from django.utils import timezone
         timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
         prefix = f"RAP{timestamp}-"
-        last = RAP.objects.filter(rap_number__startswith=prefix).order_by('id').last()
-        next_seq = (int(last.rap_number.split('-')[-1]) + 1) if last else 1
+        last = RAP.objects.order_by('id').last()
+        next_seq = (int(last.rap_number.split('-')[-1]) + 1) if last and '-' in last.rap_number else 1
         return f"{prefix}{next_seq:05d}"
 
 
