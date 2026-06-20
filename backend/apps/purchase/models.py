@@ -1,6 +1,10 @@
 from django.db import models
+from django.conf import settings
 from apps.accounting.models import Account
 from apps.organization.models import Company, Department
+from apps.projects.models import Project, RAP, RAPDetail
+from apps.inventory.models import Item, UnitMeasurement
+from apps.budget_component.models import BudgetComponent
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -297,3 +301,123 @@ class VendorContactPerson(models.Model):
     def full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name]
         return ' '.join(p for p in parts if p).strip()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Requisition (PR)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PurchaseRequisition(models.Model):
+    class DocumentStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        READY_TO_PROCESS = 'ready_to_process', 'Ready to Process'
+        CLOSE = 'close', 'Close'
+
+    class ApprovalStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        AWAITING = 'awaiting', 'Awaiting'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Reject'
+        REVISED = 'revised', 'Revised'
+
+    class PRType(models.TextChoices):
+        RAW_MATERIAL = 'RM', 'Raw Material'
+        SUPPLIES = 'SP', 'Supplies'
+        ASSET = 'AST', 'Asset'
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_requisitions')
+    pr_number = models.CharField(max_length=100, unique=True, editable=False)
+    pr_date = models.DateField()
+    pr_type = models.CharField(max_length=5, choices=PRType.choices, default=PRType.RAW_MATERIAL)
+    
+    # New fields based on requirements
+    request_type = models.CharField(max_length=50, default='Normal')
+    pr_class = models.CharField(max_length=50, default='Common')
+    repetition = models.CharField(max_length=50, default='None')
+    
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_requisitions')
+    rap = models.ForeignKey(RAP, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_requisitions')
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name='purchase_requisitions')
+    budget_component = models.ForeignKey(BudgetComponent, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_requisitions')
+    
+    cost_category = models.CharField(max_length=50, blank=True, default='')
+    currency = models.CharField(max_length=10, default='IDR')
+    
+    etd = models.DateField(null=True, blank=True, verbose_name='Estimated Time Delivery')
+    delivery_point = models.TextField(blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    
+    document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
+    approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
+    
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='created_prs'
+    )
+
+    class Meta:
+        db_table = 'purchases_pr_header'
+        ordering = ['-created_at']
+        verbose_name = 'Purchase Requisition'
+        verbose_name_plural = 'Purchase Requisitions'
+
+    def __str__(self):
+        return f"{self.pr_number} - {self.get_pr_type_display()}"
+
+    def save(self, *args, **kwargs):
+        if not self.pr_number:
+            self.pr_number = self._generate_pr_number()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_pr_number():
+        from django.utils import timezone
+        timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
+        prefix = f"PRN{timestamp}"
+        last = PurchaseRequisition.objects.filter(pr_number__startswith=prefix).order_by('id').last()
+        if last:
+            # PRN<timestamp> -> len(prefix) is 3 + 14 = 17
+            try:
+                seq_str = last.pr_number[len(prefix):]
+                next_seq = int(seq_str) + 1
+            except ValueError:
+                next_seq = 1
+        else:
+            next_seq = 1
+        return f"{prefix}{next_seq:05d}"
+
+
+class PurchaseRequisitionDetail(models.Model):
+    pr = models.ForeignKey(PurchaseRequisition, on_delete=models.CASCADE, related_name='details')
+    rap_detail = models.ForeignKey(RAPDetail, on_delete=models.SET_NULL, null=True, blank=True, related_name='pr_details')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True, related_name='pr_details')
+    
+    asset_name = models.CharField(max_length=255, blank=True, default='')
+    
+    quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    unit = models.ForeignKey(UnitMeasurement, on_delete=models.SET_NULL, null=True, blank=True, related_name='pr_details')
+    
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    final_unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    notes = models.CharField(max_length=500, blank=True, default='')
+    order_no = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'purchases_pr_detail'
+        ordering = ['pr', 'order_no', 'id']
+
+    def __str__(self):
+        return f"{self.pr.pr_number} - {self.item.item_name if self.item else self.asset_name}"
+
+    def save(self, *args, **kwargs):
+        # Auto calculate amount
+        self.amount = self.quantity * self.final_unit_price
+        super().save(*args, **kwargs)

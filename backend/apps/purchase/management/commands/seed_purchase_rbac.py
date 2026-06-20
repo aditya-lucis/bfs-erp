@@ -5,6 +5,7 @@ PURCHASE_FUNCTIONS = [
     {'code': 'PURCHASES-VENDOR-CATEGORY', 'name': 'Vendor Category', 'url_path': '/purchases/vendor-category', 'order': 0},
     {'code': 'PURCHASES-VENDOR-GROUP',    'name': 'Vendor Group',    'url_path': '/purchases/vendor-group',    'order': 1},
     {'code': 'PURCHASES-VENDOR',          'name': 'Vendor',          'url_path': '/purchases/vendor',          'order': 2},
+    {'code': 'PURCHASES-PR',              'name': 'Purchase Requisition', 'url_path': '/purchases/pr',         'order': 3},
 ]
 
 

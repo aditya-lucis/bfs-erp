@@ -1077,6 +1077,7 @@ function closeModal() {
 }
 
 async function openAddModal() {
+  await store.fetchProjects({ without_rap: true, status: 'not_start' })
   modal.show = true
   modal.mode = 'add'
   modal.editId = null
@@ -1114,6 +1115,7 @@ async function openAddModal() {
 }
 
 async function openEditModal(rap) {
+  await store.fetchProjects({ without_rap: true, include_project: rap.project, status: 'not_start' })
   modal.show = true
   modal.mode = 'edit'
   modal.editId = rap.id
@@ -1450,7 +1452,7 @@ function formatAppStatusText(status) {
 onMounted(() => {
   handleSearch()
   store.fetchRapTypes()
-  store.fetchProjects()
+  store.fetchProjects({ without_rap: true, status: 'not_start' })
   orgStore.fetchDepartments()
   budgetStore.fetchBudgetComponents()
   if (!orgStore.company) orgStore.fetchCompany()

@@ -287,6 +287,8 @@ const handleNotificationClick = (item) => {
   approvalStore.currentRequest = item
   if (item.document_code === 'GEJ') {
     router.push('/gl/general-journal-inbox')
+  } else if (item.document_code === 'PR') {
+    router.push('/purchases/purchase-requisition-inbox')
   } else {
     router.push('/projects/rap-inbox')
   }

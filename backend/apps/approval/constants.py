@@ -10,6 +10,7 @@ from django.db import models
 class DocumentType(models.TextChoices):
     RAP = 'RAP', 'Rencana Anggaran Pelaksana (RAP)'
     GENERAL_JOURNAL = 'GEJ', 'General Journal (GEJ)'
+    PURCHASE_REQUISITION = 'PR', 'Purchase Requisition (PR)'
 
 
 class ApprovalBasis(models.TextChoices):

@@ -23,6 +23,8 @@ from .serializers import (
     VendorLinkedAccountSerializer,
     VendorTermsSerializer,
     VendorContactPersonSerializer,
+    PurchaseRequisitionListSerializer,
+    PurchaseRequisitionSerializer,
 )
 
 
@@ -234,3 +236,223 @@ class VendorContactPersonDetailView(generics.RetrieveUpdateDestroyAPIView):
         return VendorContactPerson.objects.filter(
             vendor_id=self.kwargs['vendor_pk']
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Requisition (PR)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import PurchaseRequisition
+from apps.approval.models import ApprovalRequest, ApprovalStatus, StepStatus
+
+class PurchaseRequisitionListView(generics.ListCreateAPIView):
+    serializer_class = PurchaseRequisitionSerializer
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-REQUISITION'
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return PurchaseRequisitionListSerializer
+        return PurchaseRequisitionSerializer
+
+    def get_queryset(self):
+        company = Company.get_default()
+        qs = PurchaseRequisition.objects.filter(company=company).select_related(
+            'project', 'rap', 'department', 'budget_component', 'created_by'
+        )
+        
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(pr_number__icontains=search) | Q(project__project_name__icontains=search))
+            
+        doc_status = self.request.query_params.get('document_status')
+        if doc_status:
+            qs = qs.filter(document_status=doc_status)
+            
+        app_status = self.request.query_params.get('approval_status')
+        if app_status:
+            qs = qs.filter(approval_status=app_status)
+            
+        pr_type = self.request.query_params.get('pr_type')
+        if pr_type:
+            qs = qs.filter(pr_type=pr_type)
+
+        start_date = self.request.query_params.get('start_date')
+        if start_date:
+            qs = qs.filter(pr_date__gte=start_date)
+
+        end_date = self.request.query_params.get('end_date')
+        if end_date:
+            qs = qs.filter(pr_date__lte=end_date)
+
+        return qs
+
+    def perform_create(self, serializer):
+        company = Company.get_default()
+        serializer.save(company=company, created_by=self.request.user)
+
+
+class PurchaseRequisitionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PurchaseRequisition.objects.all()
+    serializer_class = PurchaseRequisitionSerializer
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-REQUISITION'
+
+    def perform_destroy(self, instance):
+        if instance.approval_status in [PurchaseRequisition.ApprovalStatus.AWAITING, PurchaseRequisition.ApprovalStatus.APPROVED]:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': 'Purchase Requisition yang sedang diajukan atau sudah disetujui tidak dapat dihapus.'})
+        instance.delete()
+
+
+class PurchaseRequisitionSubmitView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-REQUISITION'
+
+    def post(self, request, pk):
+        from django.db.models import Sum
+        from apps.accounting_period.period_checker import PeriodChecker
+        from apps.annual_budget.models import AnnualBudgetHeader
+        from apps.approval.services import create_approval_request, ApprovalMatrixError
+
+        pr = get_object_or_404(PurchaseRequisition, pk=pk)
+
+        if pr.document_status not in ['draft', 'ready_to_process']:
+            return Response({'detail': 'PR ini sudah ditutup dan tidak dapat diajukan lagi.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Validate Financial Period
+        period_result = PeriodChecker.check(pr.pr_date, raise_exception=False)
+        if not period_result.is_open:
+            return Response({'detail': period_result.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Validate Budget Constraint (Strict validation)
+        # If RM/SP, it must be validated against RAP
+        if pr.pr_type in [PurchaseRequisition.PRType.RAW_MATERIAL, PurchaseRequisition.PRType.SUPPLIES]:
+            if not pr.rap:
+                return Response({'detail': 'PR tipe RM/SP harus merujuk pada RAP.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if total amount of PR exceeds RAP remaining budget for the selected cost category or items.
+            # Simplified for now: PR total_amount must not exceed RAP total_cost remaining (or we check item by item).
+            # Here we just check total_amount against RAP's total cost
+            used_rap = PurchaseRequisition.objects.filter(
+                rap=pr.rap,
+                document_status__in=['ready_to_process', 'close']
+            ).exclude(pk=pr.pk).aggregate(total=Sum('total_amount'))['total'] or 0
+            
+            remaining_rap = pr.rap.total_cost - used_rap
+            if pr.total_amount > remaining_rap:
+                return Response({
+                    'detail': f'Total PR ({pr.total_amount}) melebihi sisa anggaran RAP ({remaining_rap}).'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Create Approval Request
+        try:
+            create_approval_request(
+                document_code='PR',
+                document_id=str(pr.id),
+                document_number=pr.pr_number,
+                creator_user=request.user,
+                amount=pr.total_amount,
+            )
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        pr.document_status = 'ready_to_process'
+        pr.approval_status = 'awaiting'
+        pr.save()
+
+        return Response(PurchaseRequisitionSerializer(pr).data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PR Inbox
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PurchaseRequisitionInboxListView(generics.ListAPIView):
+    serializer_class = PurchaseRequisitionListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        employee = getattr(user, 'employee_profile', None)
+        if not employee:
+            return PurchaseRequisition.objects.none()
+            
+        # Get pending steps for user's position
+        pending_requests = ApprovalRequest.objects.filter(
+            document_code='PR',
+            status=ApprovalStatus.PENDING,
+            steps__position_id=employee.position_id,
+            steps__status=StepStatus.PENDING,
+            steps__step_number=models.F('current_step_number')
+        ).values_list('document_id', flat=True)
+        
+        qs = PurchaseRequisition.objects.filter(id__in=pending_requests).select_related(
+            'project', 'rap', 'department', 'budget_component', 'created_by'
+        )
+        return qs
+
+
+class PurchaseRequisitionApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.approval.services import approve_step, reject_request, revise_request, ApprovalMatrixError
+        
+        pr = get_object_or_404(PurchaseRequisition, pk=pk)
+        action = request.data.get('action') # 'approve', 'reject', 'revise'
+        remarks = request.data.get('remarks', '')
+        
+        # Approver can change final_unit_price before approving
+        details_data = request.data.get('details', [])
+        if details_data and action == 'approve':
+            # Update final unit prices and recalculate
+            total = 0
+            for item_data in details_data:
+                detail_id = item_data.get('id')
+                final_price = item_data.get('final_unit_price')
+                if detail_id and final_price is not None:
+                    detail = pr.details.filter(id=detail_id).first()
+                    if detail:
+                        detail.final_unit_price = final_price
+                        detail.amount = detail.quantity * detail.final_unit_price
+                        detail.save()
+                        total += detail.amount
+            
+            pr.total_amount = total
+            pr.save()
+        
+        # Get active approval request
+        approval_request = ApprovalRequest.objects.filter(
+            document_code='PR',
+            document_id=str(pr.id),
+            status=ApprovalStatus.PENDING
+        ).first()
+        
+        if not approval_request:
+            return Response({'detail': 'Approval request tidak ditemukan atau sudah diproses.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        ip_address = request.META.get('REMOTE_ADDR')
+        user_agent = request.META.get('HTTP_USER_AGENT')
+        
+        try:
+            if action == 'approve':
+                result = approve_step(approval_request.id, request.user, remarks, ip_address, user_agent)
+                if result.status == ApprovalStatus.APPROVED:
+                    pr.approval_status = 'approved'
+            elif action == 'reject':
+                result = reject_request(approval_request.id, request.user, remarks, ip_address, user_agent)
+                pr.approval_status = 'rejected'
+                pr.document_status = 'close'
+            elif action == 'revise':
+                result = revise_request(approval_request.id, request.user, remarks, ip_address, user_agent)
+                pr.approval_status = 'revised'
+                pr.document_status = 'draft'
+            else:
+                return Response({'detail': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            pr.save()
+            return Response({'detail': f'PR berhasil di-{action}.'})
+            
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)

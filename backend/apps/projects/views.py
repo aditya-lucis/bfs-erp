@@ -131,6 +131,15 @@ class ProjectListView(generics.ListCreateAPIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
             
+        without_rap = self.request.query_params.get('without_rap')
+        include_project = self.request.query_params.get('include_project')
+        if without_rap and without_rap.lower() in ['true', '1']:
+            if include_project:
+                from django.db.models import Q
+                qs = qs.filter(Q(raps__isnull=True) | Q(pk=include_project))
+            else:
+                qs = qs.filter(raps__isnull=True)
+            
         return qs
 
     def perform_create(self, serializer):

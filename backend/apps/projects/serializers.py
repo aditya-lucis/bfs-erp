@@ -54,17 +54,26 @@ from .models import RAP, RAPDetail
 class RAPDetailSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.item_name', read_only=True)
     item_code = serializers.CharField(source='item.item_code', read_only=True)
+    inventory_item_type = serializers.CharField(source='item.item_type', read_only=True)
     unit_name = serializers.CharField(source='item.unit.unit_name', read_only=True)
     parent = serializers.IntegerField(source='parent_id', read_only=True, allow_null=True)
+    remaining_volume = serializers.SerializerMethodField()
 
     class Meta:
         model = RAPDetail
         fields = [
-            'id', 'parent', 'item_type',
+            'id', 'parent', 'item_type', 'inventory_item_type',
             'description', 'item', 'item_name', 'item_code', 'unit_name',
-            'remarks', 'volume', 'unit_price', 'total_cost',
+            'remarks', 'volume', 'remaining_volume', 'unit_price', 'total_cost',
             'order_no', 'display_number',
         ]
+
+    def get_remaining_volume(self, obj):
+        from django.db.models import Sum
+        used_volume = obj.pr_details.exclude(
+            pr__approval_status='rejected'
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        return float(obj.volume) - float(used_volume)
 
 
 class RAPSerializer(serializers.ModelSerializer):
