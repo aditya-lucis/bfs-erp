@@ -77,4 +77,15 @@ urlpatterns = [
     path('pr-inbox/<int:pk>/approve/',
          views.PurchaseRequisitionApproveView.as_view(),
          name='pr-inbox-approve'),
+
+    # ── Purchase Order (PO) ───────────────────────────────────────
+    path('po/',
+         views.PurchaseOrderListView.as_view(),
+         name='po-list'),
+    path('po/<int:pk>/',
+         views.PurchaseOrderDetailView.as_view(),
+         name='po-detail'),
+    path('po/<int:pk>/submit/',
+         views.PurchaseOrderSubmitView.as_view(),
+         name='po-submit'),
 ]

@@ -226,10 +226,22 @@ class VendorTerms(models.Model):
         COD           = 'cod',           'COD'
 
     class TaxCode(models.TextChoices):
-        PPH_23_45  = 'pph_23_45',  'PPh 23 Rate 4.5 %'
-        PPH_23_2   = 'pph_23_2',   'PPh 23 Rate 2 %'
-        PPH_23_15  = 'pph_23_15',  'PPh 23 Rate 1.5 %'
-        NON        = 'non',        'Non PPh'
+        NONE             = 'none',             'None'
+        PPH_23_RATE_15   = 'pph_23_rate_15',   'PPH 23 RATE 15 %'
+        PPH_23_RATE_2    = 'pph_23_rate_2',    'PPH 23 RATE 2 %'
+        PPH_23_RATE_4    = 'pph_23_rate_4',    'PPH 23 RATE 4%'
+        PPH_23_RATE_4_5  = 'pph_23_rate_4_5',  'PPh 23 RATE 4.5 %'
+        PPH_23_RATE_7_5  = 'pph_23_rate_7_5',  'PPH 23 RATE 7.5 %'
+        PPH_4_2_RATE_10  = 'pph_4_2_rate_10',  'PPH 4(2) RATE 10%'
+        PPH_4_2_RATE_2   = 'pph_4_2_rate_2',   'PPH 4(2) RATE 2%'
+        PPH_4_2_RATE_3   = 'pph_4_2_rate_3',   'PPH 4(2) RATE 3%'
+        PPH_4_2_RATE_4   = 'pph_4_2_rate_4',   'PPH 4(2) RATE 4%'
+        PPN_01           = 'ppn_01',           'PPN 01 %'
+        PPN_10           = 'ppn_10',           'PPN 10 %'
+        PPN_10_EURO      = 'ppn_10_euro',      'PPN 10% (EURO)'
+        PPN_11           = 'ppn_11',           'PPN 11 %'
+        PPN_15           = 'ppn_15',           'PPN 15%'
+        NON              = 'non',              'Non PPh'
 
     vendor                = models.OneToOneField(Vendor, on_delete=models.CASCADE, related_name='terms')
     payment_due           = models.CharField(max_length=20, choices=PaymentDue.choices, default=PaymentDue.TANPA_CICILAN)
@@ -420,4 +432,182 @@ class PurchaseRequisitionDetail(models.Model):
     def save(self, *args, **kwargs):
         # Auto calculate amount
         self.amount = self.quantity * self.final_unit_price
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Order (PO)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PurchaseOrder(models.Model):
+    class DocumentStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        OPEN = 'open', 'Open'
+        CONFIRMED = 'confirmed', 'Confirmed'
+        DELIVERED = 'delivered', 'Delivered'
+        INVOICED = 'invoiced', 'Invoiced'
+        CLOSE = 'close', 'Close'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    class ApprovalStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        AWAITING = 'awaiting', 'Awaiting'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Reject'
+        REVISED = 'revised', 'Revised'
+
+    class POType(models.TextChoices):
+        RAW_MATERIAL = 'RM', 'Raw Material'
+        SUPPLIES = 'SP', 'Supplies'
+        ASSET = 'AST', 'Asset'
+
+    class PrintOutType(models.TextChoices):
+        PO = 'po', 'Purchase Order'
+        SPK = 'spk', 'Surat Perintah Kerja'
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='purchase_orders')
+    po_number = models.CharField(max_length=100, unique=True, editable=False)
+    po_date = models.DateField()
+    
+    # Core Relations
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name='purchase_orders')
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_orders')
+    rap = models.ForeignKey(RAP, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_orders')
+    
+    # Financial Settings
+    po_type = models.CharField(max_length=20, choices=POType.choices, default=POType.RAW_MATERIAL)
+    po_currency = models.CharField(max_length=10, default='IDR')
+    tax_currency = models.CharField(max_length=10, default='IDR')
+    freight_currency = models.CharField(max_length=10, default='IDR')
+    
+    # Vendor Accounts (RR/VI represent vendors responsible for Receipt Report and Vendor Invoice)
+    rr_account = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True, blank=True, related_name='rr_purchase_orders')
+    vi_account = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True, blank=True, related_name='vi_purchase_orders')
+    
+    # Additional Flags & Fields
+    is_sister_company = models.BooleanField(default=False)
+    vendor_so_number = models.CharField(max_length=100, blank=True, default='')
+    is_import = models.BooleanField(default=False)
+    print_out_type = models.CharField(max_length=10, choices=PrintOutType.choices, default=PrintOutType.PO)
+    requestor_department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_orders')
+    
+    term_and_condition = models.TextField(blank=True, default='')
+    mandatory_update_material = models.BooleanField(default=False)
+    not_regular = models.BooleanField(default=False)
+    
+    ppn = models.BooleanField(default=False, verbose_name="PPN")
+    is_subcontract = models.BooleanField(default=False)
+    subcontract_notes = models.TextField(blank=True, default='')
+    
+    etd = models.DateField(null=True, blank=True, verbose_name='Estimated Time Delivery')
+    notes = models.TextField(blank=True, default='')
+
+    # State tracking
+    document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
+    approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
+    
+    # Totals
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_discount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_deduction = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    partial_cancellation = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    payment_balance = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    # Auditing
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='created_pos'
+    )
+
+    class Meta:
+        db_table = 'purchases_po_header'
+        ordering = ['-created_at']
+        verbose_name = 'Purchase Order'
+        verbose_name_plural = 'Purchase Orders'
+
+    def __str__(self):
+        return f"{self.po_number} - {self.vendor.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.po_number:
+            self.po_number = self._generate_po_number()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_po_number():
+        from django.utils import timezone
+        timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
+        prefix = f"PO{timestamp}"
+        last = PurchaseOrder.objects.filter(po_number__startswith=prefix).order_by('id').last()
+        if last:
+            try:
+                seq_str = last.po_number.split('-')[-1]
+                next_seq = int(seq_str) + 1
+            except ValueError:
+                next_seq = 1
+        else:
+            next_seq = 1
+        return f"{prefix}-{next_seq:05d}"
+
+
+class PurchaseOrderDetail(models.Model):
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='details')
+    pr_detail = models.ForeignKey(PurchaseRequisitionDetail, on_delete=models.SET_NULL, null=True, blank=True, related_name='po_details')
+    
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True, related_name='po_details')
+    rap_detail = models.ForeignKey(RAPDetail, on_delete=models.SET_NULL, null=True, blank=True, related_name='po_details')
+    budget_component = models.ForeignKey(BudgetComponent, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    unit = models.ForeignKey(UnitMeasurement, on_delete=models.SET_NULL, null=True, blank=True, related_name='po_details')
+    
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    tax1 = models.CharField(max_length=30, choices=VendorTerms.TaxCode.choices, default=VendorTerms.TaxCode.NONE)
+    tax2 = models.CharField(max_length=30, choices=VendorTerms.TaxCode.choices, default=VendorTerms.TaxCode.NONE)
+    
+    estimated_date = models.DateField(null=True, blank=True)
+    
+    order_no = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'purchases_po_detail'
+        ordering = ['po', 'order_no', 'id']
+
+    def __str__(self):
+        return f"{self.po.po_number} - {self.item.item_name if self.item else 'Item'}"
+
+    def save(self, *args, **kwargs):
+        # Auto calculate amount
+        base_amount = self.quantity * self.unit_price
+        if self.discount_percent > 0:
+            self.discount_amount = base_amount * (self.discount_percent / 100)
+        self.amount = base_amount - self.discount_amount
+        super().save(*args, **kwargs)
+
+
+class PurchaseOrderPaymentTerm(models.Model):
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='payment_terms')
+    term_desc = models.CharField(max_length=200)
+    duration_due = models.CharField(max_length=50, blank=True, default='') # E.g., '30 HARI'
+    duration_due_percent = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    due_date = models.DateField(null=True, blank=True)
+    doc_reff = models.CharField(max_length=100, blank=True, default='')
+    order_no = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'purchases_po_payment_term'
+        ordering = ['po', 'order_no', 'id']
+
+    def __str__(self):
+        return f"{self.po.po_number} - {self.term_desc}"

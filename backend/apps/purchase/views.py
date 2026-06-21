@@ -277,6 +277,14 @@ class PurchaseRequisitionListView(generics.ListCreateAPIView):
         if pr_type:
             qs = qs.filter(pr_type=pr_type)
 
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+
+        rap_id = self.request.query_params.get('rap')
+        if rap_id:
+            qs = qs.filter(rap_id=rap_id)
+
         start_date = self.request.query_params.get('start_date')
         if start_date:
             qs = qs.filter(pr_date__gte=start_date)
@@ -456,3 +464,126 @@ class PurchaseRequisitionApproveView(APIView):
             
         except ApprovalMatrixError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Order (PO)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import PurchaseOrder
+from .serializers import PurchaseOrderListSerializer, PurchaseOrderSerializer
+
+class PurchaseOrderListView(generics.ListCreateAPIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-ORDER'
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return PurchaseOrderListSerializer
+        return PurchaseOrderSerializer
+
+    def get_queryset(self):
+        company = Company.get_default()
+        qs = PurchaseOrder.objects.filter(company=company).select_related(
+            'vendor', 'project', 'rap', 'requestor_department', 'created_by'
+        )
+        
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(po_number__icontains=search) | Q(vendor__name__icontains=search))
+            
+        doc_status = self.request.query_params.get('document_status')
+        if doc_status:
+            qs = qs.filter(document_status=doc_status)
+            
+        app_status = self.request.query_params.get('approval_status')
+        if app_status:
+            qs = qs.filter(approval_status=app_status)
+            
+        po_type = self.request.query_params.get('po_type')
+        if po_type:
+            qs = qs.filter(po_type=po_type)
+
+        start_date = self.request.query_params.get('start_date')
+        if start_date:
+            qs = qs.filter(po_date__gte=start_date)
+
+        end_date = self.request.query_params.get('end_date')
+        if end_date:
+            qs = qs.filter(po_date__lte=end_date)
+
+        return qs
+
+    def perform_create(self, serializer):
+        company = Company.get_default()
+        serializer.save(company=company, created_by=self.request.user)
+
+
+class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PurchaseOrder.objects.all()
+    serializer_class = PurchaseOrderSerializer
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-ORDER'
+
+    def perform_destroy(self, instance):
+        if instance.approval_status in [PurchaseOrder.ApprovalStatus.AWAITING, PurchaseOrder.ApprovalStatus.APPROVED]:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': 'Purchase Order yang sedang diajukan atau sudah disetujui tidak dapat dihapus.'})
+        instance.delete()
+
+
+class PurchaseOrderSubmitView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-ORDER'
+
+    def post(self, request, pk):
+        from django.db.models import Sum
+        from apps.accounting_period.period_checker import PeriodChecker
+        from apps.approval.services import create_approval_request, ApprovalMatrixError
+
+        po = get_object_or_404(PurchaseOrder, pk=pk)
+
+        if po.document_status not in ['draft', 'open']:
+            return Response({'detail': 'PO ini sudah diproses atau ditutup dan tidak dapat diajukan lagi.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Validate Financial Period
+        period_result = PeriodChecker.check(po.po_date, raise_exception=False)
+        if not period_result.is_open:
+            return Response({'detail': period_result.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check Budget (based on RAP tolerance in Company)
+        # Assuming budget is checked here before submission or during approval.
+        # Since BFS ERP relies on the AnnualBudget, we should ideally check AnnualBudget remaining
+        # but for simplicity, we mirror PR behavior and assume PO budget follows RAP if linked.
+        if po.rap:
+            used_po = PurchaseOrder.objects.filter(
+                rap=po.rap,
+                document_status__in=['open', 'confirmed', 'delivered', 'invoiced', 'close']
+            ).exclude(pk=po.pk).aggregate(total=Sum('grand_total'))['total'] or 0
+            
+            # Using Company RAP tolerance if applicable
+            tolerance = po.company.rap_tolerance / 100 if po.company.rap_tolerance else 1.0
+            allowed_budget = po.rap.total_cost * tolerance
+            remaining_rap = allowed_budget - float(used_po)
+            
+            if float(po.grand_total) > remaining_rap:
+                return Response({
+                    'detail': f'Total PO ({po.grand_total}) melebihi sisa anggaran RAP yang diizinkan ({remaining_rap}).'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Create Approval Request
+        try:
+            create_approval_request(
+                document_code='PO',
+                document_id=str(po.id),
+                document_number=po.po_number,
+                creator_user=request.user,
+                amount=po.grand_total,
+            )
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        po.document_status = 'open'
+        po.approval_status = 'awaiting'
+        po.save()
+
+        return Response(PurchaseOrderSerializer(po).data)

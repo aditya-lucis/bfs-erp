@@ -252,3 +252,157 @@ class PurchaseRequisitionSerializer(serializers.ModelSerializer):
                 
         instance.save()
         return instance
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Order Serializers
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import PurchaseOrder, PurchaseOrderDetail, PurchaseOrderPaymentTerm
+
+class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source='item.item_name', read_only=True)
+    item_code = serializers.CharField(source='item.item_code', read_only=True)
+    unit_name = serializers.CharField(source='unit.unit_name', read_only=True)
+    budget_component_name = serializers.CharField(source='budget_component.name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrderDetail
+        fields = [
+            'id', 'po', 'pr_detail', 'item', 'item_code', 'item_name',
+            'rap_detail', 'budget_component', 'budget_component_name',
+            'quantity', 'unit', 'unit_name', 'unit_price',
+            'discount_percent', 'discount_amount', 'amount',
+            'tax1', 'tax2', 'estimated_date', 'order_no'
+        ]
+        read_only_fields = ['amount', 'discount_amount']
+        extra_kwargs = {
+            'po': {'required': False}
+        }
+
+
+class PurchaseOrderPaymentTermSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrderPaymentTerm
+        fields = [
+            'id', 'po', 'term_desc', 'duration_due', 'duration_due_percent',
+            'amount', 'due_date', 'doc_reff', 'order_no'
+        ]
+        extra_kwargs = {
+            'po': {'required': False}
+        }
+
+
+class PurchaseOrderListSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    vendor_code = serializers.CharField(source='vendor.code', read_only=True)
+    project_name = serializers.CharField(source='project.project_name', read_only=True)
+    department_name = serializers.CharField(source='requestor_department.name', read_only=True)
+    po_type_display = serializers.CharField(source='get_po_type_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            'id', 'po_number', 'po_date', 'vendor', 'vendor_name', 'vendor_code',
+            'po_type', 'po_type_display', 'project', 'project_name',
+            'requestor_department', 'department_name', 'po_currency',
+            'document_status', 'approval_status', 'grand_total', 'created_by_name'
+        ]
+
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    details = PurchaseOrderDetailSerializer(many=True, required=False)
+    payment_terms = PurchaseOrderPaymentTermSerializer(many=True, required=False)
+    
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    vendor_code = serializers.CharField(source='vendor.code', read_only=True)
+    vendor_address = serializers.CharField(source='vendor.address_1', read_only=True)
+    project_name = serializers.CharField(source='project.project_name', read_only=True)
+    rap_name = serializers.CharField(source='rap.rap_name', read_only=True)
+    rap_number = serializers.CharField(source='rap.rap_number', read_only=True)
+    department_name = serializers.CharField(source='requestor_department.name', read_only=True)
+    rr_account_name = serializers.CharField(source='rr_account.name', read_only=True)
+    vi_account_name = serializers.CharField(source='vi_account.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = '__all__'
+        read_only_fields = [
+            'po_number', 'document_status', 'approval_status', 
+            'company', 'created_by', 'total_amount', 'total_discount',
+            'total_tax', 'total_deduction', 'grand_total', 'payment_balance'
+        ]
+
+    def _calculate_totals(self, validated_data, details_data):
+        total_amount = 0
+        total_discount = 0
+        
+        # We will need the logic for Tax later, but for now we simplify
+        # as Tax requires knowing the percentages.
+        for item in details_data:
+            qty = item.get('quantity', 0)
+            price = item.get('unit_price', 0)
+            disc_pct = item.get('discount_percent', 0)
+            
+            base_amount = qty * price
+            disc_amt = base_amount * (disc_pct / 100)
+            
+            total_amount += base_amount
+            total_discount += disc_amt
+            
+        # Simplified grand total
+        grand_total = total_amount - total_discount
+        # Add a simple 11% PPN if VAT Include is checked as a placeholder?
+        # Sokka ERP does tax by line item tax1 and tax2.
+        
+        validated_data['total_amount'] = total_amount
+        validated_data['total_discount'] = total_discount
+        validated_data['grand_total'] = grand_total
+        validated_data['payment_balance'] = grand_total
+
+    def create(self, validated_data):
+        details_data = validated_data.pop('details', [])
+        payment_terms_data = validated_data.pop('payment_terms', [])
+        
+        self._calculate_totals(validated_data, details_data)
+        
+        po = PurchaseOrder.objects.create(**validated_data)
+        
+        for i, detail_data in enumerate(details_data):
+            detail_data['order_no'] = i
+            PurchaseOrderDetail.objects.create(po=po, **detail_data)
+            
+        for i, pt_data in enumerate(payment_terms_data):
+            pt_data['order_no'] = i
+            PurchaseOrderPaymentTerm.objects.create(po=po, **pt_data)
+            
+        return po
+
+    def update(self, instance, validated_data):
+        details_data = validated_data.pop('details', None)
+        payment_terms_data = validated_data.pop('payment_terms', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        if details_data is not None:
+            self._calculate_totals(validated_data, details_data)
+            instance.total_amount = validated_data.get('total_amount', 0)
+            instance.total_discount = validated_data.get('total_discount', 0)
+            instance.grand_total = validated_data.get('grand_total', 0)
+            instance.payment_balance = validated_data.get('payment_balance', 0)
+            
+            instance.details.all().delete()
+            for i, detail_data in enumerate(details_data):
+                detail_data['order_no'] = i
+                PurchaseOrderDetail.objects.create(po=instance, **detail_data)
+                
+        if payment_terms_data is not None:
+            instance.payment_terms.all().delete()
+            for i, pt_data in enumerate(payment_terms_data):
+                pt_data['order_no'] = i
+                PurchaseOrderPaymentTerm.objects.create(po=instance, **pt_data)
+                
+        instance.save()
+        return instance
