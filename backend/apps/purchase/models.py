@@ -617,26 +617,47 @@ class PurchaseOrderDetail(models.Model):
         discounted_amount = base_amount - self.discount_amount
         
         tax_map = {
-            'ppn_01': Decimal('1'),
-            'ppn_10': Decimal('10'),
-            'ppn_10_euro': Decimal('10'),
-            'ppn_11': Decimal('11'),
-            'ppn_15': Decimal('15'),
+            'none': (Decimal('0'), 'none'),
+            'non': (Decimal('0'), 'none'),
+            'pph_23_rate_15': (Decimal('15'), 'deduction'),
+            'pph_23_rate_2': (Decimal('2'), 'deduction'),
+            'pph_23_rate_4': (Decimal('4'), 'deduction'),
+            'pph_23_rate_4_5': (Decimal('4.5'), 'deduction'),
+            'pph_23_rate_7_5': (Decimal('7.5'), 'deduction'),
+            'pph_4_2_rate_10': (Decimal('10'), 'deduction'),
+            'pph_4_2_rate_2': (Decimal('2'), 'deduction'),
+            'pph_4_2_rate_3': (Decimal('3'), 'deduction'),
+            'pph_4_2_rate_4': (Decimal('4'), 'deduction'),
+            'ppn_01': (Decimal('1'), 'addition'),
+            'ppn_10': (Decimal('10'), 'addition'),
+            'ppn_10_euro': (Decimal('10'), 'addition'),
+            'ppn_11': (Decimal('11'), 'addition'),
+            'ppn_15': (Decimal('15'), 'addition'),
         }
         
         ppn_rate = Decimal('0')
-        if self.tax1 in tax_map:
-            ppn_rate += tax_map[self.tax1]
-        if self.tax2 in tax_map:
-            ppn_rate += tax_map[self.tax2]
+        pph_rate = Decimal('0')
+        
+        t1 = tax_map.get(self.tax1, (Decimal('0'), 'none'))
+        t2 = tax_map.get(self.tax2, (Decimal('0'), 'none'))
+        
+        if t1[1] == 'addition': ppn_rate += t1[0]
+        if t2[1] == 'addition': ppn_rate += t2[0]
+        if t1[1] == 'deduction': pph_rate += t1[0]
+        if t2[1] == 'deduction': pph_rate += t2[0]
             
+        baseAmount = discounted_amount
+        itemPPN = Decimal('0')
+        
         if hasattr(self, 'po') and self.po and getattr(self.po, 'ppn', False):
-            # Inclusive PPN
-            self.amount = discounted_amount
+            baseAmount = discounted_amount / (Decimal('1') + (ppn_rate / Decimal('100')))
+            itemPPN = discounted_amount - baseAmount
         else:
-            # Exclusive PPN
-            tax_amount = discounted_amount * (ppn_rate / Decimal('100'))
-            self.amount = discounted_amount + tax_amount
+            itemPPN = baseAmount * (ppn_rate / Decimal('100'))
+            
+        itemPPh = baseAmount * (pph_rate / Decimal('100'))
+        
+        self.amount = baseAmount + itemPPN - itemPPh
             
         super().save(*args, **kwargs)
 
