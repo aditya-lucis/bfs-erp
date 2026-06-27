@@ -273,9 +273,11 @@ class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
             'rap_detail', 'budget_component', 'budget_component_name',
             'quantity', 'unit', 'unit_name', 'unit_price',
             'discount_percent', 'discount_amount', 'amount',
+            'tax_amount', 'deduction_amount',
+            'paid_amount', 'paid_tax_amount',
             'tax1', 'tax2', 'estimated_date', 'order_no'
         ]
-        read_only_fields = ['amount', 'discount_amount']
+        read_only_fields = ['amount', 'discount_amount', 'tax_amount', 'deduction_amount', 'paid_amount', 'paid_tax_amount']
         extra_kwargs = {
             'po': {'required': False}
         }
@@ -346,27 +348,73 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     def _calculate_totals(self, validated_data, details_data):
         total_amount = Decimal('0')
         total_discount = Decimal('0')
+        total_tax = Decimal('0')
+        total_deduction = Decimal('0')
         
-        # We will need the logic for Tax later, but for now we simplify
-        # as Tax requires knowing the percentages.
+        tax_map = {
+            'none': (Decimal('0'), 'none'),
+            'non': (Decimal('0'), 'none'),
+            'pph_23_rate_15': (Decimal('15'), 'deduction'),
+            'pph_23_rate_2': (Decimal('2'), 'deduction'),
+            'pph_23_rate_4': (Decimal('4'), 'deduction'),
+            'pph_23_rate_4_5': (Decimal('4.5'), 'deduction'),
+            'pph_23_rate_7_5': (Decimal('7.5'), 'deduction'),
+            'pph_4_2_rate_10': (Decimal('10'), 'deduction'),
+            'pph_4_2_rate_2': (Decimal('2'), 'deduction'),
+            'pph_4_2_rate_3': (Decimal('3'), 'deduction'),
+            'pph_4_2_rate_4': (Decimal('4'), 'deduction'),
+            'ppn_01': (Decimal('1'), 'addition'),
+            'ppn_10': (Decimal('10'), 'addition'),
+            'ppn_10_euro': (Decimal('10'), 'addition'),
+            'ppn_11': (Decimal('11'), 'addition'),
+            'ppn_15': (Decimal('15'), 'addition'),
+        }
+        
+        is_ppn_inclusive = validated_data.get('ppn', False)
+        
         for item in details_data:
             qty = Decimal(str(item.get('quantity') or 0))
-            price = Decimal(str(item.get('unit_price') or 0))
+            price = Decimal(str(item.get('final_unit_price', item.get('unit_price', 0))))
             disc_pct = Decimal(str(item.get('discount_percent') or 0))
             
             base_amount = qty * price
             disc_amt = base_amount * (disc_pct / Decimal('100'))
+            discounted_amount = base_amount - disc_amt
             
             total_amount += base_amount
             total_discount += disc_amt
             
-        # Simplified grand total
+            t1 = tax_map.get(item.get('tax1', 'none'), (Decimal('0'), 'none'))
+            t2 = tax_map.get(item.get('tax2', 'none'), (Decimal('0'), 'none'))
+            
+            ppn_rate = Decimal('0')
+            pph_rate = Decimal('0')
+            
+            if t1[1] == 'addition': ppn_rate += t1[0]
+            if t2[1] == 'addition': ppn_rate += t2[0]
+            if t1[1] == 'deduction': pph_rate += t1[0]
+            if t2[1] == 'deduction': pph_rate += t2[0]
+            
+            baseAmount = discounted_amount
+            itemPPN = Decimal('0')
+            
+            if is_ppn_inclusive:
+                baseAmount = discounted_amount / (Decimal('1') + (ppn_rate / Decimal('100')))
+                itemPPN = discounted_amount - baseAmount
+            else:
+                itemPPN = baseAmount * (ppn_rate / Decimal('100'))
+                
+            itemPPh = baseAmount * (pph_rate / Decimal('100'))
+            
+            total_tax += itemPPN
+            total_deduction += itemPPh
+            
         grand_total = total_amount - total_discount
-        # Add a simple 11% PPN if VAT Include is checked as a placeholder?
-        # Sokka ERP does tax by line item tax1 and tax2.
         
         validated_data['total_amount'] = total_amount
         validated_data['total_discount'] = total_discount
+        validated_data['total_tax'] = total_tax
+        validated_data['total_deduction'] = total_deduction
         validated_data['grand_total'] = grand_total
         validated_data['payment_balance'] = grand_total
 

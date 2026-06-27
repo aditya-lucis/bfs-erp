@@ -370,7 +370,7 @@
                         <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.unit_price) }}</td>
                         <td class="py-1.5 px-2 text-right">{{ parseFloat(getItemTaxRate(item)).toFixed(2) }}%</td>
                         <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.discount_amount || 0) }}</td>
-                        <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.amount || item.quantity * item.unit_price) }}</td>
+                        <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(getLineTotal(item)) }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -586,8 +586,18 @@ function getItemTaxRate(item) {
   return rate
 }
 
+function getLineTotal(item) {
+  const baseAmount = parseFloat(item.amount) || ((parseFloat(item.quantity) * parseFloat(item.unit_price)) - parseFloat(item.discount_amount || 0)) || 0
+  if (printModal.value.po?.ppn) return baseAmount
+  return baseAmount + parseFloat(item.tax_amount || 0)
+}
+
 const printGrandTotal = computed(() => {
-  return printModal.value.po?.grand_total || printDetails.value.reduce((sum, item) => sum + (parseFloat(item.amount) || parseFloat(item.quantity) * parseFloat(item.unit_price) || 0), 0)
+  const po = printModal.value.po
+  if (po) {
+    return parseFloat(po.grand_total || 0) + parseFloat(po.total_tax || 0) - parseFloat(po.total_deduction || 0)
+  }
+  return printDetails.value.reduce((sum, item) => sum + (parseFloat(item.amount) || parseFloat(item.quantity) * parseFloat(item.unit_price) || 0), 0)
 })
 
 function numberToWordsEn(n) {

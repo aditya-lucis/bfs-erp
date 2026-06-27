@@ -587,6 +587,11 @@ class PurchaseOrderDetail(models.Model):
     discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     
     amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    deduction_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    paid_tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     
     tax1 = models.CharField(max_length=30, choices=VendorTerms.TaxCode.choices, default=VendorTerms.TaxCode.NONE)
     tax2 = models.CharField(max_length=30, choices=VendorTerms.TaxCode.choices, default=VendorTerms.TaxCode.NONE)
@@ -657,7 +662,9 @@ class PurchaseOrderDetail(models.Model):
             
         itemPPh = baseAmount * (pph_rate / Decimal('100'))
         
-        self.amount = baseAmount + itemPPN - itemPPh
+        self.amount = discounted_amount
+        self.tax_amount = itemPPN
+        self.deduction_amount = itemPPh
             
         super().save(*args, **kwargs)
 

@@ -385,7 +385,7 @@
                     </div>
                     <div class="flex justify-between items-center px-3 py-2 bg-gray-100 rounded text-base font-bold border-t border-gray-300 mt-2">
                       <span class="text-gray-800">Grand Total (IDR)</span>
-                      <span class="font-mono text-bfs-navy">{{ formatCurrency(summary.grand_total) }}</span>
+                      <span class="font-mono text-bfs-navy">{{ formatCurrency(summary.display_total) }}</span>
                     </div>
                       <div class="flex justify-between items-center px-2 py-1 bg-gray-50 rounded">
                         <span class="text-gray-600">Payment</span>
@@ -881,12 +881,13 @@ const summary = computed(() => {
   const discount_amount = rawSubtotal * (discount_percent / 100)
   const after_discount = rawSubtotal - discount_amount
   
-  const grand_total = after_discount + total_tax - total_deduction
+  const grand_total = after_discount
+  const display_total = grand_total + total_tax - total_deduction
   
   const payment_amount = form.value.payment_terms.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
-  const selisih = grand_total - payment_amount
+  const selisih = display_total - payment_amount
   const partial_cancellation = form.value.partial_cancellation || 0
-  const balance = grand_total - partial_cancellation - payment_amount
+  const balance = display_total - partial_cancellation - payment_amount
   
   return {
     total_amount: rawSubtotal,
@@ -894,6 +895,7 @@ const summary = computed(() => {
     total_tax,
     total_deduction,
     grand_total,
+    display_total,
     payment_amount,
     selisih,
     partial_cancellation,
@@ -972,10 +974,10 @@ async function savePO(isDraft = false) {
       notes: d.notes
     })),
     payment_terms: form.value.payment_terms.map(t => ({
-      term_desc: t.term_desc,
-      duration_due: t.duration_due === 'none' ? null : t.duration_due,
-      duration_due_percent: t.percentage,
-      amount: t.amount,
+      term_desc: t.term_desc || '',
+      duration_due: (t.duration_due === 'none' || !t.duration_due) ? '' : t.duration_due,
+      duration_due_percent: Number(t.percentage) || 0,
+      amount: Number(t.amount) || 0,
       due_date: t.due_date || null
     })),
     document_status: 'draft' // Always save as draft first before submitting
