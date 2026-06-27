@@ -359,6 +359,14 @@
                         </tr>
                       </tbody>
                     </table>
+                    <button 
+                      v-if="form.approval_status === 'approved'"
+                      @click="updatePaymentTerms" 
+                      :disabled="store.loading"
+                      class="bg-bfs-navy text-white font-medium text-[11px] px-4 py-1.5 rounded hover:bg-bfs-navy-dark transition-colors mt-3 shadow-sm shadow-bfs-navy/20"
+                    >
+                      Update Payment Term
+                    </button>
                   </div>
 
                   <!-- Right: Summary Totals -->
@@ -387,10 +395,10 @@
                       <span class="text-gray-800">Grand Total (IDR)</span>
                       <span class="font-mono text-bfs-navy">{{ formatCurrency(summary.display_total) }}</span>
                     </div>
-                      <div class="flex justify-between items-center px-2 py-1 bg-gray-50 rounded">
-                        <span class="text-gray-600">Payment</span>
-                        <span class="font-mono">{{ formatCurrency(form.paid_amount || 0) }}</span>
-                      </div>
+                        <div class="flex justify-between items-center px-2 py-1 bg-gray-50 rounded">
+                          <span class="text-gray-600">Payment</span>
+                          <span class="font-mono">{{ formatCurrency(form.paid_amount || 0) }}</span>
+                        </div>
                     <div class="flex justify-between items-center px-2 py-1 bg-gray-50 rounded">
                       <span class="text-gray-600">Selisih</span>
                       <span class="font-mono" :class="summary.selisih < 0 ? 'text-red-500' : ''">
@@ -411,6 +419,14 @@
                         <span class="text-gray-800">Balance</span>
                         <span class="font-mono text-red-600">{{ formatCurrency(summary.balance) }}</span>
                       </div>
+                      <button 
+                        v-if="form.approval_status === 'approved'"
+                        @click="updatePartialCancelation" 
+                        :disabled="store.loading"
+                        class="bg-bfs-navy text-white font-medium text-[11px] px-4 py-1.5 rounded hover:bg-bfs-navy-dark transition-colors mt-3 ml-auto block shadow-sm shadow-bfs-navy/20"
+                      >
+                        Update PO Cancelation
+                      </button>
                     </template>
                   </div>
                 </div>
@@ -437,7 +453,7 @@
                   >
                   <Send class="w-4 h-4" /> Submit to Approval
                   </button>
-                </div>
+                  </div>
               </div>
 
             </div>
@@ -788,8 +804,8 @@ function onItemSelect(row) {
 
 function addPaymentTerm() {
   let remaining = 0
-  if (summary.value && summary.value.grand_total) {
-    remaining = summary.value.grand_total - summary.value.payment_amount
+  if (summary.value && summary.value.display_total) {
+    remaining = summary.value.display_total - summary.value.payment_amount
     if (remaining < 0) remaining = 0
   }
   form.value.payment_terms.push({
@@ -885,9 +901,9 @@ const summary = computed(() => {
   const display_total = grand_total + total_tax - total_deduction
   
   const payment_amount = form.value.payment_terms.reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
-  const selisih = display_total - payment_amount
+  const selisih = display_total - (form.value.paid_amount || 0)
   const partial_cancellation = form.value.partial_cancellation || 0
-  const balance = display_total - partial_cancellation - payment_amount
+  const balance = display_total - partial_cancellation - (form.value.paid_amount || 0)
   
   return {
     total_amount: rawSubtotal,
@@ -907,7 +923,7 @@ function calculateSummary() {
   for (let d of form.value.details) {
     d.total_price = (d.quantity || 0) * (d.unit_price || 0)
   }
-  const total = summary.value.grand_total || summary.value.total_amount || 0
+  const total = summary.value.display_total || summary.value.total_amount || 0
   for (let t of form.value.payment_terms) {
     if (t.amount < 0) t.amount = 0
     if (total > 0) {
@@ -919,7 +935,7 @@ function calculateSummary() {
 }
 
 function calculatePaymentTerms() {
-  const total = summary.value.grand_total || summary.value.total_amount || 0
+  const total = summary.value.display_total || summary.value.total_amount || 0
   for (let t of form.value.payment_terms) {
     if (t.percentage) {
       t.amount = total * (t.percentage / 100)
@@ -930,6 +946,56 @@ function calculatePaymentTerms() {
 function closeModal() {
   emit('update:show', false)
   formError.value = null
+}
+
+async function updatePaymentTerms() {
+  formError.value = null
+  const payload = {
+    payment_terms: form.value.payment_terms.map(t => ({
+      term_desc: t.term_desc || '',
+      duration_due: (t.duration_due === 'none' || !t.duration_due) ? '' : t.duration_due,
+      duration_due_percent: Number(t.percentage) || 0,
+      amount: Number(t.amount) || 0,
+      due_date: t.due_date || null
+    }))
+  }
+  try {
+    await store.patchPO(props.editId, payload)
+    if (store.error) throw new Error()
+    Swal.fire({
+      icon: 'success',
+      title: 'Success!',
+      text: 'Payment Terms updated successfully.',
+      showConfirmButton: false,
+      timer: 1500
+    })
+    emit('saved')
+    closeModal()
+  } catch (err) {
+    formError.value = store.error || 'Failed to update Payment Terms.'
+  }
+}
+
+async function updatePartialCancelation() {
+  formError.value = null
+  const payload = {
+    partial_cancellation: form.value.partial_cancellation
+  }
+  try {
+    await store.patchPO(props.editId, payload)
+    if (store.error) throw new Error()
+    Swal.fire({
+      icon: 'success',
+      title: 'Success!',
+      text: 'PO Cancelation updated successfully.',
+      showConfirmButton: false,
+      timer: 1500
+    })
+    emit('saved')
+    closeModal()
+  } catch (err) {
+    formError.value = store.error || 'Failed to update Cancelation.'
+  }
 }
 
 async function savePO(isDraft = false) {

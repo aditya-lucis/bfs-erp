@@ -105,4 +105,13 @@ urlpatterns = [
     path('po-inbox/<int:pk>/reject/',
          views.POInboxViewSet.as_view({'post': 'reject'}),
          name='po-inbox-reject'),
+
+    # GRN-SES Documents
+    path('grn-ses-documents/', views.GrnSesDocumentViewSet.as_view({'get': 'list', 'post': 'create'}), name='grn-ses-document-list'),
+    path('grn-ses-documents/<int:pk>/', views.GrnSesDocumentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='grn-ses-document-detail'),
+
+    path('completion-certificates/', views.CompletionCertificateViewSet.as_view({'get': 'list', 'post': 'create'}), name='completion-certificate-list'),
+    path('completion-certificates/<int:pk>/', views.CompletionCertificateViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='completion-certificate-detail'),
+    path('completion-certificates/get_valid_vendors/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_vendors'}), name='cc-valid-vendors'),
+    path('completion-certificates/get_valid_pos/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_pos'}), name='cc-valid-pos'),
 ]

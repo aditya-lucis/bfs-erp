@@ -685,3 +685,58 @@ class PurchaseOrderPaymentTerm(models.Model):
 
     def __str__(self):
         return f"{self.po.po_number} - {self.term_desc}"
+
+
+class CompletionCertificate(models.Model):
+    class TypeChoices(models.TextChoices):
+        GRN = 'GRN', 'GRN'
+        BAST = 'BAST', 'BAST'
+
+    cc_number = models.CharField(max_length=100, unique=True)
+    document_date = models.DateField()
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE)
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
+    description = models.TextField()
+    type = models.CharField(max_length=10, choices=TypeChoices.choices, default=TypeChoices.GRN)
+    document_date_from_vendor = models.DateField()
+    currency = models.CharField(max_length=10, default='IDR')
+    payment_term = models.ForeignKey(PurchaseOrderPaymentTerm, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    approval_status = models.CharField(max_length=50, default='draft')
+    is_active = models.BooleanField(default=False)
+    
+    # Audit fields
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'purchases_completion_certificate'
+        ordering = ['-document_date', '-id']
+
+
+class GrnSesDocument(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ('GRN', 'GRN'),
+        ('SES', 'SES'),
+    ]
+    document_name = models.CharField(max_length=200)
+    type = models.CharField(max_length=10, choices=DOCUMENT_TYPE_CHOICES, default='GRN')
+    is_active = models.BooleanField(default=True, verbose_name='Is Active')
+
+    class Meta:
+        db_table = 'purchases_grn_ses_document'
+        ordering = ['document_name']
+
+class CompletionCertificateDocument(models.Model):
+    cc = models.ForeignKey(CompletionCertificate, on_delete=models.CASCADE, related_name='documents')
+    master_document = models.ForeignKey(GrnSesDocument, on_delete=models.CASCADE)
+    is_available = models.BooleanField(default=False)
+    file = models.FileField(upload_to='completion_certificates/', null=True, blank=True)
+    document_number = models.CharField(max_length=255, null=True, blank=True)
+    keterangan = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'purchases_completion_certificate_document'
+        unique_together = ('cc', 'master_document')
+
+

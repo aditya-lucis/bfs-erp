@@ -43,6 +43,7 @@ import PurchaseRequisitionView from './views/purchase/PurchaseRequisitionView.vu
 import PurchaseRequisitionInboxView from './views/purchase/PurchaseRequisitionInboxView.vue'
 import PurchaseOrderView from './views/purchase/PurchaseOrderView.vue'
 import POInboxView from './views/purchase/POInboxView.vue'
+import GrnSesDocumentView from './views/purchase/GrnSesDocumentView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
@@ -83,6 +84,8 @@ const implementedRoutes = [
   { path: '/purchases/purchase-requisition-inbox', component: PurchaseRequisitionInboxView, meta: { title: 'Purchase Requisition Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/purchase-order', component: PurchaseOrderView, meta: { title: 'Purchase Order', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/purchase-order-inbox', component: POInboxView, meta: { title: 'Purchase Order Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/grnses-document', component: GrnSesDocumentView, meta: { title: 'GRN-SES Document', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/completion-certificate', component: () => import('./views/purchase/CompletionCertificateView.vue'), meta: { title: 'Completion Certificate', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))

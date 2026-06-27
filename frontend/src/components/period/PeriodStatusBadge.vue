@@ -60,7 +60,7 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import api from '@/services/api.js'
+import api from '../../services/api.js'
 
 const props = defineProps({
   date:        { type: String, default: '' },

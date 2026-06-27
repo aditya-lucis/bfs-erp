@@ -642,3 +642,108 @@ class POInboxViewSet(viewsets.ReadOnlyModelViewSet):
         po.allow_previous_year_budget = True
         po.save()
         return Response({'status': 'success', 'message': 'Izin penggunaan RAP tahun sebelumnya telah diberikan.'})
+
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import CompletionCertificate, PurchaseOrder, Vendor
+from .serializers import CompletionCertificateSerializer
+
+class CompletionCertificateViewSet(viewsets.ModelViewSet):
+    queryset = CompletionCertificate.objects.all()
+    serializer_class = CompletionCertificateSerializer
+
+    @action(detail=False, methods=['get'])
+    def get_valid_vendors(self, request):
+        from apps.purchase.serializers import VendorListSerializer
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        three_months_ago = timezone.now().date() - timedelta(days=90)
+        PurchaseOrder.objects.filter(
+            is_active=True,
+            po_date__lt=three_months_ago,
+            completioncertificate__isnull=True
+        ).update(is_active=False)
+
+        pos = PurchaseOrder.objects.filter(is_active=True, approval_status='approved').values_list('vendor_id', flat=True)
+        vendors = Vendor.objects.filter(id__in=pos).distinct()
+        serializer = VendorListSerializer(vendors, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def get_valid_pos(self, request):
+        vendor_id = request.query_params.get('vendor_id')
+        if not vendor_id:
+            return Response([])
+        from apps.purchase.serializers import PurchaseOrderSerializer
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        three_months_ago = timezone.now().date() - timedelta(days=90)
+        PurchaseOrder.objects.filter(
+            is_active=True,
+            vendor_id=vendor_id,
+            po_date__lt=three_months_ago,
+            completioncertificate__isnull=True
+        ).update(is_active=False)
+        
+        pos = PurchaseOrder.objects.filter(vendor_id=vendor_id, is_active=True, approval_status='approved')
+        serializer = PurchaseOrderSerializer(pos, many=True)
+        return Response(serializer.data)
+
+
+from .models import GrnSesDocument
+from .serializers import GrnSesDocumentSerializer
+from rest_framework import viewsets
+
+class GrnSesDocumentViewSet(viewsets.ModelViewSet):
+    queryset = GrnSesDocument.objects.all()
+    serializer_class = GrnSesDocumentSerializer
+
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import CompletionCertificate, PurchaseOrder, Vendor
+from .serializers import CompletionCertificateSerializer
+
+class CompletionCertificateViewSet(viewsets.ModelViewSet):
+    queryset = CompletionCertificate.objects.all()
+    serializer_class = CompletionCertificateSerializer
+
+    @action(detail=False, methods=['get'])
+    def get_valid_vendors(self, request):
+        from apps.purchase.serializers import VendorListSerializer
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        three_months_ago = timezone.now().date() - timedelta(days=90)
+        PurchaseOrder.objects.filter(
+            is_active=True,
+            po_date__lt=three_months_ago,
+            completioncertificate__isnull=True
+        ).update(is_active=False)
+
+        pos = PurchaseOrder.objects.filter(is_active=True, approval_status='approved').values_list('vendor_id', flat=True)
+        vendors = Vendor.objects.filter(id__in=pos).distinct()
+        serializer = VendorListSerializer(vendors, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def get_valid_pos(self, request):
+        vendor_id = request.query_params.get('vendor_id')
+        if not vendor_id:
+            return Response([])
+        from apps.purchase.serializers import PurchaseOrderSerializer
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        three_months_ago = timezone.now().date() - timedelta(days=90)
+        PurchaseOrder.objects.filter(
+            is_active=True,
+            vendor_id=vendor_id,
+            po_date__lt=three_months_ago,
+            completioncertificate__isnull=True
+        ).update(is_active=False)
+        
+        pos = PurchaseOrder.objects.filter(vendor_id=vendor_id, is_active=True, approval_status='approved')
+        serializer = PurchaseOrderSerializer(pos, many=True)
+        return Response(serializer.data)

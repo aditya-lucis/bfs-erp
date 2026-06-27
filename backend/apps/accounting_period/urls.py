@@ -81,8 +81,8 @@ urlpatterns = [
          name='period-logs-global'),
 
    # ── Period Status Check (for frontend real-time validation) ───────────────
-    path('periods/status/',
+    path('status/',
          PeriodStatusView.as_view(),      name='period-status'),
-    path('periods/status/bulk/',
+    path('status/bulk/',
          PeriodStatusBulkView.as_view(),  name='period-status-bulk'),
 ]

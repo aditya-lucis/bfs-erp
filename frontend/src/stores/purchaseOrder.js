@@ -52,6 +52,19 @@ export const usePurchaseOrderStore = defineStore('purchaseOrder', {
       }
     },
 
+    async patchPO(id, payload) {
+      this.loading = true
+      try {
+        const response = await api.patch(`/purchase/po/${id}/`, payload)
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data || 'Gagal memperbarui PO parsial'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updatePO(id, payload) {
       this.loading = true
       try {

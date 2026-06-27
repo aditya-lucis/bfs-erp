@@ -21,7 +21,7 @@
  */
 
 import { ref, computed } from 'vue'
-import api from '@/services/api.js'
+import api from '../services/api.js'
 
 export function usePeriodCheck(options = {}) {
     const {
