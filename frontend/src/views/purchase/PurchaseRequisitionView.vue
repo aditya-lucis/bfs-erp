@@ -665,6 +665,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import Swal from 'sweetalert2'
 import { 
   Search, Plus, Loader2, Edit3, Trash2, Send, Pencil, Printer, CheckSquare,
   Folder, FolderOpen, FolderCheck,
@@ -816,12 +817,22 @@ function formatCurrency(value) {
 }
 
 async function deletePR(id) {
-  if (confirm('Are you sure you want to delete this PR?')) {
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: "You won't be able to revert this!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, delete it!'
+  })
+  if (result.isConfirmed) {
     try {
       await store.deletePR(id)
       handleSearch()
+      Swal.fire('Deleted!', 'PR has been deleted.', 'success')
     } catch (e) {
-      alert(store.error || 'Delete failed')
+      Swal.fire('Error', store.error || 'Delete failed', 'error')
     }
   }
 }
@@ -992,7 +1003,7 @@ async function openEditModal(pr) {
     })
     modal.value.show = true
   } catch (e) {
-    alert('Failed to load PR details')
+    Swal.fire('Error', 'Failed to load PR details', 'error')
   }
 }
 

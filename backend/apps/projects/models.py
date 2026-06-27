@@ -268,5 +268,61 @@ class RAPDetail(models.Model):
         count = siblings.count() + 1
         return f"{parent_num}.{count}"
 
+# ─── Project Budget (Commitment & Actual Tracking) ──────────────────────────
 
+class ProjectBudgetHeader(models.Model):
+    """
+    Menyimpan total akumulasi budget commit dan actual per Project.
+    """
+    project = models.OneToOneField(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='budget_header'
+    )
+    commit_amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    actual_amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True,
+        related_name='created_project_budgets'
+    )
+
+    class Meta:
+        db_table = 'project_budget_header'
+
+    def __str__(self):
+        return f"Budget for {self.project.project_name}"
+
+
+class ProjectBudgetDetail(models.Model):
+    """
+    Menyimpan akumulasi commit dan actual per Item dan RAPDetail.
+    """
+    budget_header = models.ForeignKey(
+        ProjectBudgetHeader,
+        on_delete=models.CASCADE,
+        related_name='details'
+    )
+    rap_detail = models.OneToOneField(
+        RAPDetail,
+        on_delete=models.CASCADE,
+        related_name='budget_detail'
+    )
+    item = models.ForeignKey(
+        'inventory.Item',
+        on_delete=models.PROTECT,
+        related_name='project_budget_details'
+    )
+    commit_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    actual_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = 'project_budget_detail'
+
+    def __str__(self):
+        return f"Budget Detail for {self.item.item_name}"
 

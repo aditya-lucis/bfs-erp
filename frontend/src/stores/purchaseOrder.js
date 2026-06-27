@@ -88,6 +88,46 @@ export const usePurchaseOrderStore = defineStore('purchaseOrder', {
       } finally {
         this.loading = false
       }
+    },
+
+    async fetchPOInbox(params = {}) {
+      this.loading = true
+      try {
+        const response = await api.get('/purchase/po-inbox/', { params })
+        this.inboxPos = response.data.results || response.data
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data?.detail || 'Gagal memuat inbox PO'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async approvePO(id) {
+      this.loading = true
+      try {
+        const response = await api.post(`/purchase/po-inbox/${id}/approve/`)
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data?.detail || 'Gagal approve PO'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async rejectPO(id) {
+      this.loading = true
+      try {
+        const response = await api.post(`/purchase/po-inbox/${id}/reject/`)
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data?.detail || 'Gagal reject PO'
+        throw err
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

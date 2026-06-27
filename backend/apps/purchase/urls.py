@@ -88,4 +88,21 @@ urlpatterns = [
     path('po/<int:pk>/submit/',
          views.PurchaseOrderSubmitView.as_view(),
          name='po-submit'),
+    path('po/<int:pk>/allow-previous-year/',
+         views.POInboxViewSet.as_view({'post': 'allow_previous_year_budget'}),
+         name='po-allow-previous-year'),
+
+    # ─── Purchase Order Inbox ──────────────────────────────────────────────────
+    path('po-inbox/',
+         views.POInboxViewSet.as_view({'get': 'list'}),
+         name='po-inbox-list'),
+    path('po-inbox/<int:pk>/',
+         views.POInboxViewSet.as_view({'get': 'retrieve'}),
+         name='po-inbox-detail'),
+    path('po-inbox/<int:pk>/approve/',
+         views.POInboxViewSet.as_view({'post': 'approve'}),
+         name='po-inbox-approve'),
+    path('po-inbox/<int:pk>/reject/',
+         views.POInboxViewSet.as_view({'post': 'reject'}),
+         name='po-inbox-reject'),
 ]

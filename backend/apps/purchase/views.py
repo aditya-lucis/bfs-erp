@@ -1,6 +1,8 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
+from django.core.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -470,7 +472,7 @@ class PurchaseRequisitionApproveView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 
 from .models import PurchaseOrder
-from .serializers import PurchaseOrderListSerializer, PurchaseOrderSerializer
+from .serializers import PurchaseOrderListSerializer, PurchaseOrderSerializer, POInboxSerializer
 
 class PurchaseOrderListView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
@@ -554,18 +556,29 @@ class PurchaseOrderSubmitView(APIView):
         # Assuming budget is checked here before submission or during approval.
         # Since BFS ERP relies on the AnnualBudget, we should ideally check AnnualBudget remaining
         # but for simplicity, we mirror PR behavior and assume PO budget follows RAP if linked.
+
         if po.rap:
+            from django.utils import timezone
+            from decimal import Decimal
+            
+            current_year = timezone.now().year
+            if current_year > po.rap.year_period and not po.allow_previous_year_budget:
+                return Response({
+                    'detail': f'PO ini menggunakan RAP tahun {po.rap.year_period}. Memerlukan izin "Allow Previous Year Budget" untuk disubmit pada tahun {current_year}.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             used_po = PurchaseOrder.objects.filter(
                 rap=po.rap,
                 document_status__in=['open', 'confirmed', 'delivered', 'invoiced', 'close']
             ).exclude(pk=po.pk).aggregate(total=Sum('grand_total'))['total'] or 0
             
             # Using Company RAP tolerance if applicable
-            tolerance = po.company.rap_tolerance / 100 if po.company.rap_tolerance else 1.0
+            tolerance_val = po.company.rap_tolerance if po.company.rap_tolerance else 100
+            tolerance = Decimal(str(tolerance_val)) / Decimal('100')
             allowed_budget = po.rap.total_cost * tolerance
-            remaining_rap = allowed_budget - float(used_po)
+            remaining_rap = allowed_budget - Decimal(str(used_po))
             
-            if float(po.grand_total) > remaining_rap:
+            if po.grand_total > remaining_rap:
                 return Response({
                     'detail': f'Total PO ({po.grand_total}) melebihi sisa anggaran RAP yang diizinkan ({remaining_rap}).'
                 }, status=status.HTTP_400_BAD_REQUEST)
@@ -587,3 +600,45 @@ class PurchaseOrderSubmitView(APIView):
         po.save()
 
         return Response(PurchaseOrderSerializer(po).data)
+
+
+class POInboxViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Viewset untuk menampilkan daftar PO yang menunggu persetujuan oleh user login.
+    """
+    serializer_class = POInboxSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return PurchaseOrder.objects.filter(approval_status=PurchaseOrder.ApprovalStatus.AWAITING).select_related('vendor', 'project')
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        try:
+            from apps.purchase.services.po_approval_service import POApprovalService
+            po = POApprovalService.approve_po(pk, request.user)
+            return Response({'status': 'approved', 'po_number': po.po_number})
+        except ValidationError as e:
+            return Response({'detail': e.messages}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        try:
+            from apps.purchase.services.po_approval_service import POApprovalService
+            po = POApprovalService.reject_po(pk, request.user)
+            return Response({'status': 'rejected', 'po_number': po.po_number})
+        except ValidationError as e:
+            return Response({'detail': e.messages}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def allow_previous_year_budget(self, request, pk=None):
+        # Tambahkan RBAC function code khusus di sini jika diperlukan
+        # Untuk kesederhanaan, kita hanya cek autentikasi
+        po = get_object_or_404(PurchaseOrder, pk=pk)
+        po.allow_previous_year_budget = True
+        po.save()
+        return Response({'status': 'success', 'message': 'Izin penggunaan RAP tahun sebelumnya telah diberikan.'})

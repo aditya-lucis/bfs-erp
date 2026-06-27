@@ -11,6 +11,7 @@ class DocumentType(models.TextChoices):
     RAP = 'RAP', 'Rencana Anggaran Pelaksana (RAP)'
     GENERAL_JOURNAL = 'GEJ', 'General Journal (GEJ)'
     PURCHASE_REQUISITION = 'PR', 'Purchase Requisition (PR)'
+    PURCHASE_ORDER = 'PO', 'Purchase Order (PO)'
 
 
 class ApprovalBasis(models.TextChoices):

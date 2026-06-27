@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from decimal import Decimal
 from .models import (
     VendorCategory,
     VendorGroup,
@@ -306,8 +307,10 @@ class PurchaseOrderListSerializer(serializers.ModelSerializer):
             'id', 'po_number', 'po_date', 'vendor', 'vendor_name', 'vendor_code',
             'po_type', 'po_type_display', 'project', 'project_name',
             'requestor_department', 'department_name', 'po_currency',
-            'document_status', 'approval_status', 'grand_total', 'created_by_name'
+            'document_status', 'approval_status', 'grand_total', 'created_by_name',
+            'allow_previous_year_budget', 'is_active'
         ]
+
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -324,6 +327,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     rr_account_name = serializers.CharField(source='rr_account.name', read_only=True)
     vi_account_name = serializers.CharField(source='vi_account.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    pr_number = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrder
@@ -334,19 +338,24 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'total_tax', 'total_deduction', 'grand_total', 'payment_balance'
         ]
 
+    def get_pr_number(self, obj):
+        first_detail = obj.details.first()
+        if first_detail and first_detail.pr_detail:
+            return first_detail.pr_detail.pr.pr_number
+        return None
     def _calculate_totals(self, validated_data, details_data):
-        total_amount = 0
-        total_discount = 0
+        total_amount = Decimal('0')
+        total_discount = Decimal('0')
         
         # We will need the logic for Tax later, but for now we simplify
         # as Tax requires knowing the percentages.
         for item in details_data:
-            qty = item.get('quantity', 0)
-            price = item.get('unit_price', 0)
-            disc_pct = item.get('discount_percent', 0)
+            qty = Decimal(str(item.get('quantity') or 0))
+            price = Decimal(str(item.get('unit_price') or 0))
+            disc_pct = Decimal(str(item.get('discount_percent') or 0))
             
             base_amount = qty * price
-            disc_amt = base_amount * (disc_pct / 100)
+            disc_amt = base_amount * (disc_pct / Decimal('100'))
             
             total_amount += base_amount
             total_discount += disc_amt
@@ -406,3 +415,17 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                 
         instance.save()
         return instance
+
+
+class POInboxSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    project_name = serializers.CharField(source='project.project_name', read_only=True)
+    requestor_department_name = serializers.CharField(source='requestor_department.name', read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = [
+            'id', 'po_number', 'po_date', 'vendor', 'vendor_name', 
+            'project', 'project_name', 'requestor_department_name',
+            'grand_total', 'document_status', 'approval_status', 'allow_previous_year_budget'
+        ]

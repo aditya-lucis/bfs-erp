@@ -175,6 +175,7 @@
               <th class="py-3 px-4 text-center">Invoiced</th>
               <th class="py-3 px-4 text-center">Active</th>
               <th class="py-3 px-4 text-center">Close</th>
+              <th class="py-3 px-4 text-center">Allow Pre Year</th>
               <th class="py-3 px-4 text-right">PO Amount</th>
               <th class="py-3 px-4 w-20 text-right">Actions</th>
             </tr>
@@ -213,11 +214,15 @@
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-4 text-center">
-                <span v-if="po.document_status !== 'close'" class="text-green-500 font-bold text-base">✓</span>
+                <span v-if="po.is_active" class="text-green-500 font-bold text-base">✓</span>
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-4 text-center">
                 <span v-if="po.document_status === 'close'" class="text-green-500 font-bold text-base">✓</span>
+                <span v-else class="text-red-500 font-bold text-base">✗</span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <span v-if="po.allow_previous_year_budget" class="text-green-500 font-bold text-base">✓</span>
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-4 text-right font-semibold text-bfs-navy">
@@ -230,6 +235,9 @@
                   </button>
                   <button @click="openEditModal(po)" class="p-1 text-gray-400 hover:text-bfs-gold transition-colors" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button v-if="po.document_status === 'draft' && !po.allow_previous_year_budget" @click="allowPreviousYearBudget(po)" class="p-1 text-gray-400 hover:text-green-500 transition-colors" title="Allow Previous Year Budget RAP">
+                    <Unlock class="w-3.5 h-3.5" />
                   </button>
                   <button v-if="po.document_status === 'draft'" @click="deletePO(po.id)" class="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
                     <Trash2 class="w-3.5 h-3.5" />
@@ -287,61 +295,159 @@
               </div>
 
               <!-- Print Content -->
-              <div class="p-8 print:p-0 print:pt-4">
-                <!-- Meta Info Grid -->
-                <div class="grid grid-cols-2 gap-x-8 gap-y-1 mb-6">
-                  <div>
+              <div class="p-[10mm] print:p-0 text-black bg-white font-sans text-[11px] relative">
+                <!-- Header: Company Info and Logo -->
+                <div class="flex justify-between items-start mb-4 border-b-2 border-black pb-4">
+                  <div class="flex-1 pr-4">
+                    <h1 class="text-base font-black uppercase mb-1">{{ orgStore.company?.company_name || 'Company Name' }}</h1>
+                    <div class="text-[10px] leading-snug whitespace-pre-line max-w-sm">{{ printAddress }}</div>
+                    <div class="text-[10px] mt-1">
+                      <span v-if="orgStore.company?.phone">Phone: {{ orgStore.company.phone }}<br/></span>
+                      <span v-if="orgStore.company?.fax">Fax: {{ orgStore.company.fax }}<br/></span>
+                      <span v-if="orgStore.company?.email">Email: {{ orgStore.company.email }}<br/></span>
+                    </div>
+                  </div>
+                  <div class="w-28 h-16 ml-4 flex items-start justify-end">
+                    <img v-if="orgStore.company?.logo_url" :src="orgStore.company.logo_url" alt="Logo" class="max-w-full max-h-full object-contain" />
+                  </div>
+                </div>
+
+                <!-- PO Title -->
+                <div class="text-center mb-6">
+                  <h2 class="text-lg font-extrabold uppercase underline tracking-wider">Purchase Order</h2>
+                  <p class="text-[11px] mt-1">{{ printModal.po?.po_number }}</p>
+                </div>
+
+                <!-- PO Meta Info -->
+                <div class="flex justify-between text-[11px] mb-6">
+                  <!-- Vendor Info -->
+                  <div class="w-1/2 pr-4">
+                    <p class="font-bold underline mb-1">Order To:</p>
                     <table class="w-full">
-                      <tr><td class="w-36 py-0.5 align-top">PO Number</td><td class="w-4 align-top">:</td><td class="font-medium align-top">{{ printModal.po?.po_number }}</td></tr>
-                      <tr><td class="py-0.5 align-top">Project Name</td><td class="align-top">:</td><td class="align-top">{{ printModal.po?.project_name || '-' }}</td></tr>
-                      <tr><td class="py-0.5 align-top">RAP Number</td><td class="align-top">:</td><td class="align-top">{{ printModal.po?.rap_number || printModal.po?.rap_name || '-' }}</td></tr>
-                      <tr><td class="py-0.5 align-top">PO Date</td><td class="align-top">:</td><td class="align-top">{{ formatDatePrint(printModal.po?.po_date) }}</td></tr>
-                      <tr><td class="py-0.5 align-top">ETD</td><td class="align-top">:</td><td class="align-top">{{ formatDatePrint(printModal.po?.etd) }}</td></tr>
+                      <tr><td class="w-16 align-top">Name</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                      <tr><td class="w-16 align-top">Company</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                      <tr><td class="w-16 align-top">Telp</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.vendor_phone || '-' }}</td></tr>
+                      <tr><td class="w-16 align-top">Alamat</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.vendor_address || '-' }}</td></tr>
                     </table>
                   </div>
-                  <div>
+                  <!-- PO Details -->
+                  <div class="w-1/2 pl-4">
                     <table class="w-full">
-                      <tr><td class="w-24 py-0.5 align-top">Delivery Point</td><td class="w-4 align-top">:</td><td class="align-top">{{ printModal.po?.delivery_point || '-' }}</td></tr>
-                      <tr><td class="py-0.5 align-top">Vendor</td><td class="align-top">:</td><td class="align-top">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                      <tr><td class="w-24 align-top">Date</td><td class="w-3 align-top">:</td><td class="align-top">{{ formatDatePrint(printModal.po?.po_date) }}</td></tr>
+                      <tr><td class="w-24 align-top">Currency</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.po_currency || 'IDR' }}</td></tr>
+                      <tr><td class="w-24 align-top">Amount</td><td class="w-3 align-top">:</td><td class="align-top">{{ formatCurrencyRaw(printGrandTotal) }}</td></tr>
+                      <tr><td colspan="3" class="h-2"></td></tr>
+                      <tr><td class="w-24 align-top">RAP / Project</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.rap_number || printModal.po?.project_name || '-' }}</td></tr>
+                      <tr><td class="w-24 align-top">Dept / SBU</td><td class="w-3 align-top">:</td><td class="align-top">{{ printModal.po?.department_name || '-' }}</td></tr>
                     </table>
                   </div>
                 </div>
 
-                <!-- Details Table -->
-                <div class="mb-6">
-                  <table class="w-full border-collapse border border-black text-xs">
+                <!-- Items Table -->
+                <div class="mb-4">
+                  <table class="w-full border-collapse border-t-[2px] border-b-[2px] border-black text-[11px]">
                     <thead>
-                      <tr class="bg-gray-100 text-center">
-                        <th class="border border-black py-1.5 px-2 w-10">No</th>
-                        <th class="border border-black py-1.5 px-2">Item Name</th>
-                        <th class="border border-black py-1.5 px-2">Notes</th>
-                        <th class="border border-black py-1.5 px-2 w-16">Qty</th>
-                        <th class="border border-black py-1.5 px-2 w-20">Unit</th>
-                        <th class="border border-black py-1.5 px-2 w-28">Unit Price</th>
-                        <th class="border border-black py-1.5 px-2 w-28">Total Price</th>
+                      <tr class="border-b-[2px] border-black">
+                        <th class="py-1 px-1 w-8 text-center font-bold">NO</th>
+                        <th class="py-1 px-2 text-left font-bold">Description</th>
+                        <th class="py-1 px-2 w-12 text-center font-bold">Qty</th>
+                        <th class="py-1 px-2 w-12 text-center font-bold">Unit</th>
+                        <th class="py-1 px-2 w-20 text-right font-bold">Unit Price</th>
+                        <th class="py-1 px-2 w-16 text-right font-bold">Tax %</th>
+                        <th class="py-1 px-2 w-16 text-right font-bold">Discount</th>
+                        <th class="py-1 px-2 w-24 text-right font-bold">Amount</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr v-for="(item, idx) in printDetails" :key="idx">
-                        <td class="border border-black py-1 px-2 text-center align-top">{{ idx + 1 }}.</td>
-                        <td class="border border-black py-1 px-2 align-top">{{ item.item_name || item.item || '-' }}</td>
-                        <td class="border border-black py-1 px-2 align-top">{{ item.notes || '-' }}</td>
-                        <td class="border border-black py-1 px-2 text-center align-top">{{ item.quantity }}</td>
-                        <td class="border border-black py-1 px-2 text-center align-top">{{ item.unit_name || 'Unit' }}</td>
-                        <td class="border border-black py-1 px-2 text-right align-top">{{ formatCurrencyRaw(item.unit_price) }}</td>
-                        <td class="border border-black py-1 px-2 text-right align-top">{{ formatCurrencyRaw(item.quantity * item.unit_price) }}</td>
-                      </tr>
-                      <tr>
-                        <td colspan="6" class="border border-black py-1 px-2 text-right font-bold text-sm">Grand Total</td>
-                        <td class="border border-black py-1 px-2 text-right font-bold text-sm">{{ formatCurrencyRaw(printGrandTotal) }}</td>
+                    <tbody class="align-top">
+                      <tr v-for="(item, idx) in printDetails" :key="idx" class="border-b border-gray-200 last:border-0">
+                        <td class="py-1.5 px-1 text-center">{{ idx + 1 }}</td>
+                        <td class="py-1.5 px-2">
+                          <div class="font-medium">{{ item.item_name || item.item || '-' }}</div>
+                          <div class="text-[9px] text-gray-500 mt-0.5" v-if="item.notes">{{ item.notes }}</div>
+                        </td>
+                        <td class="py-1.5 px-2 text-center">{{ item.quantity }}</td>
+                        <td class="py-1.5 px-2 text-center">{{ item.unit_name || 'Unit' }}</td>
+                        <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.unit_price) }}</td>
+                        <td class="py-1.5 px-2 text-right">{{ parseFloat(getItemTaxRate(item)).toFixed(2) }}%</td>
+                        <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.discount_amount || 0) }}</td>
+                        <td class="py-1.5 px-2 text-right">{{ formatCurrencyRaw(item.amount || item.quantity * item.unit_price) }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                <!-- Notes -->
-                <div class="mb-12">
-                  <span class="font-bold text-sm">Notes:</span> <span class="font-bold text-sm ml-2">{{ printModal.po?.notes || '-' }}</span>
+                <!-- Term and Condition, Term of Payment, Notes -->
+                <div class="flex justify-between text-[11px] mb-8">
+                  <div class="w-7/12 pr-4 space-y-4">
+                    <div>
+                      <p class="font-medium">Term and Condition :</p>
+                      <p class="whitespace-pre-line text-[10px]">{{ printModal.po?.term_and_condition || '-' }}</p>
+                    </div>
+                    <div>
+                      <p class="font-medium">Term of Payment :</p>
+                      <p class="whitespace-pre-line text-[10px]">{{ printModal.po?.payment_terms?.length ? printModal.po.payment_terms.map(t => `- ${t.term_desc} (${t.duration_due || '0 HARI'}) ${t.duration_due_percent}%`).join('\n') : '- (30 days) full 100.00 %' }}</p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-[10px]">Payment To :</p>
+                      <p class="whitespace-pre-line text-[11px]">{{ printModal.po?.vendor_bank || '-' }} {{ printModal.po?.vendor_account_number || '-' }} an. {{ printModal.po?.vendor_name || '-' }}</p>
+                    </div>
+                    <div>
+                      <p class="font-medium">Notes :</p>
+                      <p class="whitespace-pre-line text-[10px]">{{ printModal.po?.notes || '-' }}</p>
+                    </div>
+                    <div class="mt-4 pt-4">
+                      <span class="font-medium text-[10px]">In Word : </span> <span class="capitalize italic text-[10px]">{{ numberToWordsEn(printGrandTotal) }} {{ printModal.po?.po_currency || 'Rupiahs' }}</span>
+                    </div>
+                  </div>
+                  
+                  <div class="w-5/12 pl-4 flex flex-col justify-end pb-4">
+                    <table class="w-full text-right">
+                      <tr><td class="py-0.5">Subtotal</td><td class="w-4">:</td><td class="py-0.5 w-24">{{ formatCurrencyRaw(printDetails.reduce((sum, item) => sum + (parseFloat(item.quantity) * parseFloat(item.unit_price) || 0), 0)) }}</td></tr>
+                      <tr><td class="py-0.5">Disc</td><td class="w-4">:</td><td class="py-0.5 w-24">{{ formatCurrencyRaw(printModal.po?.total_discount || 0) }}</td></tr>
+                      <tr><td class="py-0.5">Total Tax</td><td class="w-4">:</td><td class="py-0.5 w-24">{{ formatCurrencyRaw(printModal.po?.total_tax || 0) }}</td></tr>
+                      <tr><td class="py-1 font-bold text-[13px] pt-2">Total Amount</td><td class="w-4 font-bold pt-2">:</td><td class="py-1 font-bold text-[13px] pt-2">{{ formatCurrencyRaw(printGrandTotal) }}</td></tr>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Signatures -->
+                <div class="flex justify-between text-[10px] mt-12 mb-8">
+                  <div class="w-56 text-center">
+                    <table class="w-full border border-black">
+                      <tr class="border-b border-black"><td class="py-1 text-[9px]">Accepted By</td></tr>
+                      <tr class="border-b border-black"><td class="py-1">Supplier</td></tr>
+                      <tr><td class="h-20 align-middle p-1"></td></tr>
+                      <tr class="border-t border-black"><td class="py-1">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                    </table>
+                  </div>
+                  <div class="w-56 text-center">
+                    <table class="w-full border border-black">
+                      <tr class="border-b border-black"><td class="py-1 text-[9px]">Approved By</td></tr>
+                      <tr class="border-b border-black"><td class="py-1">Direktur</td></tr>
+                      <tr>
+                        <td class="h-20 align-middle p-1 relative">
+                          <template v-for="sig in printModal.signatures" :key="sig.id">
+                            <img v-if="sig.is_signed" :src="sig.signature_image" class="max-h-16 max-w-full mx-auto object-contain" />
+                          </template>
+                        </td>
+                      </tr>
+                      <tr class="border-t border-black"><td class="py-1 font-medium">
+                        <span v-for="(sig, i) in printModal.signatures" :key="'name-'+sig.id">
+                          {{ sig.user_name }}<span v-if="i < printModal.signatures.length - 1">, </span>
+                        </span>
+                      </td></tr>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-[8px] flex justify-between">
+                  <span>REV#03</span>
+                  <span>{{ formatDatePrint(new Date()) }}</span>
+                  <span>FRM-PRC-02-01</span>
+                </div>
+                <div class="text-[8px] mt-1 font-bold leading-tight pt-2">
+                  *Dilarang keras menyebarluaskan sebagian atau seluruh konten dari dokumen ini untuk kepentingan apapun, tanpa seijin penerbit dokumen ini, informasi yang terdapat didalamnya sangat rahasia dan atau dilindungi oleh hukum.
                 </div>
               </div>
             </div>
@@ -354,10 +460,11 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import Swal from 'sweetalert2'
 import { 
   Search, Plus, Loader2, Edit3, Trash2, Send, Pencil, Printer, CheckSquare,
   Folder, FolderOpen, FolderCheck,
-  FileText, FileClock, FileCheck, FileX, FileWarning, X, AlertCircle, Save
+  FileText, FileClock, FileCheck, FileX, FileWarning, X, AlertCircle, Save, Unlock
 } from 'lucide-vue-next'
 import api from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
@@ -391,7 +498,7 @@ const printModal = ref({
 const printDetails = ref([])
 
 async function openPrintPreview(po) {
-  printModal.value.po = pr
+  printModal.value.po = po
   printModal.value.show = true
   printModal.value.signatures = []
   printDetails.value = []
@@ -403,6 +510,7 @@ async function openPrintPreview(po) {
   // Fetch full details
   try {
     const fullPo = await store.fetchPODetails(po.id)
+    printModal.value.po = fullPo
     printDetails.value = fullPo.details || []
   } catch (e) {
     console.error('Failed to fetch print details', e)
@@ -450,9 +558,57 @@ function formatCurrencyRaw(value) {
   }).format(value)
 }
 
+const taxMap = {
+  'none': { rate: 0, type: 'none' },
+  'non': { rate: 0, type: 'none' },
+  'pph_23_rate_15': { rate: 15, type: 'deduction' },
+  'pph_23_rate_2': { rate: 2, type: 'deduction' },
+  'pph_23_rate_4': { rate: 4, type: 'deduction' },
+  'pph_23_rate_4_5': { rate: 4.5, type: 'deduction' },
+  'pph_23_rate_7_5': { rate: 7.5, type: 'deduction' },
+  'pph_4_2_rate_10': { rate: 10, type: 'deduction' },
+  'pph_4_2_rate_2': { rate: 2, type: 'deduction' },
+  'pph_4_2_rate_3': { rate: 3, type: 'deduction' },
+  'pph_4_2_rate_4': { rate: 4, type: 'deduction' },
+  'ppn_01': { rate: 1, type: 'addition' },
+  'ppn_10': { rate: 10, type: 'addition' },
+  'ppn_10_euro': { rate: 10, type: 'addition' },
+  'ppn_11': { rate: 11, type: 'addition' },
+  'ppn_15': { rate: 15, type: 'addition' }
+}
+
+function getItemTaxRate(item) {
+  let rate = 0
+  const t1 = taxMap[item.tax1] || { rate: 0, type: 'none' }
+  const t2 = taxMap[item.tax2] || { rate: 0, type: 'none' }
+  if (t1.type === 'addition') rate += t1.rate
+  if (t2.type === 'addition') rate += t2.rate
+  return rate
+}
+
 const printGrandTotal = computed(() => {
-  return printDetails.value.reduce((sum, item) => sum + (parseFloat(item.amount) || parseFloat(item.quantity) * parseFloat(item.unit_price) || 0), 0)
+  return printModal.value.po?.grand_total || printDetails.value.reduce((sum, item) => sum + (parseFloat(item.amount) || parseFloat(item.quantity) * parseFloat(item.unit_price) || 0), 0)
 })
+
+function numberToWordsEn(n) {
+  if (n === 0) return 'Zero';
+  if (typeof n === 'string') n = parseFloat(n);
+  n = Math.floor(n);
+  
+  const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  
+  function convertToWords(num) {
+    if (num < 20) return a[num];
+    if (num < 100) return b[Math.floor(num / 10)] + (num % 10 ? ' ' + a[num % 10] : '');
+    if (num < 1000) return a[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + convertToWords(num % 100) : '');
+    if (num < 1000000) return convertToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + convertToWords(num % 1000) : '');
+    if (num < 1000000000) return convertToWords(Math.floor(num / 1000000)) + ' Million' + (num % 1000000 ? ' ' + convertToWords(num % 1000000) : '');
+    return convertToWords(Math.floor(num / 1000000000)) + ' Billion' + (num % 1000000000 ? ' ' + convertToWords(num % 1000000000) : '');
+  }
+  
+  return convertToWords(n);
+}
 
 // --- END POINT POEVIEW ---
 
@@ -472,6 +628,14 @@ const filterDocStatus = ref('')
 const filterAppStatus = ref('')
 
 function handleSearch() {
+  console.log("handleSearch called with filters:", {
+    search: searchQuery.value,
+    po_type: filterItemCategory.value,
+    document_status: filterDocStatus.value,
+    approval_status: filterAppStatus.value,
+    start_date: filterDateFrom.value,
+    end_date: filterDateTo.value,
+  });
   store.fetchPOs({
     search: searchQuery.value,
     po_type: filterItemCategory.value,
@@ -479,6 +643,10 @@ function handleSearch() {
     approval_status: filterAppStatus.value,
     start_date: filterDateFrom.value,
     end_date: filterDateTo.value,
+  }).then(res => {
+    console.log("fetchPOs success. store.pos:", store.pos);
+  }).catch(err => {
+    console.error("fetchPOs error:", err);
   })
 }
 
@@ -508,17 +676,50 @@ function formatCurrency(value) {
   }).format(value)
 }
 
-async function deletePO(id) {
-  if (confirm('Are you sure you want to delete this PO?')) {
-    try {
-      await store.deletePO(id)
-      handleSearch()
-    } catch (e) {
-      alert(store.error || 'Delete failed')
-    }
+const deletePO = async (id) => {
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: "You won't be able to revert this!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, delete it!'
+  })
+  if (!result.isConfirmed) return
+  
+  try {
+    await store.deletePO(id)
+    handleSearch()
+    Swal.fire('Deleted!', 'PO has been deleted.', 'success')
+  } catch (err) {
+    Swal.fire('Error', store.error || 'Failed to delete PO', 'error')
   }
 }
 
+const allowPreviousYearBudget = async (po) => {
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: `Allow PO ${po.po_number} to use previous year budget?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, allow it!'
+  })
+  if (!result.isConfirmed) return
+
+  try {
+    const response = await api.post(`/purchase/po/${po.id}/allow-previous-year/`)
+    Swal.fire('Success', response.data.message || 'Permission granted', 'success')
+    handleSearch()
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.detail || 'Failed to grant permission', 'error')
+  }
+}
+
+
+onMounted(() => {
+  handleSearch()
+})
 
 // --- MODAL & FORM STATE ---
 const modal = ref({
@@ -541,6 +742,10 @@ function openEditModal(po) {
 </script>
 <style scoped>
 @media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
   .print-modal-overlay {
     position: static !important;
     background: none !important;

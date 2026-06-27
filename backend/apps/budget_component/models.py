@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from apps.inventory.models import Item
 from apps.organization.models import Company, Department, Position
 
@@ -233,3 +234,52 @@ class TemplateRAPDetail(models.Model):
         ).exclude(pk=self.pk if self.pk else None)
         count = siblings.count() + 1
         return f"{parent_num}.{count}"
+
+# ─── Budget Commitment Log ──────────────────────────────────────────────────
+class BudgetCommitmentLog(models.Model):
+    """
+    Tabel Historis (Log) untuk setiap transaksi yang memotong / menambah budget.
+    Menggantikan TAccBudgetTransCommit dan TAccBudgetProject_Actual.
+    """
+    class DocumentType(models.TextChoices):
+        PO  = 'PO',  'Purchase Order'
+        RR  = 'RR',  'Receipt Report'
+        CBR = 'CBR', 'Cashbook Request'
+        MR  = 'MR',  'Material Requisition'
+
+    document_type = models.CharField(max_length=5, choices=DocumentType.choices)
+    document_no = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
+    department = models.ForeignKey(
+        'organization.Department', 
+        on_delete=models.PROTECT, 
+        related_name='budget_commitments'
+    )
+    rap_detail = models.ForeignKey(
+        'projects.RAPDetail', 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name='budget_commitments'
+    )
+    account = models.ForeignKey(
+        'accounting.Account', 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True, 
+        related_name='budget_commitments'
+    )
+    month = models.PositiveSmallIntegerField()
+    year = models.PositiveIntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True
+    )
+
+    class Meta:
+        db_table = 'budget_commitment_log'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.document_type}] {self.document_no} - {self.amount}"

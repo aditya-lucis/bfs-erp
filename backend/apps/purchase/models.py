@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from apps.accounting.models import Account
@@ -431,7 +432,9 @@ class PurchaseRequisitionDetail(models.Model):
 
     def save(self, *args, **kwargs):
         # Auto calculate amount
-        self.amount = self.quantity * self.final_unit_price
+        qty = Decimal(str(self.quantity or 0))
+        price = Decimal(str(self.final_unit_price or 0))
+        self.amount = qty * price
         super().save(*args, **kwargs)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -483,6 +486,16 @@ class PurchaseOrder(models.Model):
     rr_account = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True, blank=True, related_name='rr_purchase_orders')
     vi_account = models.ForeignKey(Vendor, on_delete=models.SET_NULL, null=True, blank=True, related_name='vi_purchase_orders')
     
+    # Totals
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_discount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_deduction = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    partial_cancellation = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    payment_balance = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
     # Additional Flags & Fields
     is_sister_company = models.BooleanField(default=False)
     vendor_so_number = models.CharField(max_length=100, blank=True, default='')
@@ -498,6 +511,14 @@ class PurchaseOrder(models.Model):
     is_subcontract = models.BooleanField(default=False)
     subcontract_notes = models.TextField(blank=True, default='')
     
+    stock_tower = models.BooleanField(default=False)
+    stock_besi = models.BooleanField(default=False)
+    po_approval = models.CharField(max_length=100, blank=True, default='')
+    
+    pr_class = models.CharField(max_length=50, default='Common')
+    repetition = models.CharField(max_length=50, default='None')
+    delivery_point = models.CharField(max_length=255, blank=True, default='')
+    
     etd = models.DateField(null=True, blank=True, verbose_name='Estimated Time Delivery')
     notes = models.TextField(blank=True, default='')
 
@@ -505,14 +526,9 @@ class PurchaseOrder(models.Model):
     document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
     approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
     
-    # Totals
-    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    total_discount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    total_tax = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    total_deduction = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    partial_cancellation = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
-    payment_balance = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    # Active status & Budget Validation
+    is_active = models.BooleanField(default=False, verbose_name="Active")
+    allow_previous_year_budget = models.BooleanField(default=False, verbose_name="Allow Previous Year Budget RAP")
 
     # Auditing
     created_at = models.DateTimeField(auto_now_add=True)
@@ -588,10 +604,40 @@ class PurchaseOrderDetail(models.Model):
 
     def save(self, *args, **kwargs):
         # Auto calculate amount
-        base_amount = self.quantity * self.unit_price
-        if self.discount_percent > 0:
-            self.discount_amount = base_amount * (self.discount_percent / 100)
-        self.amount = base_amount - self.discount_amount
+        qty = Decimal(str(self.quantity or 0))
+        price = Decimal(str(self.unit_price or 0))
+        disc_pct = Decimal(str(self.discount_percent or 0))
+        
+        base_amount = qty * price
+        if disc_pct > 0:
+            self.discount_amount = base_amount * (disc_pct / Decimal('100'))
+        else:
+            self.discount_amount = Decimal('0')
+            
+        discounted_amount = base_amount - self.discount_amount
+        
+        tax_map = {
+            'ppn_01': Decimal('1'),
+            'ppn_10': Decimal('10'),
+            'ppn_10_euro': Decimal('10'),
+            'ppn_11': Decimal('11'),
+            'ppn_15': Decimal('15'),
+        }
+        
+        ppn_rate = Decimal('0')
+        if self.tax1 in tax_map:
+            ppn_rate += tax_map[self.tax1]
+        if self.tax2 in tax_map:
+            ppn_rate += tax_map[self.tax2]
+            
+        if hasattr(self, 'po') and self.po and getattr(self.po, 'ppn', False):
+            # Inclusive PPN
+            self.amount = discounted_amount
+        else:
+            # Exclusive PPN
+            tax_amount = discounted_amount * (ppn_rate / Decimal('100'))
+            self.amount = discounted_amount + tax_amount
+            
         super().save(*args, **kwargs)
 
 

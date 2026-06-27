@@ -102,6 +102,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import Swal from 'sweetalert2'
 
 const props = defineProps({ contact: { type: Object, default: null } })
 const emit = defineEmits(['close', 'save'])
@@ -122,9 +123,9 @@ watch(() => props.contact, (c) => {
 }, { immediate: true })
 
 function handleSave() {
-  if (!form.value.first_name.trim()) return alert('First name wajib diisi.')
-  if (!form.value.job_title.trim()) return alert('Job title wajib diisi.')
-  if (!form.value.phone.trim()) return alert('Phone wajib diisi.')
+  if (!form.value.first_name.trim()) return Swal.fire('Error', 'First name wajib diisi.', 'warning')
+  if (!form.value.job_title.trim()) return Swal.fire('Error', 'Job title wajib diisi.', 'warning')
+  if (!form.value.phone.trim()) return Swal.fire('Error', 'Phone wajib diisi.', 'warning')
   const payload = { ...form.value }
   if (!payload.birthday) payload.birthday = null
   if (props.contact?.id) payload.id = props.contact.id
