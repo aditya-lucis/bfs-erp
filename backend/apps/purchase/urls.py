@@ -112,6 +112,8 @@ urlpatterns = [
 
     path('completion-certificates/', views.CompletionCertificateViewSet.as_view({'get': 'list', 'post': 'create'}), name='completion-certificate-list'),
     path('completion-certificates/<int:pk>/', views.CompletionCertificateViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='completion-certificate-detail'),
+    path('completion-certificates/<int:pk>/void_cc/', views.CompletionCertificateViewSet.as_view({'post': 'void_cc'}), name='cc-void'),
     path('completion-certificates/get_valid_vendors/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_vendors'}), name='cc-valid-vendors'),
     path('completion-certificates/get_valid_pos/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_pos'}), name='cc-valid-pos'),
+    path('completion-certificates/<int:pk>/submit/', views.CompletionCertificateSubmitApprovalView.as_view(), name='cc-submit'),
 ]

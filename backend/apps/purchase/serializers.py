@@ -284,15 +284,20 @@ class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
 
 
 class PurchaseOrderPaymentTermSerializer(serializers.ModelSerializer):
+    has_active_cc = serializers.SerializerMethodField()
+    
     class Meta:
         model = PurchaseOrderPaymentTerm
         fields = [
             'id', 'po', 'term_desc', 'duration_due', 'duration_due_percent',
-            'amount', 'due_date', 'doc_reff', 'order_no'
+            'amount', 'due_date', 'doc_reff', 'order_no', 'has_active_cc'
         ]
         extra_kwargs = {
             'po': {'required': False}
         }
+        
+    def get_has_active_cc(self, obj):
+        return obj.completioncertificate_set.filter(is_active=True).exists()
 
 
 class PurchaseOrderListSerializer(serializers.ModelSerializer):
@@ -486,10 +491,31 @@ class GrnSesDocumentSerializer(serializers.ModelSerializer):
 
 from .models import CompletionCertificate, CompletionCertificateDocument
 
+import base64
+import uuid
+import mimetypes
+from django.core.files.base import ContentFile
+
+class Base64FileField(serializers.FileField):
+    def to_internal_value(self, data):
+        if isinstance(data, str) and data.startswith('data:'):
+            # Format: data:image/png;base64,<base64 data>
+            format, imgstr = data.split(';base64,')
+            mime_type = format.split(':')[1] if ':' in format else ''
+            ext = mimetypes.guess_extension(mime_type) or '.bin'
+            
+            # Use a dummy name, we will rename it during save
+            name = str(uuid.uuid4()) + ext
+            data = ContentFile(base64.b64decode(imgstr), name=name)
+        return super().to_internal_value(data)
+
 class CompletionCertificateDocumentSerializer(serializers.ModelSerializer):
+    file = Base64FileField(required=False, allow_null=True)
+    document_name = serializers.CharField(source='master_document.document_name', read_only=True)
+
     class Meta:
         model = CompletionCertificateDocument
-        fields = ['id', 'cc', 'master_document', 'is_available', 'file', 'document_number', 'keterangan']
+        fields = ['id', 'cc', 'master_document', 'document_name', 'is_available', 'file', 'document_number', 'keterangan']
         extra_kwargs = {
             'cc': {'read_only': True}
         }
@@ -507,7 +533,8 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
             'id', 'cc_number', 'document_date', 'vendor', 'po', 'description', 
             'type', 'document_date_from_vendor', 'currency', 'payment_term', 
             'amount', 'approval_status', 'is_active', 'documents',
-            'vendor_name', 'po_number', 'site_name', 'rap_name'
+            'vendor_name', 'po_number', 'site_name', 'rap_name',
+            'void_reason', 'void_date'
         ]
         read_only_fields = ['cc_number', 'approval_status', 'created_at', 'updated_at']
 
@@ -516,7 +543,7 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
         # Auto generate cc_number
         import datetime
         now = datetime.datetime.now()
-        prefix = f"CC{now.strftime('%m%d%y')}-"
+        prefix = f"CC{now.strftime('%Y%m%d%H%M%S')}-"
         last_cc = CompletionCertificate.objects.filter(cc_number__startswith=prefix).order_by('id').last()
         if last_cc:
             last_seq = int(last_cc.cc_number.split('-')[1])
@@ -540,8 +567,25 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
         instance.save()
         
         if documents_data:
-            instance.documents.all().delete()
+            # Update or create documents based on master_document
+            existing_docs = {doc.master_document_id: doc for doc in instance.documents.all()}
             for doc_data in documents_data:
-                CompletionCertificateDocument.objects.create(cc=instance, **doc_data)
+                master_document = doc_data.get('master_document')
+                file = doc_data.get('file', None)
+                
+                if master_document.id in existing_docs:
+                    doc = existing_docs.pop(master_document.id)
+                    doc.is_available = doc_data.get('is_available', doc.is_available)
+                    doc.document_number = doc_data.get('document_number', doc.document_number)
+                    doc.keterangan = doc_data.get('keterangan', doc.keterangan)
+                    if file is not None:
+                        doc.file = file
+                    doc.save()
+                else:
+                    CompletionCertificateDocument.objects.create(cc=instance, **doc_data)
+            
+            # Delete any that were not in the payload
+            for doc in existing_docs.values():
+                doc.delete()
                 
         return instance

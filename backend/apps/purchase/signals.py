@@ -41,3 +41,19 @@ def sync_purchase_approval_status(sender, instance, **kwargs):
                 po.save()
         except (PurchaseOrder.DoesNotExist, ValueError):
             pass
+    elif instance.document_code == 'CC':
+        try:
+            from apps.purchase.models import CompletionCertificate
+            cc = CompletionCertificate.objects.get(pk=int(instance.document_id))
+            if instance.status == ApprovalStatus.APPROVED:
+                cc.approval_status = 'approved'
+                cc.is_active = True
+                cc.save()
+            elif instance.status == ApprovalStatus.REJECTED:
+                cc.approval_status = 'rejected'
+                cc.save()
+            elif instance.status == ApprovalStatus.CANCELLED:
+                cc.approval_status = 'revised'
+                cc.save()
+        except (CompletionCertificate.DoesNotExist, ValueError, ImportError):
+            pass

@@ -747,3 +747,64 @@ class CompletionCertificateViewSet(viewsets.ModelViewSet):
         pos = PurchaseOrder.objects.filter(vendor_id=vendor_id, is_active=True, approval_status='approved')
         serializer = PurchaseOrderSerializer(pos, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def void_cc(self, request, pk=None):
+        from django.utils import timezone
+        cc = self.get_object()
+        void_reason = request.data.get('void_reason')
+        if not void_reason:
+            return Response({'detail': 'Alasan void wajib diisi.'}, status=400)
+            
+        cc.is_active = False
+        cc.void_reason = void_reason
+        cc.void_date = timezone.now()
+        cc.void_by = request.user
+        cc.save()
+        
+        return Response({'status': 'success', 'message': 'CC berhasil di-void'})
+
+class CompletionCertificateSubmitApprovalView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-COMPLETION-CERTIFICATE'
+
+    def post(self, request, pk):
+        from apps.accounting_period.period_checker import PeriodChecker
+        from apps.approval.services import create_approval_request, ApprovalMatrixError
+        
+        cc = get_object_or_404(CompletionCertificate, pk=pk)
+
+        if cc.approval_status not in ['draft', 'revised']:
+            return Response({'detail': 'Completion Certificate ini sudah diajukan atau diproses.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Validate Financial Period
+        period_result = PeriodChecker.check(cc.document_date, raise_exception=False)
+        if not period_result.is_open:
+            return Response({'detail': period_result.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check if at least one document is attached and available
+        if not cc.documents.filter(is_available=True).exists():
+            return Response({'detail': 'Minimal satu dokumen kelengkapan (GRN/SES) harus tersedia (is_available=True).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Create Approval Request
+        try:
+            employee = request.user.employee_profile
+            req = create_approval_request(
+                document_code='CC',
+                document_id=str(cc.id),
+                document_number=cc.cc_number,
+                creator_user=request.user,
+                amount=cc.amount
+            )
+            
+            # Update CC status to awaiting
+            cc.approval_status = 'awaiting'
+            cc.save()
+
+            return Response({'detail': 'CC berhasil diajukan untuk persetujuan.', 'request_id': req.id}, status=status.HTTP_201_CREATED)
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except AttributeError:
+            return Response({'detail': 'User belum terhubung dengan data profil Karyawan/Posisi.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

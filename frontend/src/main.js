@@ -86,6 +86,7 @@ const implementedRoutes = [
   { path: '/purchases/purchase-order-inbox', component: POInboxView, meta: { title: 'Purchase Order Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/grnses-document', component: GrnSesDocumentView, meta: { title: 'GRN-SES Document', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/completion-certificate', component: () => import('./views/purchase/CompletionCertificateView.vue'), meta: { title: 'Completion Certificate', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/completion-certificate-inbox', component: () => import('./views/purchase/CCInboxView.vue'), meta: { title: 'Completion Certificate Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))

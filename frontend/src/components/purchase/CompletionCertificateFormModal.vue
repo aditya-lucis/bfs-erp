@@ -112,7 +112,10 @@
                 <td class="py-2 px-4 text-center">
                   <input type="checkbox" v-model="doc.checked" class="w-4 h-4 text-bfs-gold border-gray-300 rounded" />
                 </td>
-                <td class="py-2 px-4 text-sm font-medium text-gray-700">{{ doc.document_name }}</td>
+                <td class="py-2 px-4 text-sm font-medium text-gray-700">
+                  {{ doc.document_name }}
+                  <span v-if="doc.type" class="text-xs text-gray-400 font-normal">({{ doc.type }})</span>
+                </td>
                 <td class="py-2 px-4 text-center">
                   <select v-model="doc.is_available" class="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-bfs-navy bg-white" :disabled="!doc.checked">
                     <option :value="true">Ada</option>
@@ -120,14 +123,26 @@
                   </select>
                 </td>
                 <td class="py-2 px-4">
-                  <input 
-                    type="file" 
-                    @change="handleFileUpload($event, doc)" 
-                    class="text-sm file:mr-4 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 file:text-bfs-gold hover:file:bg-yellow-100 disabled:opacity-50"
-                    :disabled="!doc.checked || !doc.is_available"
-                  />
-                  <p v-if="doc.fileError" class="text-red-500 text-xs mt-1">{{ doc.fileError }}</p>
-                  <p v-else-if="doc.existingFile" class="text-blue-500 text-xs mt-1 truncate max-w-[150px]">Current: {{ doc.existingFile }}</p>
+                  <div class="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      v-if="doc.is_available && (doc.fileData || doc.fileUrl)" 
+                      @click="previewFile(doc)" 
+                      class="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap cursor-pointer"
+                    >
+                      Show
+                    </button>
+                    <div class="flex flex-col gap-1">
+                      <input 
+                        type="file" 
+                        @change="handleFileUpload($event, doc)" 
+                        class="text-sm file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-yellow-50 file:text-bfs-gold hover:file:bg-yellow-100 disabled:opacity-50 max-w-[200px]"
+                        :disabled="!doc.checked || !doc.is_available"
+                      />
+                      <p v-if="doc.fileError" class="text-red-500 text-xs">{{ doc.fileError }}</p>
+                      <p v-else-if="doc.existingFile" class="text-blue-500 text-xs truncate max-w-[150px]">Current: {{ doc.existingFile }}</p>
+                    </div>
+                  </div>
                 </td>
                 <td class="py-2 px-4">
                   <input type="text" v-model="doc.document_number" class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-bfs-navy bg-white" placeholder="No. Dok" :disabled="!doc.checked" />
@@ -191,12 +206,24 @@
           Cancel
         </button>
         <button 
-          @click="submitForm" 
-          class="px-6 py-2 text-sm font-bold text-white bg-bfs-gold hover:bg-yellow-600 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[120px]"
+          v-if="['draft', 'revised'].includes(form.approval_status)"
+          @click="submitForm(true)" 
+          class="px-6 py-2 text-sm font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2"
           :disabled="isSubmitting || !isFormValid"
         >
           <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />
+          <Save v-else class="w-4 h-4" />
           <span>{{ isEdit ? 'Save Changes' : 'Save Document' }}</span>
+        </button>
+        <button 
+          v-if="['draft', 'revised'].includes(form.approval_status)"
+          @click="submitForm(false)" 
+          class="px-6 py-2 text-sm font-bold text-white bg-bfs-navy hover:bg-bfs-navy-dark rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+          :disabled="isSubmitting || !isFormValid"
+        >
+          <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin" />
+          <Send v-else class="w-4 h-4" />
+          <span>Submit to Approval</span>
         </button>
       </div>
     </div>
@@ -205,7 +232,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { X, Loader2 } from 'lucide-vue-next'
+import { X, Loader2, Save, Send } from 'lucide-vue-next'
 import Swal from 'sweetalert2'
 import { useCompletionCertificateStore } from '../../stores/completionCertificate'
 import { useGrnSesDocumentStore } from '../../stores/grnSesDocument'
@@ -237,6 +264,7 @@ const initialFormState = {
   description: '',
   payment_term: '',
   amount: 0,
+  approval_status: 'draft',
 }
 
 const form = ref({ ...initialFormState })
@@ -248,19 +276,25 @@ const selectedPOObj = computed(() => {
   if (!form.value.po) return null
   return store.validPOs.find(p => p.id === form.value.po)
 })
-const selectedPOTerms = computed(() => {
-  return selectedPOObj.value?.payment_terms || []
-})
+  const selectedPOTerms = computed(() => {
+    const terms = selectedPOObj.value?.payment_terms || []
+    return terms.filter(t => !t.has_active_cc)
+  })
 const selectedTermObj = computed(() => {
   if (!form.value.payment_term) return null
   return selectedPOTerms.value.find(t => t.id === form.value.payment_term)
 })
-const poOptions = computed(() => {
-  return store.validPOs.map(po => ({
-    id: po.id,
-    label: `${po.po_number} - ${po.project?.site_name || ''}`
-  }))
-})
+  const poOptions = computed(() => {
+    return store.validPOs
+      .filter(po => {
+        const terms = po.payment_terms || []
+        return terms.some(t => !t.has_active_cc)
+      })
+      .map(po => ({
+        id: po.id,
+        label: `${po.po_number} - ${po.project?.site_name || ''}`
+      }))
+  })
 
 const selectedRAPName = computed(() => {
   return selectedPOObj.value?.rap_number || '-'
@@ -314,6 +348,7 @@ watch(() => props.isOpen, async (newVal) => {
         description: data.description || '',
         payment_term: data.payment_term,
         amount: data.amount,
+        approval_status: data.approval_status || 'draft',
       }
 
       if (form.value.document_date) {
@@ -330,6 +365,7 @@ watch(() => props.isOpen, async (newVal) => {
             match.document_number = savedDoc.document_number || ''
             match.keterangan = savedDoc.keterangan || ''
             match.existingFile = savedDoc.file ? savedDoc.file.split('/').pop() : null
+            match.fileUrl = savedDoc.file || null
           }
         })
       }
@@ -371,6 +407,15 @@ function onTerminChange() {
   }
 }
 
+function previewFile(doc) {
+  if (doc.fileData) {
+    const url = URL.createObjectURL(doc.fileData)
+    window.open(url, '_blank')
+  } else if (doc.fileUrl) {
+    window.open(doc.fileUrl, '_blank')
+  }
+}
+
 function handleFileUpload(event, doc) {
   const file = event.target.files[0]
   doc.fileError = ''
@@ -393,7 +438,7 @@ function formatCurrency(val) {
   return Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-async function submitForm() {
+async function submitForm(isDraft = true) {
   if (!isFormValid.value) return
 
   isSubmitting.value = true
@@ -456,7 +501,7 @@ async function submitForm() {
         is_available: doc.is_available,
         document_number: doc.document_number,
         keterangan: doc.keterangan,
-        // file: fileObj // Omitted for now to avoid DRF validation error on pure FileField
+        ...(fileObj && { file: fileObj })
       })
     }
 
@@ -466,23 +511,34 @@ async function submitForm() {
       await store.createCertificate(payload)
     }
 
-    if (!store.error) {
-      Swal.fire({
-        icon: 'success',
-        title: 'Berhasil',
-        text: 'Completion Certificate berhasil disimpan!',
-        confirmButtonColor: '#002E5D'
-      })
-      emit('close')
-    } else {
+    if (store.error) {
       throw new Error(typeof store.error === 'string' ? store.error : JSON.stringify(store.error))
     }
+
+    if (!isDraft) {
+      if (!isEdit.value) {
+        throw new Error('Silakan Simpan Dokumen terlebih dahulu (Save Document) sebelum Submit ke Approval untuk dokumen baru.')
+      }
+      await store.submitCC(props.editData.id)
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Berhasil',
+      text: isDraft ? 'Completion Certificate berhasil disimpan!' : 'Completion Certificate berhasil diajukan untuk persetujuan!',
+      confirmButtonColor: '#002E5D'
+    })
+    emit('close')
   } catch (err) {
     console.error(err)
+    const errorMsg = store.error 
+      ? (typeof store.error === 'string' ? store.error : JSON.stringify(store.error))
+      : (err.response?.data?.detail || err.message || 'Terjadi kesalahan sistem.')
+      
     Swal.fire({
       icon: 'error',
       title: 'Gagal Menyimpan',
-      text: err.message || 'Terjadi kesalahan sistem.',
+      text: errorMsg,
       confirmButtonColor: '#002E5D'
     })
   } finally {

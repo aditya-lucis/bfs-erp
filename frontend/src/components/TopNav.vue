@@ -291,7 +291,9 @@ const handleNotificationClick = (item) => {
     router.push('/purchases/purchase-requisition-inbox')
   } else if (item.document_code === 'PO') {
     router.push('/purchases/purchase-order-inbox')
-  } else {
+  } else if (item.document_code === 'CC') {
+    router.push('/purchases/completion-certificate-inbox')
+  } else {  
     router.push('/projects/rap-inbox')
   }
 }

@@ -12,6 +12,7 @@ class DocumentType(models.TextChoices):
     GENERAL_JOURNAL = 'GEJ', 'General Journal (GEJ)'
     PURCHASE_REQUISITION = 'PR', 'Purchase Requisition (PR)'
     PURCHASE_ORDER = 'PO', 'Purchase Order (PO)'
+    COMPLETION_CERTIFICATE = 'CC', 'Completion Certificate (CC)'
 
 
 class ApprovalBasis(models.TextChoices):

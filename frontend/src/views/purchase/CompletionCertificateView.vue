@@ -107,8 +107,10 @@
               <td class="py-3 px-4 font-mono">{{ cc.po_number || '-' }}</td>
               
               <td class="py-3 px-4 text-center">
-                <div class="inline-flex items-center justify-center p-1 rounded-md" title="draft">
-                  <Folder class="w-4.5 h-4.5 text-amber-500 fill-amber-500/10" />
+                <div class="inline-flex items-center justify-center p-1 rounded-md" :title="getDocStatus(cc.approval_status)">
+                  <Folder v-if="getDocStatus(cc.approval_status) === 'draft'" class="w-4.5 h-4.5 text-amber-500 fill-amber-500/10" />
+                  <FolderOpen v-else-if="getDocStatus(cc.approval_status) === 'ready'" class="w-4.5 h-4.5 text-blue-500 fill-blue-500/10" />
+                  <FolderCheck v-else-if="getDocStatus(cc.approval_status) === 'close'" class="w-4.5 h-4.5 text-green-500 fill-green-500/10" />
                 </div>
               </td>
               <td class="py-3 px-4 text-center">
@@ -122,8 +124,19 @@
               </td>
               
               <td class="py-3 px-4 text-center">
-                <span v-if="cc.is_active" class="text-green-500 font-bold text-base">✓</span>
-                <span v-else class="text-red-500 font-bold text-base">✗</span>
+                <div v-if="cc.is_active" class="flex items-center justify-center">
+                  <span class="text-green-500 font-bold text-base">✓</span>
+                </div>
+                <div v-else class="flex items-center justify-center gap-1">
+                  <span class="text-red-500 font-bold text-base">✗</span>
+                  <div v-if="cc.void_reason" class="relative group">
+                    <AlertCircle class="w-4 h-4 text-pink-500 cursor-help" />
+                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 hidden group-hover:block w-56 p-2 bg-pink-100 border border-pink-300 text-pink-800 text-[10px] rounded shadow-lg z-50 text-left">
+                      <strong>Voided At:</strong> {{ cc.void_date ? new Date(cc.void_date).toLocaleDateString() : '-' }}<br/>
+                      <strong>Reason:</strong> {{ cc.void_reason }}
+                    </div>
+                  </div>
+                </div>
               </td>
               <td class="py-3 px-4 text-center font-semibold text-gray-600">{{ cc.type }}</td>
               <td class="py-3 px-4 text-right font-semibold text-bfs-navy whitespace-nowrap">
@@ -133,12 +146,27 @@
               <td class="py-3 px-4 text-center">
                 <div class="flex items-center justify-center gap-1.5">
                   <button
+                    @click="openPrintPreview(cc)"
+                    class="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                    title="Print"
+                  >
+                    <Printer class="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     v-if="canUpdate"
                     @click="openEditModal(cc)"
                     class="p-1 text-gray-400 hover:text-bfs-gold transition-colors"
                     title="Edit"
                   >
                     <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    v-if="canUpdate && cc.is_active"
+                    @click="voidCC(cc)"
+                    class="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Void"
+                  >
+                    <Ban class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </td>
@@ -160,6 +188,14 @@
       :edit-data="selectedCC"
       @close="closeModal"
     />
+    
+    <!-- Print Template -->
+    <CCPrintTemplate
+      :show="showPrintPreview"
+      :cc="printDetail"
+      :signatures="printSignatures"
+      @close="showPrintPreview = false"
+    />
   </Panel>
 </template>
 
@@ -167,13 +203,18 @@
 import { ref, computed, onMounted } from 'vue'
 import Panel from '../../components/Panel.vue'
 import CompletionCertificateFormModal from '../../components/purchase/CompletionCertificateFormModal.vue'
-import { Plus, Search, Loader2, Pencil, FileText, Folder, FolderOpen, FolderCheck, FileCheck, FileX, FileClock, FileWarning } from 'lucide-vue-next'
+import CCPrintTemplate from '../../components/purchase/CCPrintTemplate.vue'
+import { Plus, Search, Loader2, Pencil, FileText, Folder, FolderOpen, FolderCheck, FileCheck, FileX, FileClock, FileWarning, Printer, Ban, AlertCircle } from 'lucide-vue-next'
 import { useCompletionCertificateStore } from '../../stores/completionCertificate'
 import { usePermission } from '../../composables/usePermission.js'
+import api from '../../services/api'
+import { useApprovalRequestStore } from '../../stores/approvalRequest'
+import Swal from 'sweetalert2'
 
 const { canCreate, canUpdate } = usePermission('PURCHASES-COMPLETION-CERTIFICATE')
 
 const store = useCompletionCertificateStore()
+const approvalStore = useApprovalRequestStore()
 
 // Native JS Date helpers for Start/End of Month
 const getStartOfMonth = () => {
@@ -195,12 +236,90 @@ const filterDocStatus = ref('')
 const isModalOpen = ref(false)
 const selectedCC = ref(null)
 
+// --- Print Logic ---
+const showPrintPreview = ref(false)
+const printDetail = ref(null)
+const printSignatures = ref([])
+
+async function openPrintPreview(ccItem) {
+  showPrintPreview.value = true
+  try {
+    const res = await api.get(`/purchase/completion-certificates/${ccItem.id}/`)
+    const ccData = res.data
+    
+    if (ccData.po) {
+      const poRes = await api.get(`/purchase/po/${ccData.po}/`)
+      ccData.po_detail = poRes.data
+    }
+    printDetail.value = ccData
+
+    const sigs = await approvalStore.fetchSignatures('CC', ccItem.id)
+    printSignatures.value = sigs
+  } catch (e) {
+    console.error('Failed to load print details', e)
+    printSignatures.value = []
+  }
+}
+
+async function voidCC(ccItem) {
+    const { value: reason } = await Swal.fire({
+      title: 'Void Completion Certificate?',
+      text: "Anda yakin ingin melakukan void CC ini? Silakan masukkan alasannya (Wajib):",
+      input: 'textarea',
+      inputPlaceholder: 'Masukkan alasan void...',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Process Void',
+      cancelButtonText: 'Batal',
+      inputValidator: (value) => {
+        if (!value || value.trim() === '') {
+          return 'Alasan void wajib diisi!'
+        }
+      }
+    })
+
+    if (reason) {
+      try {
+        store.loading = true
+        await api.post(`/purchase/completion-certificates/${ccItem.id}/void_cc/`, {
+          void_reason: reason
+        })
+        await store.fetchCertificates()
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil',
+          text: 'CC berhasil di-void dan status tidak aktif.',
+          confirmButtonColor: '#1e3a8a'
+        })
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: err.response?.data?.detail || 'Terjadi kesalahan saat memproses void CC.',
+          confirmButtonColor: '#1e3a8a'
+        })
+      } finally {
+        store.loading = false
+      }
+    }
+}
+
 const handleResetFilters = () => {
   searchQuery.value = ''
   filterDateFrom.value = getStartOfMonth()
   filterDateTo.value = getEndOfMonth()
   filterAppStatus.value = ''
   filterDocStatus.value = ''
+}
+
+const getDocStatus = (approval_status) => {
+  const status = (approval_status || '').toLowerCase()
+  if (['draft', 'revised'].includes(status)) return 'draft'
+  if (['awaiting'].includes(status)) return 'ready'
+  if (['approved', 'rejected'].includes(status)) return 'close'
+  return 'draft'
 }
 
 const filteredCertificates = computed(() => {
@@ -219,6 +338,12 @@ const filteredCertificates = computed(() => {
     if (filterDateFrom.value && filterDateTo.value) {
       matchesDate = cc.document_date >= filterDateFrom.value && cc.document_date <= filterDateTo.value
     }
+
+    // Document Status
+    let matchesDocStatus = true
+    if (filterDocStatus.value) {
+      matchesDocStatus = getDocStatus(cc.approval_status) === filterDocStatus.value
+    }
     
     // Approval Status
     let matchesApp = true
@@ -226,7 +351,7 @@ const filteredCertificates = computed(() => {
       matchesApp = cc.approval_status?.toLowerCase() === filterAppStatus.value.toLowerCase()
     }
     
-    return matchesSearch && matchesDate && matchesApp
+    return matchesSearch && matchesDate && matchesApp && matchesDocStatus
   })
 })
 

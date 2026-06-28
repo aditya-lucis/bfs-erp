@@ -705,6 +705,11 @@ class CompletionCertificate(models.Model):
     approval_status = models.CharField(max_length=50, default='draft')
     is_active = models.BooleanField(default=False)
     
+    # Void fields
+    void_reason = models.TextField(null=True, blank=True)
+    void_date = models.DateTimeField(null=True, blank=True)
+    void_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='voided_ccs')
+    
     # Audit fields
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -727,11 +732,22 @@ class GrnSesDocument(models.Model):
         db_table = 'purchases_grn_ses_document'
         ordering = ['document_name']
 
+def cc_document_upload_path(instance, filename):
+    import os
+    ext = os.path.splitext(filename)[1]
+    # count existing documents for this CC to get an incremental number
+    # instance.cc might not be saved yet, but if it is, we can query
+    count = CompletionCertificateDocument.objects.filter(cc=instance.cc).count() + 1
+    # fallback if cc_number is empty somehow
+    cc_num = instance.cc.cc_number.replace('/', '_').replace(' ', '_') if instance.cc and instance.cc.cc_number else 'new_cc'
+    new_filename = f'{cc_num}_{count}{ext}'
+    return os.path.join('cc', new_filename)
+
 class CompletionCertificateDocument(models.Model):
     cc = models.ForeignKey(CompletionCertificate, on_delete=models.CASCADE, related_name='documents')
     master_document = models.ForeignKey(GrnSesDocument, on_delete=models.CASCADE)
     is_available = models.BooleanField(default=False)
-    file = models.FileField(upload_to='completion_certificates/', null=True, blank=True)
+    file = models.FileField(upload_to=cc_document_upload_path, null=True, blank=True)
     document_number = models.CharField(max_length=255, null=True, blank=True)
     keterangan = models.TextField(null=True, blank=True)
     

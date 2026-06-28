@@ -51,6 +51,18 @@ export const useCompletionCertificateStore = defineStore('completionCertificate'
         this.error = err.response?.data || err.message
       }
     },
+    async submitCC(id) {
+      this.loading = true
+      try {
+        const response = await api.post(`/purchase/completion-certificates/${id}/submit/`)
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data?.detail || 'Gagal submit Completion Certificate.'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
     async updateCertificate(id, payload) {
       this.error = null
       try {
