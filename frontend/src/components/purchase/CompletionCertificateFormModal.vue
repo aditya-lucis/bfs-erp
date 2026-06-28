@@ -105,10 +105,10 @@
               <tr v-if="loadingDocs" class="border-b border-gray-100">
                 <td colspan="6" class="text-center py-4 text-gray-500">Loading documents...</td>
               </tr>
-              <tr v-else-if="!activeDocs.length" class="border-b border-gray-100">
+              <tr v-else-if="!displayedDocs.length" class="border-b border-gray-100">
                 <td colspan="6" class="text-center py-4 text-gray-500">No active documents found.</td>
               </tr>
-              <tr v-else v-for="(doc, idx) in activeDocs" :key="doc.id" class="border-b border-gray-100 hover:bg-yellow-50/20 text-xs">
+              <tr v-else v-for="(doc, idx) in displayedDocs" :key="doc.id" class="border-b border-gray-100 hover:bg-yellow-50/20 text-xs">
                 <td class="py-2 px-4 text-center">
                   <input type="checkbox" v-model="doc.checked" class="w-4 h-4 text-bfs-gold border-gray-300 rounded" />
                 </td>
@@ -216,7 +216,7 @@
           <span>{{ isEdit ? 'Save Changes' : 'Save Document' }}</span>
         </button>
         <button 
-          v-if="['draft', 'revised'].includes(form.approval_status)"
+          v-if="isEdit && ['draft', 'revised'].includes(form.approval_status)"
           @click="submitForm(false)" 
           class="px-6 py-2 text-sm font-bold text-white bg-bfs-navy hover:bg-bfs-navy-dark rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
           :disabled="isSubmitting || !isFormValid"
@@ -267,7 +267,16 @@ const initialFormState = {
   approval_status: 'draft',
 }
 
-const form = ref({ ...initialFormState })
+const form = ref({ ...initialFormState, document_date: new Date().toISOString().split('T')[0] })
+
+const displayedDocs = computed(() => {
+  if (form.value.type === 'GRN') {
+    return activeDocs.value.filter(d => d.type === 'GRN')
+  } else if (form.value.type === 'BAST') {
+    return activeDocs.value.filter(d => d.type === 'SES')
+  }
+  return activeDocs.value
+})
 
 const isEdit = computed(() => !!props.editData)
 
@@ -301,8 +310,8 @@ const selectedRAPName = computed(() => {
 })
 
 const isFormValid = computed(() => {
-  const hasCheckedDocs = activeDocs.value.some(d => d.checked)
-  const hasFileErrors = activeDocs.value.some(d => d.checked && d.fileError)
+  const hasCheckedDocs = displayedDocs.value.some(d => d.checked)
+  const hasFileErrors = displayedDocs.value.some(d => d.checked && d.fileError)
   return form.value.vendor && form.value.po && form.value.payment_term && 
          form.value.document_date && isPeriodOpen.value && hasCheckedDocs && !hasFileErrors
 })
@@ -466,7 +475,7 @@ async function submitForm(isDraft = true) {
 
     // For documents: we use array-like keys if DRF supports it (requires drf-nested-multipart) 
     // OR we can just send JSON for non-file fields and a separate logic, but let's try the array approach.
-    const selectedDocs = activeDocs.value.filter(d => d.checked)
+    const selectedDocs = displayedDocs.value.filter(d => d.checked)
     
     // Instead of raw FormData for nested, some DRF setups expect JSON for the main body 
     // and base64 for files. Since we appended files, let's just do a JSON payload for now
