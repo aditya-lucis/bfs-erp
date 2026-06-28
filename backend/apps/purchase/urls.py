@@ -116,4 +116,13 @@ urlpatterns = [
     path('completion-certificates/get_valid_vendors/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_vendors'}), name='cc-valid-vendors'),
     path('completion-certificates/get_valid_pos/', views.CompletionCertificateViewSet.as_view({'get': 'get_valid_pos'}), name='cc-valid-pos'),
     path('completion-certificates/<int:pk>/submit/', views.CompletionCertificateSubmitApprovalView.as_view(), name='cc-submit'),
+
+    # Good Receipt Note
+    path('good-receipt-notes/', views.GoodReceiptNoteViewSet.as_view({'get': 'list', 'post': 'create'}), name='grn-list'),
+    path('good-receipt-notes/<int:pk>/', views.GoodReceiptNoteViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='grn-detail'),
+    path('good-receipt-notes/<int:pk>/void_grn/', views.GoodReceiptNoteViewSet.as_view({'post': 'void_grn'}), name='grn-void'),
+    path('good-receipt-notes/get_valid_vendors/', views.GoodReceiptNoteViewSet.as_view({'get': 'get_valid_vendors'}), name='grn-valid-vendors'),
+    path('good-receipt-notes/get_valid_pos/', views.GoodReceiptNoteViewSet.as_view({'get': 'get_valid_pos'}), name='grn-valid-pos'),
+    path('good-receipt-notes/get_valid_ccs/', views.GoodReceiptNoteViewSet.as_view({'get': 'get_valid_ccs'}), name='grn-valid-ccs'),
+    path('good-receipt-notes/<int:pk>/submit/', views.GoodReceiptNoteSubmitApprovalView.as_view(), name='grn-submit'),
 ]

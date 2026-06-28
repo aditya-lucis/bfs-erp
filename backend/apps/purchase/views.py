@@ -752,6 +752,20 @@ class CompletionCertificateViewSet(viewsets.ModelViewSet):
     def void_cc(self, request, pk=None):
         from django.utils import timezone
         cc = self.get_object()
+        
+        # Check if a non-void, non-rejected GRN exists for this CC
+        from apps.purchase.models import GoodReceiptNote
+        active_grn = GoodReceiptNote.objects.filter(
+            cc=cc
+        ).exclude(
+            void_reason__isnull=False
+        ).exclude(
+            approval_status='rejected'
+        ).first()
+        
+        if active_grn:
+            return Response({'detail': f'Tidak dapat melakukan void karena CC ini sudah digunakan pada Good Receipt Note ({active_grn.grn_number}).'}, status=400)
+            
         void_reason = request.data.get('void_reason')
         if not void_reason:
             return Response({'detail': 'Alasan void wajib diisi.'}, status=400)
@@ -802,6 +816,147 @@ class CompletionCertificateSubmitApprovalView(APIView):
             cc.save()
 
             return Response({'detail': 'CC berhasil diajukan untuk persetujuan.', 'request_id': req.id}, status=status.HTTP_201_CREATED)
+        except ApprovalMatrixError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except AttributeError:
+            return Response({'detail': 'User belum terhubung dengan data profil Karyawan/Posisi.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from .models import GoodReceiptNote, GoodReceiptNoteDocument
+from .serializers import GoodReceiptNoteSerializer, GoodReceiptNoteDocumentSerializer
+
+class GoodReceiptNoteViewSet(viewsets.ModelViewSet):
+    queryset = GoodReceiptNote.objects.all()
+    serializer_class = GoodReceiptNoteSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        vendor_id = self.request.query_params.get('vendor')
+
+        if start_date:
+            queryset = queryset.filter(document_date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(document_date__lte=end_date)
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+            
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def get_valid_vendors(self, request):
+        from apps.purchase.serializers import VendorListSerializer
+        from apps.purchase.models import Vendor, PurchaseOrder
+        
+        pos = PurchaseOrder.objects.filter(
+            is_active=True, 
+            approval_status='approved',
+            completioncertificate__approval_status='approved',
+            completioncertificate__is_active=True,
+            completioncertificate__void_reason__isnull=True
+        ).values_list('vendor_id', flat=True)
+        
+        vendors = Vendor.objects.filter(id__in=pos).distinct()
+        serializer = VendorListSerializer(vendors, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def get_valid_pos(self, request):
+        vendor_id = request.query_params.get('vendor_id')
+        if not vendor_id:
+            return Response({'detail': 'vendor_id is required'}, status=400)
+            
+        from apps.purchase.models import PurchaseOrder
+        pos = PurchaseOrder.objects.filter(
+            vendor_id=vendor_id,
+            is_active=True,
+            approval_status='approved',
+            completioncertificate__approval_status='approved',
+            completioncertificate__is_active=True,
+            completioncertificate__void_reason__isnull=True
+        ).distinct()
+        
+        serializer = PurchaseOrderSerializer(pos, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def get_valid_ccs(self, request):
+        po_id = request.query_params.get('po_id')
+        if not po_id:
+            return Response({'detail': 'po_id is required'}, status=400)
+            
+        from apps.purchase.models import CompletionCertificate, GoodReceiptNote
+        
+        ccs = CompletionCertificate.objects.filter(
+            po_id=po_id,
+            approval_status='approved',
+            is_active=True,
+            void_reason__isnull=True
+        )
+        
+        used_cc_ids = GoodReceiptNote.objects.filter(
+            po_id=po_id
+        ).exclude(
+            void_reason__isnull=False
+        ).exclude(
+            approval_status='rejected'
+        ).values_list('cc_id', flat=True)
+        
+        ccs = ccs.exclude(id__in=used_cc_ids)
+        
+        from .serializers import CompletionCertificateSerializer
+        serializer = CompletionCertificateSerializer(ccs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def void_grn(self, request, pk=None):
+        from django.utils import timezone
+        grn = self.get_object()
+        
+        void_reason = request.data.get('void_reason')
+        if not void_reason:
+            return Response({'detail': 'Alasan void wajib diisi.'}, status=400)
+            
+        grn.is_active = False
+        grn.void_reason = void_reason
+        grn.void_date = timezone.now()
+        grn.void_by = request.user
+        grn.save()
+        
+        return Response({'status': 'success', 'message': 'GRN berhasil di-void'})
+
+class GoodReceiptNoteSubmitApprovalView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-GOOD-RECEIPT-NOTE'
+
+    def post(self, request, pk):
+        from apps.accounting_period.period_checker import PeriodChecker
+        from apps.approval.services import create_approval_request, ApprovalMatrixError
+        
+        grn = get_object_or_404(GoodReceiptNote, pk=pk)
+        
+        period_result = PeriodChecker.check(grn.document_date, raise_exception=False)
+        if not period_result.get('is_open', False):
+            return Response({'detail': f'Accounting period is closed or not configured for date {grn.document_date}.'}, status=400)
+            
+        has_docs = grn.documents.filter(is_available=True).exists()
+        if not has_docs:
+            return Response({'detail': 'Setidaknya ada satu dokumen kelengkapan yang tersedia.'}, status=400)
+
+        try:
+            req = create_approval_request(
+                document_type='GOOD_RECEIPT_NOTE',
+                document_id=grn.id,
+                document_number=grn.grn_number,
+                document_date=grn.document_date,
+                creator_user=request.user,
+                amount=grn.amount
+            )
+            grn.approval_status = 'awaiting'
+            grn.save()
+            return Response({'detail': 'GRN berhasil diajukan untuk persetujuan.', 'request_id': req.id}, status=status.HTTP_201_CREATED)
         except ApprovalMatrixError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except AttributeError:

@@ -589,3 +589,105 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
                 doc.delete()
                 
         return instance
+
+from .models import GoodReceiptNote, GoodReceiptNoteDocument
+
+class GoodReceiptNoteDocumentSerializer(serializers.ModelSerializer):
+    document_name = serializers.CharField(source='master_document.document_name', read_only=True)
+    type = serializers.CharField(source='master_document.type', read_only=True)
+
+    class Meta:
+        model = GoodReceiptNoteDocument
+        fields = ['id', 'grn', 'master_document', 'is_available', 'file', 'document_number', 'keterangan', 'document_name', 'type']
+        extra_kwargs = {
+            'grn': {'read_only': True}
+        }
+
+class GoodReceiptNoteSerializer(serializers.ModelSerializer):
+    documents = GoodReceiptNoteDocumentSerializer(many=True, read_only=False)
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    po_number = serializers.CharField(source='po.po_number', read_only=True)
+    cc_number = serializers.CharField(source='cc.cc_number', read_only=True)
+    site_name = serializers.CharField(source='po.project.site_name', read_only=True)
+    rap_name = serializers.CharField(source='po.project.rap.document_name', read_only=True, default='None')
+
+    class Meta:
+        model = GoodReceiptNote
+        fields = [
+            'id', 'grn_number', 'vendor', 'po', 'cc', 'document_date', 'acceptance_date',
+            'description', 'type', 'currency', 'amount', 'term_percentage',
+            'approval_status', 'is_active', 'documents',
+            'vendor_name', 'po_number', 'cc_number', 'site_name', 'rap_name',
+            'void_reason', 'void_date'
+        ]
+        read_only_fields = ['grn_number', 'approval_status', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        documents_data = validated_data.pop('documents', [])
+        import datetime
+        now = datetime.datetime.now()
+        prefix = f"GRN{now.strftime('%Y%m%d%H%M%S')}-"
+        last_grn = GoodReceiptNote.objects.filter(grn_number__startswith=prefix).order_by('id').last()
+        if last_grn:
+            last_seq = int(last_grn.grn_number.split('-')[1])
+            new_seq = last_seq + 1
+        else:
+            new_seq = 1
+        validated_data['grn_number'] = f"{prefix}{new_seq:07d}"
+        
+        grn = GoodReceiptNote.objects.create(**validated_data)
+        
+        for doc_data in documents_data:
+            if doc_data.get('file') is None and grn.cc:
+                from apps.purchase.models import CompletionCertificateDocument
+                cc_doc = CompletionCertificateDocument.objects.filter(
+                    cc=grn.cc, master_document=doc_data.get('master_document')
+                ).first()
+                if cc_doc and cc_doc.file:
+                    doc_data['file'] = cc_doc.file
+            GoodReceiptNoteDocument.objects.create(grn=grn, **doc_data)
+        
+        return grn
+
+    def update(self, instance, validated_data):
+        documents_data = validated_data.pop('documents', [])
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if documents_data:
+            existing_docs = {doc.master_document_id: doc for doc in instance.documents.all()}
+            for doc_data in documents_data:
+                master_document = doc_data.get('master_document')
+                file = doc_data.get('file', None)
+                
+                if master_document.id in existing_docs:
+                    doc = existing_docs.pop(master_document.id)
+                    doc.is_available = doc_data.get('is_available', doc.is_available)
+                    doc.document_number = doc_data.get('document_number', doc.document_number)
+                    doc.keterangan = doc_data.get('keterangan', doc.keterangan)
+                    if file is not None:
+                        doc.file = file
+                    elif not doc.file and instance.cc:
+                        from apps.purchase.models import CompletionCertificateDocument
+                        cc_doc = CompletionCertificateDocument.objects.filter(
+                            cc=instance.cc, master_document=master_document
+                        ).first()
+                        if cc_doc and cc_doc.file:
+                            doc.file = cc_doc.file
+                    doc.save()
+                else:
+                    if file is None and instance.cc:
+                        from apps.purchase.models import CompletionCertificateDocument
+                        cc_doc = CompletionCertificateDocument.objects.filter(
+                            cc=instance.cc, master_document=master_document
+                        ).first()
+                        if cc_doc and cc_doc.file:
+                            doc_data['file'] = cc_doc.file
+                    GoodReceiptNoteDocument.objects.create(grn=instance, **doc_data)
+            
+            for doc in existing_docs.values():
+                doc.delete()
+                
+        return instance

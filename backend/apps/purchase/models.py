@@ -756,3 +756,56 @@ class CompletionCertificateDocument(models.Model):
         unique_together = ('cc', 'master_document')
 
 
+class GoodReceiptNote(models.Model):
+    class TypeChoices(models.TextChoices):
+        GRN = 'GRN', 'GRN'
+        SES = 'SES', 'SES'
+
+    grn_number = models.CharField(max_length=100, unique=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE)
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE)
+    cc = models.ForeignKey(CompletionCertificate, on_delete=models.CASCADE)
+    document_date = models.DateField()
+    acceptance_date = models.DateField()
+    description = models.TextField()
+    type = models.CharField(max_length=10, choices=TypeChoices.choices, default=TypeChoices.GRN)
+    currency = models.CharField(max_length=10, default='IDR')
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    term_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    approval_status = models.CharField(max_length=50, default='draft')
+    is_active = models.BooleanField(default=False)
+    
+    # Void fields
+    void_reason = models.TextField(null=True, blank=True)
+    void_date = models.DateTimeField(null=True, blank=True)
+    void_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='voided_grns')
+    
+    # Audit fields
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'purchases_good_receipt_note'
+        ordering = ['-document_date', '-id']
+
+def grn_document_upload_path(instance, filename):
+    import os
+    ext = os.path.splitext(filename)[1]
+    # count existing documents for this GRN to get an incremental number
+    count = GoodReceiptNoteDocument.objects.filter(grn=instance.grn).count() + 1
+    # fallback if grn_number is empty somehow
+    grn_num = instance.grn.grn_number.replace('/', '_').replace(' ', '_') if instance.grn and instance.grn.grn_number else 'new_grn'
+    new_filename = f'{grn_num}_{count}{ext}'
+    return os.path.join('grn', new_filename)
+
+class GoodReceiptNoteDocument(models.Model):
+    grn = models.ForeignKey(GoodReceiptNote, on_delete=models.CASCADE, related_name='documents')
+    master_document = models.ForeignKey(GrnSesDocument, on_delete=models.CASCADE)
+    is_available = models.BooleanField(default=False)
+    file = models.FileField(upload_to=grn_document_upload_path, null=True, blank=True)
+    document_number = models.CharField(max_length=255, null=True, blank=True)
+    keterangan = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'purchases_good_receipt_note_document'
+        unique_together = ('grn', 'master_document')

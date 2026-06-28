@@ -237,6 +237,7 @@ import Swal from 'sweetalert2'
 import { useCompletionCertificateStore } from '../../stores/completionCertificate'
 import { useGrnSesDocumentStore } from '../../stores/grnSesDocument'
 import { usePeriodCheck } from '../../composables/usePeriodCheck'
+import api from '../../services/api.js'
 import SearchableSelect from '../../components/SearchableSelect.vue'
 
 const props = defineProps({
@@ -287,7 +288,7 @@ const selectedPOObj = computed(() => {
 })
   const selectedPOTerms = computed(() => {
     const terms = selectedPOObj.value?.payment_terms || []
-    return terms.filter(t => !t.has_active_cc)
+    return terms.filter(t => !t.has_active_cc || t.id === form.value.payment_term)
   })
 const selectedTermObj = computed(() => {
   if (!form.value.payment_term) return null
@@ -297,7 +298,7 @@ const selectedTermObj = computed(() => {
     return store.validPOs
       .filter(po => {
         const terms = po.payment_terms || []
-        return terms.some(t => !t.has_active_cc)
+        return terms.some(t => !t.has_active_cc || t.id === form.value.payment_term)
       })
       .map(po => ({
         id: po.id,
