@@ -50,6 +50,16 @@ class Company(models.Model):
     period_frequency    = models.PositiveSmallIntegerField(default=12)
     currency_id         = models.CharField(max_length=10, default='IDR')
 
+    is_holding          = models.BooleanField(default=False)
+    
+    # SMTP Configuration
+    smtp_host           = models.CharField(max_length=255, blank=True, default='sandbox.smtp.mailtrap.io')
+    smtp_port           = models.IntegerField(default=2525)
+    smtp_user           = models.CharField(max_length=255, blank=True, default='')
+    smtp_password       = models.CharField(max_length=255, blank=True, default='')
+    smtp_use_tls        = models.BooleanField(default=True)
+    smtp_from_email     = models.CharField(max_length=255, blank=True, default='noreply@example.com', help_text="Alamat pengirim untuk email otomatis")
+
     is_active           = models.BooleanField(default=True)
     created_at          = models.DateTimeField(auto_now_add=True)
     updated_at          = models.DateTimeField(auto_now=True)

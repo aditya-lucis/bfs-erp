@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRN Approved Notification</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .email-container {
+            max-width: 700px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #f8fafc;
+            padding: 24px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .header img {
+            max-height: 60px;
+            object-fit: contain;
+        }
+        .content {
+            padding: 32px;
+            color: #374151;
+            line-height: 1.6;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+        .opening-text {
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 24px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+        th {
+            background-color: #fbf8f3;
+            color: #856114;
+            font-weight: 600;
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .note-box {
+            background-color: #f8fafc;
+            border-left: 4px solid #c79f47;
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 32px;
+        }
+        .note-box h4 {
+            margin: 0 0 8px 0;
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .note-box ul {
+            margin: 0;
+            padding-left: 16px;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        .note-box li {
+            margin-bottom: 4px;
+        }
+        .signoff {
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 24px;
+        }
+        .company-profile {
+            background-color: #fbf8f3;
+            padding: 24px 32px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        .company-profile strong {
+            color: #111827;
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        .company-profile .admin-title {
+            color: #c79f47;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .company-profile p {
+            margin: 2px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 16px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            {% if company.logo %}
+            <img src="cid:company_logo" alt="{{ company.company_name }} Logo">
+            {% else %}
+            <h2 style="margin:0; color:#c79f47;">{{ company.company_name }}</h2>
+            {% endif %}
+        </div>
+
+        <div class="content">
+            <div class="greeting">Dear Vendor, {{ vendor_name }}</div>
+            
+            <div class="opening-text">
+                Berikut adalah Good Receipt Note (GRN) yang sudah selesai diproses oleh {{ company.company_name }}. 
+                Silakan untuk dapat melakukan Invoicing, mengingat usia GRN adalah <strong>30 hari</strong> setelah tanggal GRN ini diterbitkan.
+                <br><br>
+                Untuk Vendor yang berada di luar wilayah, dapat berkoordinasi dengan PIC dari departemen terkait {{ company.company_name }}.
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Vendor</th>
+                            <th>Site / Proyek</th>
+                            <th>No. PO</th>
+                            <th>No. GRN/SES</th>
+                            <th>Nilai</th>
+                            <th>Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1.</td>
+                            <td>{{ vendor_name }}</td>
+                            <td>{{ site_name }}</td>
+                            <td>{{ po_number }}</td>
+                            <td>{{ grn_number }}</td>
+                            <td>{{ currency }} {{ total_value|default:"0" }}</td>
+                            <td>{{ description }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="note-box">
+                <h4>Note :</h4>
+                <ul>
+                    <li>Diinformasikan bahwa batas waktu invoice paling lambat <strong>1 bulan</strong> setelah GRN / SES diterbitkan oleh {{ company.company_name }}.</li>
+                    <li>Apabila terjadi keterlambatan invoice melewati batas waktu, maka GRN / SES tersebut akan hangus dan Vendor harus mengajukan ulang pembuatan GRN / SES pada PIC departemen terkait.</li>
+                    <li>Untuk pengajuan GRN DP adalah dengan syarat mengirimkan kembali copy PO yang sudah ditandatangani oleh pihak Vendor kepada team {{ company.company_name }} ataupun kepada departemen terkait.</li>
+                    <li>Jadwal penerimaan Invoice adalah setiap hari Senin s/d Kamis jam 09.00 WIB - 14.00 WIB.</li>
+                </ul>
+            </div>
+
+            <div class="signoff">
+                Thanks & Regards,
+            </div>
+        </div>
+
+        <div class="company-profile">
+            <strong>{{ company.company_name }}</strong>
+            <span class="admin-title">Admin GRN SES</span>
+            <p>{{ company.company_address }}</p>
+            {% if company.company_address2 %}<p>{{ company.company_address2 }}</p>{% endif %}
+            <p>{{ company.state }}, {{ company.country }} {{ company.postal_code }}</p>
+            {% if company.phone %}<p>Telepon: {{ company.phone }}</p>{% endif %}
+            {% if company.email %}<p>Email: {{ company.email }}</p>{% endif %}
+        </div>
+    </div>
+    
+    <div class="footer">
+        Powered By BFS ERP
+    </div>
+</body>
+</html>

@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
+from email.mime.image import MIMEImage
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -927,6 +928,117 @@ class GoodReceiptNoteViewSet(viewsets.ModelViewSet):
         
         return Response({'status': 'success', 'message': 'GRN berhasil di-void'})
 
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        grn = self.get_object()
+        
+        pdf_file = request.FILES.get('pdf_file')
+
+        from apps.organization.models import Company
+        company = Company.get_default()
+        
+        # Optional sending logic
+        if not company or not company.smtp_host or not company.smtp_user:
+            return Response({'status': 'approved_no_email', 'detail': 'GRN Approved successfully, but email not sent (SMTP not configured).'}, status=status.HTTP_200_OK)
+
+        try:
+            from django.core.mail import EmailMultiAlternatives
+            from django.core.mail.backends.smtp import EmailBackend
+            from django.template.loader import render_to_string
+
+            backend = EmailBackend(
+                host=company.smtp_host,
+                port=company.smtp_port,
+                username=company.smtp_user,
+                password=company.smtp_password,
+                use_tls=company.smtp_use_tls,
+                fail_silently=False
+            )
+
+            subject = f'Approved Good Receipt Note: {grn.grn_number}'
+            
+            # Prepare context for the template
+            logo_url = ''
+            if company.logo:
+                logo_url = request.build_absolute_uri(company.logo.url)
+                
+            site_name = ''
+            if grn.po and getattr(grn.po, 'project', None):
+                site_name = f'{grn.po.project.project_code} - {grn.po.project.project_name}'
+                
+            po_number = grn.po.po_number if grn.po else ''
+            
+            # Calculate total value
+            total_value = grn.amount
+            
+            context = {
+                'company': company,
+                'logo_url': logo_url,
+                'vendor_name': grn.vendor.name if grn.vendor else '',
+                'site_name': site_name,
+                'po_number': po_number,
+                'grn_number': grn.grn_number,
+                'currency': grn.currency,
+                'total_value': '{:,.2f}'.format(total_value),
+                'description': grn.description or 'Pembayaran Tagihan'
+            }
+            
+            html_content = render_to_string('email/grn_notification.html', context)
+            text_content = f'Dear {grn.vendor.name},\n\nBerikut adalah GRN yang sudah selesai diproses oleh {company.company_name}. Silakan untuk dapat melakukan Invoicing.\n\nRegards,\n{company.company_name}'
+            
+            from_email = company.smtp_from_email or company.smtp_user or 'noreply@example.com'
+            to_email = [grn.vendor.email] if grn.vendor and grn.vendor.email else []
+            
+            cc_email = []
+            if hasattr(grn, 'created_by') and grn.created_by and hasattr(grn.created_by, 'email') and grn.created_by.email:
+                cc_email.append(grn.created_by.email)
+
+            if not to_email:
+                return Response({'status': 'approved_no_email', 'detail': 'Vendor does not have an email address.'}, status=status.HTTP_200_OK)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=from_email,
+                to=to_email,
+                cc=cc_email,
+                connection=backend
+            )
+            email.attach_alternative(html_content, "text/html")
+            
+            if company.logo:
+                try:
+                    with open(company.logo.path, 'rb') as f:
+                        logo_image = MIMEImage(f.read())
+                        logo_image.add_header('Content-ID', '<company_logo>')
+                        email.attach(logo_image)
+                except Exception as e:
+                    pass
+
+            pdf_attached = False
+            pdf_size = 0
+            if pdf_file and pdf_file.size > 0:
+                email.attach(pdf_file.name, pdf_file.read(), pdf_file.content_type)
+                pdf_attached = True
+                pdf_size = pdf_file.size
+            email.send()
+
+            import traceback
+            with open('c:/Traine/bfs-erp/backend/email_debug.log', 'a') as f:
+                f.write(f'SUCCESS: Email sent to {to_email} at {grn.grn_number}. PDF attached: {pdf_attached} (size: {pdf_size})\n')
+
+            return Response({'status': 'email_sent', 'detail': 'Approval email sent to vendor successfully.'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            with open('c:/Traine/bfs-erp/backend/email_debug.log', 'a') as f:
+                f.write(f'EXCEPTION: {str(e)}\n')
+                f.write(traceback.format_exc() + '\n')
+            # If email fails for some reason (e.g. wrong credentials), we still return success for the approval
+            # but notify the user that email failed.
+            return Response({'status': 'approved_email_failed', 'detail': f'GRN Approved but failed to send email: {str(e)}'}, status=status.HTTP_200_OK)
+
+
 class GoodReceiptNoteSubmitApprovalView(APIView):
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'PURCHASES-GOOD-RECEIPT-NOTE'
@@ -938,7 +1050,7 @@ class GoodReceiptNoteSubmitApprovalView(APIView):
         grn = get_object_or_404(GoodReceiptNote, pk=pk)
         
         period_result = PeriodChecker.check(grn.document_date, raise_exception=False)
-        if not period_result.get('is_open', False):
+        if not period_result.is_open:
             return Response({'detail': f'Accounting period is closed or not configured for date {grn.document_date}.'}, status=400)
             
         has_docs = grn.documents.filter(is_available=True).exists()
@@ -947,10 +1059,9 @@ class GoodReceiptNoteSubmitApprovalView(APIView):
 
         try:
             req = create_approval_request(
-                document_type='GOOD_RECEIPT_NOTE',
+                document_code='GRN',
                 document_id=grn.id,
                 document_number=grn.grn_number,
-                document_date=grn.document_date,
                 creator_user=request.user,
                 amount=grn.amount
             )

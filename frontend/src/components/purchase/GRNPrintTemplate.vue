@@ -25,13 +25,13 @@
             </div>
 
             <!-- Print Page Content -->
-            <div class="p-8 lg:p-12 bg-white text-[11px] leading-relaxed relative">
+            <div id="print-area-wrapper" class="p-8 lg:p-12 bg-white text-[11px] leading-relaxed relative">
               
               <!-- HEADER -->
               <div class="flex justify-between items-start border-b-2 border-bfs-navy pb-6 mb-6">
                 <!-- Company Logo & Details -->
                 <div class="flex items-center gap-4">
-                  <img v-if="orgStore.company?.logo_url" :src="orgStore.company.logo_url" alt="Company Logo" class="h-16 object-contain" />
+                  <img v-if="orgStore.company?.logo_url" :src="orgStore.company.logo_url" crossorigin="anonymous" alt="Company Logo" class="h-16 object-contain" />
                   <div v-else class="h-16 w-16 bg-gray-100 flex items-center justify-center rounded-lg border border-gray-200">
                     <span class="text-[10px] text-gray-400 font-bold tracking-widest">LOGO</span>
                   </div>

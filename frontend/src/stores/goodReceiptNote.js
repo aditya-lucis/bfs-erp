@@ -142,6 +142,25 @@ export const useGoodReceiptNoteStore = defineStore('goodReceiptNote', {
         this.loading = false
       }
     },
+    async approveGRN(id, pdfBlob, fileName = 'GRN_Approved.pdf') {
+      this.loading = true
+      this.error = null
+      try {
+        const formData = new FormData()
+        formData.append('pdf_file', pdfBlob, fileName)
+        const res = await api.post(`/purchase/good-receipt-notes/${id}/approve/`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        return res.data
+      } catch (err) {
+        this.error = err.response?.data || err.message
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
     async voidGRN(id, reason) {
       this.loading = true
       this.error = null

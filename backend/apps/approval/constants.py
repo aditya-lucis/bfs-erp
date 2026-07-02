@@ -13,6 +13,7 @@ class DocumentType(models.TextChoices):
     PURCHASE_REQUISITION = 'PR', 'Purchase Requisition (PR)'
     PURCHASE_ORDER = 'PO', 'Purchase Order (PO)'
     COMPLETION_CERTIFICATE = 'CC', 'Completion Certificate (CC)'
+    GOOD_RECEIPT_NOTE = 'GRN', 'Good Receipt Note (GRN)'
 
 
 class ApprovalBasis(models.TextChoices):

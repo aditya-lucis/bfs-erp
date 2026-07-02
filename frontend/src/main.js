@@ -87,6 +87,7 @@ const implementedRoutes = [
   { path: '/purchases/grnses-document', component: GrnSesDocumentView, meta: { title: 'GRN-SES Document', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/completion-certificate', component: () => import('./views/purchase/CompletionCertificateView.vue'), meta: { title: 'Completion Certificate', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/completion-certificate-inbox', component: () => import('./views/purchase/CCInboxView.vue'), meta: { title: 'Completion Certificate Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/good-receipt-note-inbox', component: () => import('./views/purchase/GRNInboxView.vue'), meta: { title: 'GRN Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/good-receipt-note', component: () => import('./views/purchase/GoodReceiptNoteView.vue'), meta: { title: 'Good Receipt Note', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
 ]
 

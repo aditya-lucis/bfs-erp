@@ -288,7 +288,7 @@ async function voidGRN(grnItem) {
         })
         await store.fetchGRNs()
         Swal.fire({
-          icon: 'sugrness',
+          icon: 'success',
           title: 'Berhasil',
           text: 'GRN berhasil di-void dan status tidak aktif.',
           confirmButtonColor: '#1e3a8a'

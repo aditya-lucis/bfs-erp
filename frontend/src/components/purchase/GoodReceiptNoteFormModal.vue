@@ -235,7 +235,7 @@
         </button>
         <div class="flex gap-2">
           <button
-            v-if="!isEdit ? canCreate : canUpdate"
+            v-if="(!isEdit && canCreate) || (isEdit && canUpdate && ['draft', 'revised'].includes(form.approval_status))"
             @click="submitForm(true)" 
             class="px-6 py-2 text-sm font-bold text-bfs-navy border border-bfs-navy hover:bg-gray-50 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2"
             :disabled="isSubmitting || !isFormValid"

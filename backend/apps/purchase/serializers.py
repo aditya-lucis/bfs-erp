@@ -536,7 +536,7 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
             'vendor_name', 'po_number', 'site_name', 'rap_name',
             'void_reason', 'void_date'
         ]
-        read_only_fields = ['cc_number', 'approval_status', 'created_at', 'updated_at']
+        read_only_fields = ['cc_number', 'approval_status', 'is_active', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         documents_data = validated_data.pop('documents', [])
@@ -544,7 +544,7 @@ class CompletionCertificateSerializer(serializers.ModelSerializer):
         import datetime
         now = datetime.datetime.now()
         prefix = f"CC{now.strftime('%Y%m%d%H%M%S')}-"
-        last_cc = CompletionCertificate.objects.filter(cc_number__startswith=prefix).order_by('id').last()
+        last_cc = CompletionCertificate.objects.order_by('id').last()
         if last_cc:
             last_seq = int(last_cc.cc_number.split('-')[1])
             new_seq = last_seq + 1
@@ -620,14 +620,14 @@ class GoodReceiptNoteSerializer(serializers.ModelSerializer):
             'vendor_name', 'po_number', 'cc_number', 'site_name', 'rap_name',
             'void_reason', 'void_date'
         ]
-        read_only_fields = ['grn_number', 'approval_status', 'created_at', 'updated_at']
+        read_only_fields = ['grn_number', 'approval_status', 'is_active', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         documents_data = validated_data.pop('documents', [])
         import datetime
         now = datetime.datetime.now()
         prefix = f"GRN{now.strftime('%Y%m%d%H%M%S')}-"
-        last_grn = GoodReceiptNote.objects.filter(grn_number__startswith=prefix).order_by('id').last()
+        last_grn = GoodReceiptNote.objects.order_by('id').last()
         if last_grn:
             last_seq = int(last_grn.grn_number.split('-')[1])
             new_seq = last_seq + 1

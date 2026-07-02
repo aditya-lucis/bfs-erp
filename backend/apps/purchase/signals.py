@@ -57,3 +57,19 @@ def sync_purchase_approval_status(sender, instance, **kwargs):
                 cc.save()
         except (CompletionCertificate.DoesNotExist, ValueError, ImportError):
             pass
+    elif instance.document_code == 'GRN':
+        try:
+            from apps.purchase.models import GoodReceiptNote
+            grn = GoodReceiptNote.objects.get(pk=int(instance.document_id))
+            if instance.status == ApprovalStatus.APPROVED:
+                grn.approval_status = 'approved'
+                grn.is_active = True
+                grn.save()
+            elif instance.status == ApprovalStatus.REJECTED:
+                grn.approval_status = 'rejected'
+                grn.save()
+            elif instance.status == ApprovalStatus.CANCELLED:
+                grn.approval_status = 'revised'
+                grn.save()
+        except (GoodReceiptNote.DoesNotExist, ValueError, ImportError):
+            pass

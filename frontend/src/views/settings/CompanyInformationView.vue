@@ -148,6 +148,65 @@
             <label for="is_holding" class="text-sm text-gray-700">Holding Company</label>
           </div>
 
+          <!-- SMTP Configuration Section -->
+          <div class="md:col-span-2 border-t border-gray-100 pt-6 mt-2 mb-4">
+            <h3 class="text-sm font-semibold text-gray-800 mb-4">SMTP Configuration</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <FormField label="SMTP HOST">
+                <input 
+                  id="smtp_host" 
+                  v-model="form.smtp_host" 
+                  type="text" 
+                  class="form-input" 
+                  placeholder="e.g. smtp.gmail.com" 
+                />
+              </FormField>
+              <FormField label="SMTP PORT">
+                <input 
+                  id="smtp_port" 
+                  v-model.number="form.smtp_port" 
+                  type="number" 
+                  class="form-input" 
+                />
+              </FormField>
+              <FormField label="SMTP FROM EMAIL">
+                <input 
+                  id="smtp_from_email" 
+                  v-model="form.smtp_from_email" 
+                  type="email" 
+                  class="form-input" 
+                  placeholder="e.g. noreply@company.com" 
+                />
+              </FormField>
+              <FormField label="SMTP USER">
+                <input 
+                  id="smtp_user" 
+                  v-model="form.smtp_user" 
+                  type="text" 
+                  class="form-input" 
+                  placeholder="e.g. your-email@gmail.com" 
+                />
+              </FormField>
+              <FormField label="SMTP PASSWORD">
+                <input 
+                  id="smtp_password" 
+                  v-model="form.smtp_password" 
+                  type="password" 
+                  class="form-input" 
+                  placeholder="App Password" 
+                />
+              </FormField>
+              <div class="flex items-center gap-3 md:col-span-2">
+                <input 
+                  v-model="form.smtp_use_tls" 
+                  type="checkbox" 
+                  id="smtp_use_tls"
+                  class="w-4 h-4 rounded border-gray-300 text-bfs-gold focus:ring-bfs-gold"
+                />
+                <label for="smtp_use_tls" class="text-sm text-gray-700">Use TLS</label>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ── Divider ── -->
@@ -228,6 +287,12 @@ const form = reactive({
   business_template:    'trading',
   rap_tolerance:        100,
   is_holding:           false,
+  smtp_from_email:      '',
+  smtp_host:            '',
+  smtp_port:            2525,
+  smtp_user:            '',
+  smtp_password:        '',
+  smtp_use_tls:         true,
 })
 
 // Populate form saat data company sudah tersedia

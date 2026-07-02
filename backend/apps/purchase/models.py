@@ -393,7 +393,7 @@ class PurchaseRequisition(models.Model):
         from django.utils import timezone
         timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
         prefix = f"PRN{timestamp}"
-        last = PurchaseRequisition.objects.filter(pr_number__startswith=prefix).order_by('id').last()
+        last = PurchaseRequisition.objects.order_by('id').last()
         if last:
             # PRN<timestamp> -> len(prefix) is 3 + 14 = 17
             try:
@@ -559,7 +559,7 @@ class PurchaseOrder(models.Model):
         from django.utils import timezone
         timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
         prefix = f"PO{timestamp}"
-        last = PurchaseOrder.objects.filter(po_number__startswith=prefix).order_by('id').last()
+        last = PurchaseOrder.objects.order_by('id').last()
         if last:
             try:
                 seq_str = last.po_number.split('-')[-1]
