@@ -65,6 +65,20 @@ export const usePurchaseOrderStore = defineStore('purchaseOrder', {
       }
     },
 
+    
+    async manualClosePO(id, payload) {
+      this.loading = true
+      try {
+        const response = await api.post(`/purchase/po/${id}/manual-close/`, payload)
+        return response.data
+      } catch (err) {
+        this.error = err.response?.data || 'Gagal melakukan manual close'
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updatePO(id, payload) {
       this.loading = true
       try {

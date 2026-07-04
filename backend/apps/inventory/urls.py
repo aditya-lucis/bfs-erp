@@ -34,3 +34,19 @@ urlpatterns = [
     # Choices
     path('choices/', InventoryChoicesView.as_view(), name='inventory-choices'),
 ]
+
+from rest_framework.routers import DefaultRouter
+from .views import ReceiptReportViewSet
+
+router = DefaultRouter()
+router.register(r'receipt-reports', ReceiptReportViewSet, basename='receipt-report')
+
+urlpatterns += router.urls
+
+
+from .views import ReceiptReportSubmitView, ReceiptReportApproveView
+
+urlpatterns += [
+    path('receipt-reports/<int:pk>/submit/', ReceiptReportSubmitView.as_view(), name='receipt-report-submit'),
+    path('receipt-reports/<int:pk>/approve/', ReceiptReportApproveView.as_view(), name='receipt-report-approve'),
+]

@@ -534,6 +534,40 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
 
 
+
+class PurchaseOrderManualCloseView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'PURCHASES-PURCHASE-ORDER'
+
+    def post(self, request, pk):
+        from rest_framework.exceptions import ValidationError
+        from rest_framework.response import Response
+        
+        try:
+            po = PurchaseOrder.objects.get(pk=pk)
+        except PurchaseOrder.DoesNotExist:
+            raise ValidationError({'detail': 'Purchase Order tidak ditemukan.'})
+            
+        action_type = request.data.get('action', 'toggle')
+        close_reason_val = request.data.get('close_reason', 'Manual Close')
+
+        if po.is_close:
+            # Check if it was auto-closed due to expiration
+            if po.close_reason and ('kadaluarsa' in po.close_reason.lower() or 'expired' in po.close_reason.lower()):
+                raise ValidationError({'detail': 'PO ini ditutup otomatis karena sudah kadaluarsa dan tidak bisa dibuka kembali.'})
+            
+            # Re-open the PO
+            po.is_close = False
+            po.close_reason = ''
+            po.save()
+            return Response({'message': 'Purchase Order berhasil dibuka kembali.'})
+        else:
+            # Close the PO
+            po.is_close = True
+            po.close_reason = close_reason_val
+            po.save()
+            return Response({'message': 'Purchase Order berhasil ditutup manual.'})
+
 class PurchaseOrderSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'PURCHASES-PURCHASE-ORDER'

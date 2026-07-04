@@ -263,8 +263,9 @@ from .models import PurchaseOrder, PurchaseOrderDetail, PurchaseOrderPaymentTerm
 class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.item_name', read_only=True)
     item_code = serializers.CharField(source='item.item_code', read_only=True)
-    unit_name = serializers.CharField(source='unit.unit_name', read_only=True)
+    unit_name = serializers.SerializerMethodField()
     budget_component_name = serializers.CharField(source='budget_component.name', read_only=True)
+    received_qty = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrderDetail
@@ -275,8 +276,27 @@ class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
             'discount_percent', 'discount_amount', 'amount',
             'tax_amount', 'deduction_amount',
             'paid_amount', 'paid_tax_amount',
-            'tax1', 'tax2', 'estimated_date', 'order_no'
+            'tax1', 'tax2', 'estimated_date', 'order_no',
+            'received_qty'
         ]
+
+    def get_unit_name(self, obj):
+        if obj.unit:
+            return obj.unit.unit_name
+        if obj.item and obj.item.unit:
+            return obj.item.unit.unit_name
+        return None
+
+    def get_received_qty(self, obj):
+        from apps.inventory.models import ReceiptReportItem
+        from django.db.models import Sum
+        total_received = ReceiptReportItem.objects.filter(
+            po_item=obj,
+            receipt_report__approval_status='approved',
+            receipt_report__receipt_type='RR_PUR'
+        ).aggregate(Sum('receive_qty'))['receive_qty__sum']
+        return total_received or 0
+
         read_only_fields = ['amount', 'discount_amount', 'tax_amount', 'deduction_amount', 'paid_amount', 'paid_tax_amount']
         extra_kwargs = {
             'po': {'required': False}
@@ -315,7 +335,7 @@ class PurchaseOrderListSerializer(serializers.ModelSerializer):
             'po_type', 'po_type_display', 'project', 'project_name',
             'requestor_department', 'department_name', 'po_currency',
             'document_status', 'approval_status', 'grand_total', 'created_by_name',
-            'allow_previous_year_budget', 'is_active'
+            'allow_previous_year_budget', 'is_active', 'close_reason', 'is_close'
         ]
 
 

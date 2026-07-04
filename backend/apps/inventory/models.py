@@ -376,3 +376,67 @@ class ItemAccountLink(models.Model):
 
     def __str__(self):
         return f"{self.item.item_code} | {self.purpose} | {self.currency}"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Receipt Report
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ReceiptReport(models.Model):
+    class ReceiptType(models.TextChoices):
+        PURCHASE = 'RR_PUR', 'Receipt Report For Purchase'
+        SALES_RETURN = 'RR_SRT', 'Receipt Report For Sales Return'
+        INTERNAL = 'RR_INT', 'Receipt Report For Internal'
+        SERVICE_NOTE = 'RR_SRV', 'Receipt Report For Service Note'
+        REPAIR = 'RR_REP', 'Receipt Report For Repair'
+
+    class ApprovalStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        AWAITING = 'awaiting', 'Awaiting'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Reject'
+        REVISED = 'revised', 'Revised'
+        VOID = 'void', 'Void'
+
+    receipt_number = models.CharField(max_length=100, unique=True, editable=False)
+    receipt_type = models.CharField(max_length=20, choices=ReceiptType.choices, default=ReceiptType.PURCHASE)
+    
+    # Core Relations
+    company = models.ForeignKey('organization.Company', on_delete=models.CASCADE, related_name='receipt_reports', null=True)
+    vendor = models.ForeignKey('purchase.Vendor', on_delete=models.PROTECT, related_name='receipt_reports', null=True, blank=True)
+    po = models.ForeignKey('purchase.PurchaseOrder', on_delete=models.PROTECT, related_name='receipt_reports', null=True, blank=True)
+    
+    # Document Info
+    receive_date = models.DateField()
+    vendor_sn = models.CharField(max_length=100, blank=True, default='')
+    vendor_sn_date = models.DateField(null=True, blank=True)
+    memo = models.TextField(blank=True, default='')
+    
+    approval_status = models.CharField(max_length=50, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
+    
+    # Auditing
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_receipt_reports')
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_receipt_reports')
+
+    class Meta:
+        db_table = 'inv_receipt_report'
+        ordering = ['-receive_date', '-id']
+
+    def __str__(self):
+        return self.receipt_number
+
+
+class ReceiptReportItem(models.Model):
+    receipt_report = models.ForeignKey(ReceiptReport, on_delete=models.CASCADE, related_name='items')
+    po_item = models.ForeignKey('purchase.PurchaseOrderDetail', on_delete=models.PROTECT, null=True, blank=True, related_name='receipt_report_items')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name='receipt_report_items')
+    
+    receive_qty = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    unit_type = models.ForeignKey('UnitMeasurement', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'inv_receipt_report_item'
+
+    def __str__(self):
+        return f"{self.receipt_report.receipt_number} - {self.item.item_name}"

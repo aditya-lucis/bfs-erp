@@ -306,3 +306,34 @@ def get_inventory_choices():
             {'value': 'SGD', 'label': 'SGD'},
         ],
     }
+from .models import ReceiptReport, ReceiptReportItem
+
+class ReceiptReportItemSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source='item.item_name', read_only=True)
+    item_code = serializers.CharField(source='item.item_code', read_only=True)
+    unit_name = serializers.CharField(source='unit_type.unit_name', read_only=True)
+
+    class Meta:
+        model = ReceiptReportItem
+        fields = '__all__'
+        read_only_fields = ('receipt_report',)
+
+class ReceiptReportSerializer(serializers.ModelSerializer):
+    items = ReceiptReportItemSerializer(many=True)
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    po_number = serializers.CharField(source='po.po_number', read_only=True)
+    
+    class Meta:
+        model = ReceiptReport
+        fields = '__all__'
+        read_only_fields = ('receipt_number', 'created_at', 'updated_at', 'created_by', 'updated_by', 'approval_status')
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        # Provide default receipt_number (will be updated on save or via signals)
+        receipt_report = ReceiptReport.objects.create(**validated_data)
+        
+        for item_data in items_data:
+            ReceiptReportItem.objects.create(receipt_report=receipt_report, **item_data)
+            
+        return receipt_report

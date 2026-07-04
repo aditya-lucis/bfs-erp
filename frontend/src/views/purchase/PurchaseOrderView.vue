@@ -218,8 +218,17 @@
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-4 text-center">
-                <span v-if="po.document_status === 'close'" class="text-green-500 font-bold text-base">✓</span>
-                <span v-else class="text-red-500 font-bold text-base">✗</span>
+                <div class="flex items-center justify-center gap-1">
+                  <span v-if="po.is_close" class="text-green-500 font-bold text-base">&#10003;</span>
+                  <span v-else class="text-red-500 font-bold text-base">&#10007;</span>
+                  <div v-if="po.is_close && po.close_reason" class="relative group flex items-center justify-center">
+                    <AlertCircle class="w-4 h-4 text-pink-500 cursor-help" />
+                    <div class="absolute bottom-full mb-1 hidden group-hover:block w-max max-w-xs bg-pink-500 text-white text-xs px-2 py-1 rounded shadow-lg z-50">
+                      {{ po.close_reason }}
+                      <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-pink-500"></div>
+                    </div>
+                  </div>
+                </div>
               </td>
               <td class="py-3 px-4 text-center">
                 <span v-if="po.allow_previous_year_budget" class="text-green-500 font-bold text-base">✓</span>
@@ -242,6 +251,14 @@
                   <button v-if="po.document_status === 'draft'" @click="deletePO(po.id)" class="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
+                  <template v-if="po.approval_status === 'approved'">
+                    <button v-if="!po.is_close" @click="manualClose(po)" class="p-1 text-gray-400 hover:text-pink-500 transition-colors" title="Manual Close">
+                      <FileX class="w-3.5 h-3.5" />
+                    </button>
+                    <button v-else-if="!(po.close_reason && (po.close_reason.toLowerCase().includes('kadaluarsa') || po.close_reason.toLowerCase().includes('expired')))" @click="manualClose(po)" class="p-1 text-gray-400 hover:text-green-500 transition-colors" title="Open PO">
+                      <FileCheck class="w-3.5 h-3.5" />
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
@@ -742,6 +759,61 @@ function openAddModal() {
   modal.value.mode = 'add'
   modal.value.editId = null
   modal.value.show = true
+}
+
+async function manualClose(po) {
+  if (po.is_close) {
+    const confirm = await Swal.fire({
+      title: 'Open PO?',
+      text: 'Anda akan membuka kembali PO ini.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0f172a',
+      cancelButtonColor: '#ef4444'
+    })
+    
+    if (confirm.isConfirmed) {
+      try {
+        await store.manualClosePO(po.id, { action: 'open' })
+        if (!store.error) {
+          Swal.fire('Success', 'PO berhasil dibuka kembali.', 'success')
+          handleSearch()
+        } else {
+          Swal.fire('Error', store.error, 'error')
+        }
+      } catch (err) {
+        Swal.fire('Error', 'Gagal memproses aksi ini.', 'error')
+      }
+    }
+    return
+  }
+
+  const { value: reason } = await Swal.fire({
+    title: 'Manual Close PO',
+    input: 'text',
+    inputLabel: 'Alasan penutupan manual:',
+    inputPlaceholder: 'Masukkan alasan...',
+    showCancelButton: true,
+    confirmButtonColor: '#0f172a',
+    cancelButtonColor: '#ef4444',
+    inputValidator: (value) => {
+      if (!value) return 'Alasan harus diisi!'
+    }
+  })
+
+  if (reason) {
+    try {
+      await store.manualClosePO(po.id, { close_reason: reason })
+      if (!store.error) {
+        Swal.fire('Success', 'PO berhasil diclose secara manual.', 'success')
+        handleSearch()
+      } else {
+        Swal.fire('Error', store.error, 'error')
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Gagal memproses manual close.', 'error')
+    }
+  }
 }
 
 function openEditModal(po) {

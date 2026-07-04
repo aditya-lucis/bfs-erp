@@ -493,6 +493,8 @@ class PurchaseOrder(models.Model):
     total_deduction = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     partial_cancellation = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    close_reason = models.CharField(max_length=255, blank=True, null=True)
+    is_close = models.BooleanField(default=False)
     payment_balance = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
 
@@ -580,6 +582,7 @@ class PurchaseOrderDetail(models.Model):
     budget_component = models.ForeignKey(BudgetComponent, on_delete=models.SET_NULL, null=True, blank=True)
     
     quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    received_qty = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     unit = models.ForeignKey(UnitMeasurement, on_delete=models.SET_NULL, null=True, blank=True, related_name='po_details')
     
     unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)

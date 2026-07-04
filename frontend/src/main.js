@@ -44,10 +44,12 @@ import PurchaseRequisitionInboxView from './views/purchase/PurchaseRequisitionIn
 import PurchaseOrderView from './views/purchase/PurchaseOrderView.vue'
 import POInboxView from './views/purchase/POInboxView.vue'
 import GrnSesDocumentView from './views/purchase/GrnSesDocumentView.vue'
+import ReceiptReportView from './views/inventory/ReceiptReportView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
 const implementedRoutes = [
+  { path: '/inventory/receipt-report', component: ReceiptReportView, meta: { title: 'Receipt Report', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
   { path: '/settings/company-information', component: CompanyInformationView, meta: { title: 'Company Information', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/organizational-level', component: DepartmentView, meta: { title: 'Organizational Level', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/user-authorization-group', component: AuthGroupListView, meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
