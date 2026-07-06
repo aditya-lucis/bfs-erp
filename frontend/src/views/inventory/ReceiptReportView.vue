@@ -202,6 +202,9 @@
               </td>
               <td class="py-3 px-4 text-right">
                   <div class="flex justify-end gap-1.5">
+                    <button @click="openTrackingModal(rr)" class="p-1 text-gray-400 hover:text-indigo-500 transition-colors cursor-pointer" title="Tracking Info">
+                      <MapPin class="w-3.5 h-3.5" />
+                    </button>
                     <button @click="printRR(rr.id)" class="p-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer" title="Print Document">
                       <Printer class="w-3.5 h-3.5" />
                     </button>
@@ -234,6 +237,15 @@
       :documentId="printRRId"
       @close="closePrintModal"
     />
+
+    <!-- Tracking Modal -->
+    <ReceiptReportTrackingModal
+      :show="showTrackingModal"
+      :documentId="trackingRRId"
+      :receiptNumber="trackingRRNumber"
+      @close="closeTrackingModal"
+      @success="handleSuccess"
+    />
   </Panel>
 </template>
 
@@ -242,13 +254,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { useReceiptReportStore } from '../../stores/inventory/receiptReportStore'
 import ReceiptReportFormModal from '../../components/inventory/ReceiptReportFormModal.vue'
 import ReceiptReportPrintTemplate from '../../components/inventory/ReceiptReportPrintTemplate.vue'
+import ReceiptReportTrackingModal from '../../components/inventory/ReceiptReportTrackingModal.vue'
 import Panel from '../../components/Panel.vue'
 import Swal from 'sweetalert2'
 import { 
   Folder, FolderOpen, FolderCheck, 
   FileText, FileClock, FileCheck, FileX, FileWarning, 
   Search, Plus, Send, Printer, Pencil, Unlock, Lock, AlertCircle, Loader2,
-  CheckCircle, XCircle, Clock
+  CheckCircle, XCircle, Clock, MapPin
 } from 'lucide-vue-next'
 
 import { useRouter } from 'vue-router'
@@ -260,6 +273,10 @@ const selectedRR = ref(null)
 
 const showPrintModal = ref(false)
 const printRRId = ref(null)
+
+const showTrackingModal = ref(false)
+const trackingRRId = ref(null)
+const trackingRRNumber = ref('')
 
 function getDefaultDates() {
   const today = new Date();
@@ -333,6 +350,18 @@ function printRR(id) {
 function closePrintModal() {
   showPrintModal.value = false
   printRRId.value = null
+}
+
+function openTrackingModal(rr) {
+  trackingRRId.value = rr.id
+  trackingRRNumber.value = rr.receipt_number
+  showTrackingModal.value = true
+}
+
+function closeTrackingModal() {
+  showTrackingModal.value = false
+  trackingRRId.value = null
+  trackingRRNumber.value = ''
 }
 
 async function submitRR(id) {

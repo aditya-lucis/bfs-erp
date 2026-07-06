@@ -89,7 +89,7 @@
                     </div>
                     <div class="flex">
                       <span class="w-32 text-gray-500 font-semibold uppercase tracking-wider text-[10px]">DIANGKUT OLEH</span>
-                      <span class="font-medium text-gray-900">: {{ data.transporter_name || '-' }}</span>
+                      <span class="font-medium text-gray-900">: {{ data.transport_with || '-' }}</span>
                     </div>
                   </div>
                 </div>

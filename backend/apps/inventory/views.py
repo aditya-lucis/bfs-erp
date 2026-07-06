@@ -331,7 +331,8 @@ from apps.purchase.models import PurchaseOrder
 class ReceiptReportViewSet(viewsets.ModelViewSet):
     queryset = ReceiptReport.objects.all().select_related('company', 'vendor', 'po', 'created_by')
     serializer_class = ReceiptReportSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'INV-RECEIPT-REPORT'
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -379,6 +380,18 @@ class ReceiptReportViewSet(viewsets.ModelViewSet):
         date_str = datetime.now().strftime('%Y%m%d%H%M%S')
         rr.receipt_number = f"RR{date_str}-{rr.id:04d}"
         rr.save()
+
+    @action(detail=True, methods=['post', 'patch'])
+    def update_tracking(self, request, pk=None):
+        from django.utils import timezone
+        instance = self.get_object()
+        tracking_status = request.data.get('tracking_status', '')
+        
+        instance.tracking_status = tracking_status
+        instance.tracking_last_update = timezone.now()
+        instance.save(update_fields=['tracking_status', 'tracking_last_update'])
+        
+        return Response({'status': 'Tracking updated successfully'})
 
     @action(detail=True, methods=['get'])
     def print_data(self, request, pk=None):
@@ -516,13 +529,21 @@ from apps.rbac.permissions import HasFunctionPermission
 from apps.approval.services import create_approval_request, approve_step, reject_request
 
 class ReceiptReportSubmitView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'INV-RECEIPT-REPORT'
 
     def post(self, request, pk):
+        from apps.accounting_period.period_checker import PeriodChecker
+        
         rr = get_object_or_404(ReceiptReport, pk=pk)
         if rr.approval_status not in ['draft', 'revised']:
             return Response({'detail': 'Receipt Report ini sudah diajukan.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Validate Accounting Period
+        period_result = PeriodChecker.check(rr.receive_date, raise_exception=False)
+        if not period_result.is_open:
+            return Response({'detail': period_result.message}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             total_quantity = sum(item.receive_qty for item in rr.items.all())
             total_amount = sum(item.receive_qty * (item.po_item.unit_price if item.po_item else 0) for item in rr.items.all())
@@ -544,7 +565,8 @@ class ReceiptReportSubmitView(APIView):
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class ReceiptReportApproveView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'INV-RECEIPT-REPORT'
 
     def post(self, request, pk):
         rr = get_object_or_404(ReceiptReport, pk=pk)

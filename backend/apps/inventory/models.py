@@ -412,10 +412,16 @@ class ReceiptReport(models.Model):
     
     # Document Info
     receive_date = models.DateField()
+    transport_with = models.CharField(max_length=255, blank=True, default='')
+    vehicle_number = models.CharField(max_length=255, blank=True, default='')
     vendor_sn = models.CharField(max_length=100, blank=True, default='')
     vendor_sn_date = models.DateField(null=True, blank=True)
     memo = models.TextField(blank=True, default='')
     is_partial = models.BooleanField(default=False)
+    
+    # Tracking
+    tracking_status = models.TextField(blank=True, default='')
+    tracking_last_update = models.DateTimeField(null=True, blank=True)
     
     approval_status = models.CharField(max_length=50, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
     document_status = models.CharField(max_length=50, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)

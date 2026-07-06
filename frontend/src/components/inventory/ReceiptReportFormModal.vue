@@ -88,6 +88,19 @@
             <!-- Middle Column -->
             <div class="space-y-4">
               <div class="flex items-center text-sm">
+                <label class="w-32 font-semibold text-gray-600 shrink-0">Transport with</label>
+                <div class="flex-1">
+                  <input type="text" v-model="formData.transport_with" class="w-full border-gray-300 rounded focus:ring-bfs-gold focus:border-bfs-gold text-sm shadow-sm bg-white">
+                </div>
+              </div>
+              <div class="flex items-center text-sm">
+                <label class="w-32 font-semibold text-gray-600 shrink-0">Vehicle Number</label>
+                <div class="flex-1">
+                  <input type="text" v-model="formData.vehicle_number" class="w-full border-gray-300 rounded focus:ring-bfs-gold focus:border-bfs-gold text-sm shadow-sm bg-white">
+                </div>
+              </div>
+
+              <div class="flex items-center text-sm">
                 <label class="w-32 font-semibold text-gray-600 shrink-0">Receive Date <span class="text-red-500">*</span></label>
                 <div class="flex-1">
                   <input type="date" v-model="formData.receive_date" class="w-full border-gray-300 rounded focus:ring-bfs-gold focus:border-bfs-gold text-sm shadow-sm bg-white">
@@ -281,13 +294,17 @@ const computedIsPartial = computed(() => {
 })
 
 const formData = reactive({
+  id: null,
+  approval_status: 'draft',
   receipt_type: 'RR_PUR',
   vendor: '',
   po: '',
   receive_date: new Date().toISOString().split('T')[0],
   vendor_sn: '',
   vendor_sn_date: new Date().toISOString().split('T')[0],
-  memo: ''
+  memo: '',
+  transport_with: '',
+  vehicle_number: ''
 })
 
 const selectedVendorDetails = computed(() => {
@@ -330,6 +347,8 @@ async function fetchWarehouses() {
 async function loadEditData() {
   try {
     const { data } = await api.get(`/inventory/receipt-reports/${props.editId}/`)
+    formData.id = data.id
+    formData.approval_status = data.approval_status
     formData.receipt_type = data.receipt_type
     formData.vendor = data.vendor
     formData.po = data.po
@@ -337,6 +356,8 @@ async function loadEditData() {
     formData.vendor_sn = data.vendor_sn
     formData.vendor_sn_date = data.vendor_sn_date || ''
     formData.memo = data.memo
+    formData.transport_with = data.transport_with || ''
+    formData.vehicle_number = data.vehicle_number || ''
     
     // We also need to fetch POs for the vendor
     await fetchPOs()
