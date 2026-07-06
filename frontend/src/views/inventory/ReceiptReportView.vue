@@ -5,15 +5,24 @@
     <div class="flex flex-col gap-4 mb-6">
       <div class="flex flex-wrap items-center gap-4">
         <!-- Search -->
-        <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
-          <span class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 border-r border-gray-200">Search</span>
-          <input
-            v-model="filters.po_number"
-            type="text"
-            placeholder="Type PO Number..."
-            class="px-3 py-1.5 text-xs focus:outline-none w-48 sm:w-64"
-            @keyup.enter="applyFilters"
-          />
+        <div class="flex items-center gap-2">
+          <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white h-[34px]">
+            <span class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 border-r border-gray-200 h-full flex items-center">Search</span>
+            <input
+              v-model="filters.po_number"
+              type="text"
+              placeholder="Type PO Number..."
+              class="px-3 py-1.5 text-xs focus:outline-none w-48 sm:w-64 h-full"
+              @keyup.enter="applyFilters"
+            />
+          </div>
+          
+          <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white h-[34px] ml-2">
+            <span class="px-3 py-1.5 bg-gray-50 text-xs text-gray-500 border-r border-gray-200 h-full flex items-center">Date</span>
+            <input type="date" v-model="filters.start_date" @change="applyFilters" class="px-2 py-1 text-xs focus:outline-none h-full text-gray-600 border-r border-gray-100">
+            <span class="px-2 py-1 text-xs text-gray-400 bg-gray-50 h-full flex items-center border-r border-gray-100">to</span>
+            <input type="date" v-model="filters.end_date" @change="applyFilters" class="px-2 py-1 text-xs focus:outline-none h-full text-gray-600">
+          </div>
         </div>
 
         <button
@@ -72,9 +81,9 @@
               <FolderOpen class="w-4 h-4 text-blue-500 fill-blue-500/10" />
             </button>
             <button 
-              @click="filters.document_status = 'closed'; applyFilters()" 
+              @click="filters.document_status = 'close'; applyFilters()" 
               class="p-0.5 rounded transition-all cursor-pointer"
-              :class="filters.document_status === 'closed' ? 'ring-2 ring-bfs-gold ring-offset-1 scale-110' : 'hover:bg-gray-100'"
+              :class="filters.document_status === 'close' ? 'ring-2 ring-bfs-gold ring-offset-1 scale-110' : 'hover:bg-gray-100'"
               title="Closed"
             >
               <FolderCheck class="w-4 h-4 text-emerald-500 fill-emerald-500/10" />
@@ -161,6 +170,7 @@
               <th class="py-3 px-4">Receive Date</th>
               <th class="py-3 px-4">PO Number</th>
               <th class="py-3 px-4">Vendor</th>
+              <th class="py-3 px-4 text-center">Document Status</th>
               <th class="py-3 px-4 text-center">Approval</th>
               <th class="py-3 px-4 w-20 text-right">Actions</th>
             </tr>
@@ -175,6 +185,13 @@
               <td class="py-3 px-4 truncate max-w-[150px]" :title="rr.vendor_name">{{ rr.vendor_name || '-' }}</td>
               
               <td class="py-3 px-4 text-center">
+                  <div class="inline-flex items-center justify-center p-1 rounded-md" :title="rr.document_status">
+                    <Folder v-if="rr.document_status === 'draft'" class="w-4.5 h-4.5 text-amber-500 fill-amber-500/10" />
+                    <FolderOpen v-else-if="rr.document_status === 'ready_to_process'" class="w-4.5 h-4.5 text-blue-500 fill-blue-500/10" />
+                    <FolderCheck v-else class="w-4.5 h-4.5 text-green-500 fill-green-500/10" />
+                  </div>
+                </td>
+              <td class="py-3 px-4 text-center">
                 <div class="inline-flex items-center justify-center p-1 rounded-md" :title="rr.approval_status">
                   <FileText v-if="rr.approval_status === 'draft'" class="w-4.5 h-4.5 text-gray-400" />
                   <FileClock v-else-if="rr.approval_status === 'awaiting'" class="w-4.5 h-4.5 text-bfs-gold animate-pulse" />
@@ -184,14 +201,20 @@
                 </div>
               </td>
               <td class="py-3 px-4 text-right">
-                <div class="flex justify-end gap-1.5">
-                  <button v-if="rr.approval_status === 'draft'" @click="submitRR(rr.id)" class="p-1 text-gray-400 hover:text-blue-500 transition-colors cursor-pointer" title="Submit">
-                    <Send class="w-3.5 h-3.5" />
-                  </button>
-                  <button v-if="rr.approval_status === 'awaiting'" @click="approveRR(rr.id)" class="p-1 text-gray-400 hover:text-green-500 transition-colors cursor-pointer" title="Approve">
-                    <FileCheck class="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                  <div class="flex justify-end gap-1.5">
+                    <button @click="printRR(rr.id)" class="p-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer" title="Print Document">
+                      <Printer class="w-3.5 h-3.5" />
+                    </button>
+                    <button @click="openEditModal(rr)" class="p-1 text-gray-400 hover:text-bfs-gold transition-colors cursor-pointer" title="View/Edit">
+                      <Pencil class="w-3.5 h-3.5" />
+                    </button>
+                    <button v-if="['draft', 'revised'].includes(rr.approval_status)" @click="submitRR(rr.id)" class="p-1 text-gray-400 hover:text-blue-500 transition-colors cursor-pointer" title="Submit">
+                      <Send class="w-3.5 h-3.5" />
+                    </button>
+                    <button v-if="rr.approval_status === 'awaiting'" @click="approveRR(rr.id)" class="p-1 text-gray-400 hover:text-green-500 transition-colors cursor-pointer" title="Approve">
+                      <FileCheck class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
               </td>
             </tr>
           </tbody>
@@ -203,7 +226,14 @@
       ... NO RECORDS ...
     </div>
     
-    <ReceiptReportFormModal v-if="showCreateModal" @close="showCreateModal = false" @success="handleSuccess" />
+    <ReceiptReportFormModal v-if="showCreateModal" @close="showCreateModal = false; selectedRR = null" :editId="selectedRR" @success="handleSuccess" />
+
+    <!-- Print Modal -->
+    <ReceiptReportPrintTemplate
+      :show="showPrintModal"
+      :documentId="printRRId"
+      @close="closePrintModal"
+    />
   </Panel>
 </template>
 
@@ -211,6 +241,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useReceiptReportStore } from '../../stores/inventory/receiptReportStore'
 import ReceiptReportFormModal from '../../components/inventory/ReceiptReportFormModal.vue'
+import ReceiptReportPrintTemplate from '../../components/inventory/ReceiptReportPrintTemplate.vue'
 import Panel from '../../components/Panel.vue'
 import Swal from 'sweetalert2'
 import { 
@@ -220,14 +251,43 @@ import {
   CheckCircle, XCircle, Clock
 } from 'lucide-vue-next'
 
+import { useRouter } from 'vue-router'
+
 const store = useReceiptReportStore()
+const router = useRouter()
 const showCreateModal = ref(false)
+const selectedRR = ref(null)
+
+const showPrintModal = ref(false)
+const printRRId = ref(null)
+
+function getDefaultDates() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  
+  // Format to YYYY-MM-DD (handling local timezone appropriately by simple offset)
+  const formatDate = (date) => {
+    const d = new Date(date);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+  
+  return {
+    start: formatDate(firstDay),
+    end: formatDate(lastDay)
+  };
+}
+
+const defaultDates = getDefaultDates();
 
 const filters = reactive({
   po_number: '',
   receipt_type: 'RR_PUR',
   document_status: '',
-  approval_status: ''
+  approval_status: '',
+  start_date: defaultDates.start,
+  end_date: defaultDates.end
 })
 
 onMounted(() => {
@@ -239,29 +299,60 @@ function applyFilters() {
 }
 
 function resetFilters() {
+  const defaultDates = getDefaultDates();
   filters.po_number = ''
   filters.approval_status = ''
+  filters.document_status = ''
+  filters.start_date = defaultDates.start
+  filters.end_date = defaultDates.end
   applyFilters()
 }
 
 function handleSuccess() {
   showCreateModal.value = false
+  selectedRR.value = null
   store.fetchReceiptReports()
   Swal.fire({
+    title: 'Success!',
+    text: 'Receipt Report has been saved successfully.',
     icon: 'success',
-    title: 'Success',
-    text: 'Receipt Report created successfully!',
-    timer: 2000,
-    showConfirmButton: false
+    confirmButtonColor: '#C2A05B'
   })
 }
 
+function openEditModal(rr) {
+  selectedRR.value = rr.id
+  showCreateModal.value = true
+}
+
+function printRR(id) {
+  printRRId.value = id
+  showPrintModal.value = true
+}
+
+function closePrintModal() {
+  showPrintModal.value = false
+  printRRId.value = null
+}
+
 async function submitRR(id) {
-  try {
-    await store.submitReceiptReport(id)
-    Swal.fire({ icon: 'success', title: 'Submitted', text: 'Receipt Report submitted for approval.' })
-  } catch (error) {
-    Swal.fire({ icon: 'error', title: 'Error', text: error.detail || 'Failed to submit.' })
+  const result = await Swal.fire({
+    title: 'Are you sure?',
+    text: "You want to submit this receipt report for approval?",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C2A05B',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, submit it!'
+  })
+  
+  if (result.isConfirmed) {
+    try {
+      await store.submitReceiptReport(id)
+      Swal.fire('Submitted!', 'Receipt report has been submitted.', 'success')
+    } catch (error) {
+      Swal.fire('Error!', error.detail || 'Failed to submit', 'error')
+    }
   }
 }
 

@@ -295,6 +295,8 @@ const handleNotificationClick = (item) => {
     router.push('/purchases/completion-certificate-inbox')
   } else if (item.document_code === 'GRN') {
     router.push('/purchases/good-receipt-note-inbox')
+  } else if (item.document_code === 'RECEIPT_REPORT') {
+    router.push('/inventory/receipt-report-inbox')
   } else {
     router.push('/projects/rap-inbox')
   }

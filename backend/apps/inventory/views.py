@@ -22,13 +22,16 @@ Endpoints:
 """
 
 from django.db.models import Q
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from apps.rbac.permissions import HasFunctionPermission
-from .models import UnitMeasurement, ItemCategory, Item, ItemAccountLink
+from .models import (
+    UnitMeasurement, ItemCategory, Item, ItemAccountLink,
+    ReceiptReport, Warehouse, WarehouseBin
+)
 from .serializers import (
     UnitMeasurementSerializer,
     ItemCategorySerializer,
@@ -36,8 +39,23 @@ from .serializers import (
     ItemDetailSerializer,
     ItemCreateSerializer,
     ItemAccountLinkSerializer,
+    WarehouseSerializer,
+    WarehouseBinSerializer,
+    ReceiptReportSerializer,
     get_inventory_choices,
 )
+
+
+# ─── Warehouse ────────────────────────────────────────────────────────────────
+
+class WarehouseViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Warehouse.objects.filter(is_active=True).prefetch_related('bins')
+    serializer_class = WarehouseSerializer
+
+
+class WarehouseBinViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = WarehouseBin.objects.filter(is_active=True)
+    serializer_class = WarehouseBinSerializer
 
 
 # ─── Unit Measurement ─────────────────────────────────────────────────────────
@@ -326,16 +344,81 @@ class ReceiptReportViewSet(viewsets.ModelViewSet):
         if po_number:
             qs = qs.filter(po__po_number__icontains=po_number)
             
+        start_date = self.request.query_params.get('start_date')
+        if start_date:
+            qs = qs.filter(receive_date__gte=start_date)
+            
+        end_date = self.request.query_params.get('end_date')
+        if end_date:
+            qs = qs.filter(receive_date__lte=end_date)
+            
+        document_status = self.request.query_params.get('document_status')
+        if document_status:
+            qs = qs.filter(document_status=document_status)
+            
+        approval_status = self.request.query_params.get('approval_status')
+        if approval_status:
+            qs = qs.filter(approval_status=approval_status)
+            
         return qs
 
     def perform_create(self, serializer):
         from datetime import datetime
         user = self.request.user
-        rr = serializer.save(created_by=user, updated_by=user)
+        
+        # Determine company from PO if available, otherwise fallback to user's company
+        po = serializer.validated_data.get('po')
+        company = None
+        if po and hasattr(po, 'company'):
+            company = po.company
+        elif hasattr(user, 'employee') and user.employee:
+            company = user.employee.company
+            
+        rr = serializer.save(created_by=user, updated_by=user, company=company)
         # Generate receipt_number
         date_str = datetime.now().strftime('%Y%m%d%H%M%S')
         rr.receipt_number = f"RR{date_str}-{rr.id:04d}"
         rr.save()
+
+    @action(detail=True, methods=['get'])
+    def print_data(self, request, pk=None):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+
+        # Add company data
+        if instance.company:
+            from apps.organization.serializers import CompanySerializer
+            company_data = CompanySerializer(instance.company).data
+            # Adjust logo url if needed
+            if instance.company.logo:
+                company_data['logo_url'] = request.build_absolute_uri(instance.company.logo.url)
+            data['company_detail'] = company_data
+        else:
+            data['company_detail'] = None
+
+        # Add created_by detail
+        if instance.created_by:
+            data['created_by_name'] = getattr(instance.created_by, 'get_full_name', lambda: instance.created_by.username)()
+            
+        # Add approval signatures
+        from apps.approval.models import ApprovalRequest
+        approval_req = ApprovalRequest.objects.filter(document_code='RECEIPT_REPORT', document_id=str(instance.id)).order_by('-created_at').first()
+        
+        signatures = []
+        if approval_req:
+            for step in approval_req.steps.all().order_by('step_number'):
+                signer_name = step.position.employee.full_name if (hasattr(step.position, 'employee') and step.position.employee) else step.position.name
+                signatures.append({
+                    'role': step.get_role_display(),
+                    'name': signer_name,
+                    'status': step.status,
+                    'date': step.updated_at if step.status == 'approved' else None
+                })
+                
+        data['signatures'] = signatures
+
+        return Response(data)
 
     @action(detail=False, methods=['get'])
     def get_valid_vendors(self, request):
@@ -441,16 +524,21 @@ class ReceiptReportSubmitView(APIView):
             return Response({'detail': 'Receipt Report ini sudah diajukan.'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            total_quantity = sum(item.receive_qty for item in rr.items.all())
+            total_amount = sum(item.receive_qty * (item.po_item.unit_price if item.po_item else 0) for item in rr.items.all())
+            
             req = create_approval_request(
-                document_code='RR',
+                document_code='RECEIPT_REPORT',
                 document_id=rr.id,
                 document_number=rr.receipt_number,
                 creator_user=request.user,
-                amount=0,
+                quantity=total_quantity,
+                amount=total_amount,
                 company=rr.company
             )
             rr.approval_status = ReceiptReport.ApprovalStatus.AWAITING
-            rr.save()
+            rr.document_status = ReceiptReport.DocumentStatus.READY_TO_PROCESS
+            rr.save(update_fields=['approval_status', 'document_status'])
             return Response({'message': 'Receipt Report berhasil disubmit.', 'approval_id': req.id})
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)

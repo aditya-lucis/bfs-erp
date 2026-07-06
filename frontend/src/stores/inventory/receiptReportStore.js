@@ -43,6 +43,15 @@ export const useReceiptReportStore = defineStore('receiptReport', {
         throw error.response?.data || error
       }
     },
+    async updateReceiptReport(id, payload) {
+      try {
+        const { data } = await api.put(`/inventory/receipt-reports/${id}/`, payload)
+        await this.fetchReceiptReports()
+        return data
+      } catch (error) {
+        throw error.response?.data || error
+      }
+    },
     async submitReceiptReport(id) {
       try {
         const { data } = await api.post(`/inventory/receipt-reports/${id}/submit/`)

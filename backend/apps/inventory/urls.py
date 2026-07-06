@@ -36,10 +36,11 @@ urlpatterns = [
 ]
 
 from rest_framework.routers import DefaultRouter
-from .views import ReceiptReportViewSet
+from .views import ReceiptReportViewSet, WarehouseViewSet
 
 router = DefaultRouter()
 router.register(r'receipt-reports', ReceiptReportViewSet, basename='receipt-report')
+router.register(r'warehouses', WarehouseViewSet, basename='warehouse')
 
 urlpatterns += router.urls
 

@@ -9,11 +9,23 @@ from rest_framework import serializers
 from .models import (
     UnitMeasurement, ItemCategory, Item, ItemAccountLink,
     ItemType, CostingMethod, PriceType, AccountPurpose,
+    Warehouse, WarehouseBin, ItemBinAllocation,
     validate_directory_name,
 )
 
 
 # ─── Unit Measurement ─────────────────────────────────────────────────────────
+
+class WarehouseBinSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WarehouseBin
+        fields = '__all__'
+
+class WarehouseSerializer(serializers.ModelSerializer):
+    bins = WarehouseBinSerializer(many=True, read_only=True)
+    class Meta:
+        model = Warehouse
+        fields = '__all__'
 
 class UnitMeasurementSerializer(serializers.ModelSerializer):
     item_type_label = serializers.CharField(source='get_item_type_display', read_only=True)
@@ -308,15 +320,35 @@ def get_inventory_choices():
     }
 from .models import ReceiptReport, ReceiptReportItem
 
+class ItemBinAllocationSerializer(serializers.ModelSerializer):
+    bin_name = serializers.CharField(source='bin.bin_name', read_only=True)
+    bin_code = serializers.CharField(source='bin.bin_code', read_only=True)
+
+    class Meta:
+        model = ItemBinAllocation
+        fields = '__all__'
+        read_only_fields = ('reference_number', 'document_type', 'item')
+
 class ReceiptReportItemSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.item_name', read_only=True)
     item_code = serializers.CharField(source='item.item_code', read_only=True)
     unit_name = serializers.CharField(source='unit_type.unit_name', read_only=True)
+    bins = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
 
     class Meta:
         model = ReceiptReportItem
         fields = '__all__'
         read_only_fields = ('receipt_report',)
+        
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        allocations = ItemBinAllocation.objects.filter(
+            reference_number=instance.receipt_report.receipt_number,
+            document_type='RECEIPT_REPORT',
+            item=instance.item
+        )
+        ret['bins'] = ItemBinAllocationSerializer(allocations, many=True).data
+        return ret
 
 class ReceiptReportSerializer(serializers.ModelSerializer):
     items = ReceiptReportItemSerializer(many=True)
@@ -326,14 +358,117 @@ class ReceiptReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReceiptReport
         fields = '__all__'
-        read_only_fields = ('receipt_number', 'created_at', 'updated_at', 'created_by', 'updated_by', 'approval_status')
+        read_only_fields = ('receipt_number', 'created_at', 'updated_at', 'created_by', 'updated_by', 'approval_status', 'document_status')
+
+    def validate(self, attrs):
+        # We need to validate items against PO remaining quantities
+        po = attrs.get('po')
+        if po:
+            # We must get the items data from initial_data because it's a writable nested serializer
+            # or from attrs if it's already popped/present. Actually, nested serializer data is in attrs.
+            items_data = attrs.get('items', [])
+            
+            # Map PO items to their current remaining quantities
+            # We get all po details to also check for partial status
+            po_details = po.details.all()
+            po_item_map = {}
+            for pd in po_details:
+                # pd.received_qty is dynamically calculated, but let's query it explicitly to be safe
+                from django.db.models import Sum
+                from apps.inventory.models import ReceiptReportItem
+                
+                qs = ReceiptReportItem.objects.filter(receipt_report__po=po, po_item=pd)
+                if self.instance:
+                    qs = qs.exclude(receipt_report=self.instance)
+                    
+                received = qs.aggregate(Sum('receive_qty'))['receive_qty__sum'] or 0
+                remaining = pd.quantity - received
+                po_item_map[pd.id] = {
+                    'quantity': pd.quantity,
+                    'received': received,
+                    'remaining': remaining,
+                    'new_receive': 0
+                }
+            
+            for item_data in items_data:
+                po_item = item_data.get('po_item')
+                receive_qty = item_data.get('receive_qty', 0)
+                
+                if po_item:
+                    pd_info = po_item_map.get(po_item.id)
+                    if pd_info:
+                        if receive_qty > pd_info['remaining']:
+                            raise serializers.ValidationError(
+                                f"Cannot receive {receive_qty} for item {po_item.item.item_code}. Only {pd_info['remaining']} remaining."
+                            )
+                        pd_info['new_receive'] += receive_qty
+            
+            # Check if partial
+            is_partial = False
+            for pd_id, pd_info in po_item_map.items():
+                total_after_this = pd_info['received'] + pd_info['new_receive']
+                if total_after_this < pd_info['quantity']:
+                    is_partial = True
+                    break
+            
+            attrs['is_partial'] = is_partial
+            
+        vendor = attrs.get('vendor', getattr(self.instance, 'vendor', None))
+        vendor_sn = attrs.get('vendor_sn', getattr(self.instance, 'vendor_sn', None))
+        
+        if vendor and vendor_sn:
+            qs = ReceiptReport.objects.filter(vendor=vendor, vendor_sn=vendor_sn)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    'vendor_sn': f'Vendor SN "{vendor_sn}" sudah pernah direcord untuk vendor ini. Harap gunakan DO / Vendor SN yang unik.'
+                })
+            
+        return attrs
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
-        # Provide default receipt_number (will be updated on save or via signals)
         receipt_report = ReceiptReport.objects.create(**validated_data)
         
         for item_data in items_data:
-            ReceiptReportItem.objects.create(receipt_report=receipt_report, **item_data)
+            bins_data = item_data.pop('bins', [])
+            rr_item = ReceiptReportItem.objects.create(receipt_report=receipt_report, **item_data)
+            
+            for bin_data in bins_data:
+                ItemBinAllocation.objects.create(
+                    reference_number=receipt_report.receipt_number,
+                    document_type='RECEIPT_REPORT',
+                    item=rr_item.item,
+                    bin_id=bin_data.get('bin'),
+                    qty=bin_data.get('qty')
+                )
             
         return receipt_report
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if items_data is not None:
+            instance.items.all().delete()
+            ItemBinAllocation.objects.filter(
+                reference_number=instance.receipt_number,
+                document_type='RECEIPT_REPORT'
+            ).delete()
+            for item_data in items_data:
+                bins_data = item_data.pop('bins', [])
+                rr_item = ReceiptReportItem.objects.create(receipt_report=instance, **item_data)
+                for bin_data in bins_data:
+                    ItemBinAllocation.objects.create(
+                        reference_number=instance.receipt_number,
+                        document_type='RECEIPT_REPORT',
+                        item=rr_item.item,
+                        bin_id=bin_data.get('bin'),
+                        qty=bin_data.get('qty')
+                    )
+                
+        return instance

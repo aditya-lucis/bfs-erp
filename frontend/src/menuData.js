@@ -619,9 +619,9 @@ export const menuData = {
     },
     {
       name: 'Receipt Report', url: '', children: [
-        { name: 'Receipt Report', url: '' },
+        { name: 'Receipt Report', url: '/inventory/receipt-report' },
         { name: 'Inter Company Receipt', url: '' },
-        { name: 'Receipt Report Inbox', url: '' },
+        { name: 'Receipt Report Inbox', url: '/inventory/receipt-report-inbox' },
       ]
     },
     { name: 'Delivery Order', url: '' },

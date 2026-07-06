@@ -397,6 +397,11 @@ class ReceiptReport(models.Model):
         REVISED = 'revised', 'Revised'
         VOID = 'void', 'Void'
 
+    class DocumentStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        READY_TO_PROCESS = 'ready_to_process', 'Ready to Process'
+        CLOSE = 'close', 'Close'
+
     receipt_number = models.CharField(max_length=100, unique=True, editable=False)
     receipt_type = models.CharField(max_length=20, choices=ReceiptType.choices, default=ReceiptType.PURCHASE)
     
@@ -410,8 +415,10 @@ class ReceiptReport(models.Model):
     vendor_sn = models.CharField(max_length=100, blank=True, default='')
     vendor_sn_date = models.DateField(null=True, blank=True)
     memo = models.TextField(blank=True, default='')
+    is_partial = models.BooleanField(default=False)
     
     approval_status = models.CharField(max_length=50, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
+    document_status = models.CharField(max_length=50, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
     
     # Auditing
     created_at = models.DateTimeField(auto_now_add=True)
@@ -440,3 +447,44 @@ class ReceiptReportItem(models.Model):
 
     def __str__(self):
         return f"{self.receipt_report.receipt_number} - {self.item.item_name}"
+
+class Warehouse(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'inv_warehouse'
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+class WarehouseBin(models.Model):
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='bins')
+    bin_code = models.CharField(max_length=50)
+    bin_name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'inv_warehouse_bin'
+        unique_together = ('warehouse', 'bin_code')
+
+    def __str__(self):
+        return f"{self.warehouse.code} / {self.bin_code}"
+
+class ItemBinAllocation(models.Model):
+    reference_number = models.CharField(max_length=50)
+    document_type = models.CharField(max_length=50)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='bin_allocations')
+    bin = models.ForeignKey(WarehouseBin, on_delete=models.PROTECT, related_name='allocations')
+    qty = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = 'inv_item_bin_allocation'
+
+    def __str__(self):
+        return f"{self.reference_number} | {self.item.item_code} -> {self.bin.bin_code}: {self.qty}"
