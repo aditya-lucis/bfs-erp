@@ -812,3 +812,113 @@ class GoodReceiptNoteDocument(models.Model):
     class Meta:
         db_table = 'purchases_good_receipt_note_document'
         unique_together = ('grn', 'master_document')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Purchase Invoice
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PurchaseInvoice(models.Model):
+    class StatusChoices(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        OPEN = 'open', 'Open'
+        HALF_PAID = 'half_paid', 'Half Paid'
+        FULL_PAID = 'full_paid', 'Full Paid'
+        VOID = 'void', 'Void'
+
+    invoice_number = models.CharField(max_length=100, unique=True, editable=False)
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='purchase_invoices')
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='purchase_invoices')
+    receipt_report = models.ForeignKey('inventory.ReceiptReport', on_delete=models.CASCADE, related_name='purchase_invoices', null=True, blank=True)
+    grn = models.ForeignKey(GoodReceiptNote, on_delete=models.CASCADE, related_name='purchase_invoices', null=True, blank=True)
+    invoice_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
+    
+    invoice_date = models.DateField()
+    due_date = models.DateField()
+    tax_date = models.DateField()
+    tax_number = models.CharField(max_length=100, blank=True, default='')
+    vendor_invoice_number = models.CharField(max_length=100, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    currency = models.CharField(max_length=10, default='IDR')
+    
+    subtotal_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.OPEN)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='created_purchase_invoices'
+    )
+
+    class Meta:
+        db_table = 'purchases_invoice_header'
+        ordering = ['-invoice_date', '-id']
+        verbose_name = 'Purchase Invoice'
+
+    def __str__(self):
+        return f"{self.invoice_number} - {self.vendor.code}"
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            self.invoice_number = self._generate_invoice_number()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_invoice_number():
+        from django.utils import timezone
+        timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
+        prefix = f"VIN{timestamp}"
+        last = PurchaseInvoice.objects.order_by('id').last()
+        if last:
+            try:
+                seq_str = last.invoice_number.split('-')[-1]
+                next_seq = int(seq_str) + 1
+            except ValueError:
+                next_seq = 1
+        else:
+            next_seq = 1
+        return f"{prefix}-{next_seq:05d}"
+
+
+class PurchaseInvoiceDetail(models.Model):
+    invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name='details')
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_invoice_details')
+    
+    quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    order_no = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'purchases_invoice_detail'
+        ordering = ['invoice', 'order_no', 'id']
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.item.item_name if self.item else 'Item'}"
+
+
+class PurchaseInvoicePaymentTerm(models.Model):
+    invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name='payment_terms')
+    due_date = models.DateField()
+    description = models.CharField(max_length=255, blank=True, default='')
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    term_number = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = 'purchases_invoice_payment_term'
+        ordering = ['invoice', 'term_number', 'id']
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - Term {self.term_number}"

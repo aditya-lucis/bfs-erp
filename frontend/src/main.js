@@ -34,6 +34,7 @@ import MonthlyPeriodView from './views/gl/MonthlyPeriodView.vue'
 import AccountingPeriodView from './views/gl/AccountingPeriodView.vue'
 import PeriodActivityLogView from './views/gl/PeriodActivityLogView.vue'
 import RequestApprovalSettingView from './views/settings/RequestApprovalSettingView.vue'
+import GlobalLinkedAccountView from './views/settings/GlobalLinkedAccountView.vue'
 import RapInboxView from './views/projects/RapInboxView.vue'
 import RapTypeView from './views/projects/RapTypeView.vue'
 import ProjectListView from './views/projects/ProjectListView.vue'
@@ -75,6 +76,7 @@ const implementedRoutes = [
   { path: '/settings/monthly-period', component: MonthlyPeriodView, meta: { title: 'Monthly Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/accounting-period', component: AccountingPeriodView, meta: { title: 'Accounting Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/period-activity-log', component: PeriodActivityLogView, meta: { title: 'Period Activity Log', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
+  { path: '/settings/linked-accounts', component: GlobalLinkedAccountView, meta: { title: 'Linked Accounts', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/request-approval-setting', component: RequestApprovalSettingView, meta: { title: 'Request Approval Setting', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/projects/rap-inbox', component: RapInboxView, meta: { title: 'RAP Inbox', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
   { path: '/projects/rap-type', component: RapTypeView, meta: { title: 'RAP Type', moduleId: 'projects', moduleName: 'Projects', layout: 'default' } },
@@ -91,6 +93,7 @@ const implementedRoutes = [
   { path: '/purchases/completion-certificate-inbox', component: () => import('./views/purchase/CCInboxView.vue'), meta: { title: 'Completion Certificate Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/good-receipt-note-inbox', component: () => import('./views/purchase/GRNInboxView.vue'), meta: { title: 'GRN Inbox', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/purchases/good-receipt-note', component: () => import('./views/purchase/GoodReceiptNoteView.vue'), meta: { title: 'Good Receipt Note', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
+  { path: '/purchases/purchase-invoice', component: () => import('./views/purchase/PurchaseInvoiceView.vue'), meta: { title: 'Purchase Invoice', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
 ]
 
 const implementedPaths = new Set(implementedRoutes.map(r => r.path))

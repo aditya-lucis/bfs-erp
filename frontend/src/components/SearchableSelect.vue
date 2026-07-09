@@ -231,8 +231,8 @@ const totalCount = computed(() => {
 })
 
 const selectedOption = computed(() => {
-  if (props.modelValue === null || props.modelValue === undefined) return null
-  return allOptions.value.find(opt => getOptionValue(opt) === props.modelValue) ?? null
+  if (props.modelValue === null || props.modelValue === undefined || props.modelValue === '') return null
+  return allOptions.value.find(opt => String(getOptionValue(opt)) === String(props.modelValue)) ?? null
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────

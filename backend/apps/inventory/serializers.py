@@ -334,6 +334,29 @@ class ReceiptReportItemSerializer(serializers.ModelSerializer):
     item_code = serializers.CharField(source='item.item_code', read_only=True)
     unit_name = serializers.CharField(source='unit_type.unit_name', read_only=True)
     bins = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    
+    # From add.cfm: unit_price and disc come from TAccPO_Detail (joined via RR Item -> PO Detail)
+    po_item_unit_price = serializers.DecimalField(
+        source='po_item.unit_price', max_digits=18, decimal_places=2, read_only=True, default=0
+    )
+    po_item_discount_percent = serializers.DecimalField(
+        source='po_item.discount_percent', max_digits=5, decimal_places=2, read_only=True, default=0
+    )
+    po_item_amount = serializers.DecimalField(
+        source='po_item.amount', max_digits=18, decimal_places=2, read_only=True, default=0
+    )
+    po_item_tax1 = serializers.CharField(source='po_item.tax1', read_only=True, default='')
+    po_item_tax2 = serializers.CharField(source='po_item.tax2', read_only=True, default='')
+    # Dimension from po_item (budget_component or rap_detail name)
+    dimension = serializers.SerializerMethodField()
+
+    def get_dimension(self, obj):
+        if obj.po_item:
+            if obj.po_item.budget_component:
+                return obj.po_item.budget_component.name if hasattr(obj.po_item.budget_component, 'name') else str(obj.po_item.budget_component)
+            if obj.po_item.rap_detail:
+                return str(obj.po_item.rap_detail)
+        return ''
 
     class Meta:
         model = ReceiptReportItem

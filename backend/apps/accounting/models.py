@@ -424,3 +424,77 @@ class JournalDetail(models.Model):
 
     class Meta:
         db_table = 'acc_journal_detail'
+
+# ─── Global Linked Accounts ───────────────────────────────────────────────────
+
+class GlobalLinkedAccount(models.Model):
+    company = models.OneToOneField(
+        'organization.Company', 
+        on_delete=models.CASCADE, 
+        related_name='global_linked_accounts'
+    )
+    
+    # General Ledger Linked Accounts
+    current_earnings = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    retained_earnings = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    historical_balancing = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # SO PO DISC Account
+    sales_discount = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    purchase_discount = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # PPIC Accounts
+    wip_account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    direct_labor_liability = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Revaluation Linked Accounts
+    income_for_revaluation = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    expense_for_revaluation = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Sales Linked Accounts
+    ar_trade = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    customer_deposit = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    ds_for_tracking_receivables = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    ds_for_tracking_sales_return = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+
+    # Purchase Linked Accounts
+    ap_trade = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    account_for_tracking_price_different = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    vendor_deposit = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Asset Management
+    profit_on_selling_assets = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    loss_on_selling_assets = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Commission
+    commission_amount = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    commission_amount_payable = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    commission_tax_payable = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Expense Kurs
+    currency_gain = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    currency_loss = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Journal Difference Container Account
+    journal_difference = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Waste Account
+    waste_account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # Production Waste Account
+    production_waste_account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    
+    # WHT Account
+    wht_account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'acc_global_linked_account'
+        verbose_name = 'Global Linked Account'
+        verbose_name_plural = 'Global Linked Accounts'
+
+    def __str__(self):
+        return f"Global Linked Accounts - {self.company.name}"

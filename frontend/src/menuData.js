@@ -345,6 +345,7 @@ export const menuData = {
     {
       name: 'Good Receipt Note', url: '', children: [
         { name: 'Good Receipt Note', url: '/purchases/good-receipt-note' },
+        { name: 'Purchase Invoice', url: '/purchases/purchase-invoice' },
         { name: 'Good Receipt Note Inbox', url: '' },
         { name: 'GRN-SES Document', url: '/purchases/grnses-document' },
       ]

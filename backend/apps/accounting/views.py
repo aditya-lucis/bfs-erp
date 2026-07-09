@@ -431,3 +431,36 @@ class GeneralJournalTransactionViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
             return Response({'status': 'Submitted for approval'})
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+from .models import GlobalLinkedAccount
+from .serializers import GlobalLinkedAccountSerializer
+from rest_framework.views import APIView
+
+class GlobalLinkedAccountView(APIView):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'GL-ACCOUNT'
+
+    def get_queryset(self):
+        return GlobalLinkedAccount.objects.none() # for HasFunctionPermission
+
+    def get(self, request, *args, **kwargs):
+        company = get_company(request)
+        if not company:
+            return Response({"detail": "No default company found."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        gla, created = GlobalLinkedAccount.objects.get_or_create(company=company)
+        serializer = GlobalLinkedAccountSerializer(gla)
+        return Response(serializer.data)
+
+    def put(self, request, *args, **kwargs):
+        company = get_company(request)
+        if not company:
+            return Response({"detail": "No default company found."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        gla, created = GlobalLinkedAccount.objects.get_or_create(company=company)
+        serializer = GlobalLinkedAccountSerializer(gla, data=request.data, partial=True, context={'request': request})
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

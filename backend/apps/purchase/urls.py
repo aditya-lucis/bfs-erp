@@ -129,4 +129,11 @@ urlpatterns = [
     path('good-receipt-notes/get_valid_pos/', views.GoodReceiptNoteViewSet.as_view({'get': 'get_valid_pos'}), name='grn-valid-pos'),
     path('good-receipt-notes/get_valid_ccs/', views.GoodReceiptNoteViewSet.as_view({'get': 'get_valid_ccs'}), name='grn-valid-ccs'),
     path('good-receipt-notes/<int:pk>/submit/', views.GoodReceiptNoteSubmitApprovalView.as_view(), name='grn-submit'),
+
+    # Purchase Invoice
+    path('purchase-invoices/', views.PurchaseInvoiceViewSet.as_view({'get': 'list', 'post': 'create'}), name='purchase-invoice-list'),
+    path('purchase-invoices/<int:pk>/', views.PurchaseInvoiceViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='purchase-invoice-detail'),
+    path('purchase-invoices/get_valid_vendors/', views.PurchaseInvoiceViewSet.as_view({'get': 'get_valid_vendors'}), name='purchase-invoice-valid-vendors'),
+    path('purchase-invoices/get_valid_pos/', views.PurchaseInvoiceViewSet.as_view({'get': 'get_valid_pos'}), name='purchase-invoice-valid-pos'),
+
 ]

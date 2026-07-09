@@ -286,3 +286,17 @@ class GeneralJournalTransactionSerializer(serializers.ModelSerializer):
                 GeneralJournalTransactionDetail.objects.create(header=instance, **detail_data)
                 
         return instance
+
+from .models import GlobalLinkedAccount
+
+class GlobalLinkedAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalLinkedAccount
+        fields = '__all__'
+        read_only_fields = ('company', 'created_at', 'updated_at', 'updated_by')
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        return super().update(instance, validated_data)

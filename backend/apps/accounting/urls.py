@@ -5,6 +5,7 @@ Base: /api/v1/accounting/
 """
 from django.urls import path, include
 from .views import (
+    GlobalLinkedAccountView,
     AccountGroupListCreateView,
     AccountGroupDetailView,
     AccountListCreateView,
@@ -21,7 +22,8 @@ router = DefaultRouter()
 router.register(r'general-journals', GeneralJournalTransactionViewSet, basename='general-journal')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('global-linked-accounts/', GlobalLinkedAccountView.as_view(), name='global-linked-accounts'),
+path('', include(router.urls)),
     # ── Account Groups ────────────────────────────────────────────────────────
     path('account-groups/',
          AccountGroupListCreateView.as_view(),

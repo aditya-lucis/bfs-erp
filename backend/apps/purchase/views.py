@@ -84,9 +84,19 @@ class VendorListView(generics.ListAPIView):
                 Q(name__icontains=search) | Q(code__icontains=search)
             )
 
+        
+        has_ready_grn = self.request.query_params.get('has_ready_grn')
+        if has_ready_grn == 'true':
+            from django.db.models import Q
+            qs = qs.filter(
+                purchase_orders__goodreceiptnote__approval_status='approved',
+                purchase_orders__goodreceiptnote__is_active=True
+            ).exclude(
+                ~Q(purchase_orders__goodreceiptnote__purchase_invoices__status='void'),
+                purchase_orders__goodreceiptnote__purchase_invoices__isnull=False
+            ).distinct()
+
         return qs
-
-
 class VendorCreateView(generics.CreateAPIView):
     serializer_class   = VendorWriteSerializer
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
@@ -296,6 +306,22 @@ class PurchaseRequisitionListView(generics.ListCreateAPIView):
         if end_date:
             qs = qs.filter(pr_date__lte=end_date)
 
+        
+        vendor = self.request.query_params.get('vendor')
+        if vendor:
+            qs = qs.filter(vendor_id=vendor)
+            
+        has_ready_grn = self.request.query_params.get('has_ready_grn')
+        if has_ready_grn == 'true':
+            from django.db.models import Q
+            qs = qs.filter(
+                goodreceiptnote__approval_status='approved',
+                goodreceiptnote__is_active=True
+            ).exclude(
+                ~Q(goodreceiptnote__purchase_invoices__status='void'),
+                goodreceiptnote__purchase_invoices__isnull=False
+            ).distinct()
+
         return qs
 
     def perform_create(self, serializer):
@@ -493,6 +519,10 @@ class PurchaseOrderListView(generics.ListCreateAPIView):
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(Q(po_number__icontains=search) | Q(vendor__name__icontains=search))
+            
+        vendor = self.request.query_params.get('vendor')
+        if vendor:
+            qs = qs.filter(vendor_id=vendor)
             
         doc_status = self.request.query_params.get('document_status')
         if doc_status:
@@ -878,8 +908,26 @@ class GoodReceiptNoteViewSet(viewsets.ModelViewSet):
         if vendor_id:
             queryset = queryset.filter(vendor_id=vendor_id)
             
+        
+        po_id = self.request.query_params.get('po')
+        if po_id:
+            queryset = queryset.filter(po_id=po_id)
+            
+        un_invoiced = self.request.query_params.get('un_invoiced')
+        if un_invoiced == 'true':
+            # From add.cfm logic:
+            # - Approval_Status = 3 (approved)
+            # - isVoid = 0 (not void: void_reason is null and is_active=True)
+            # - Not already invoiced (no non-void purchase invoice linked to this GRN)
+            queryset = queryset.filter(
+                approval_status='approved',
+                is_active=True,
+                void_reason__isnull=True
+            ).exclude(
+                purchase_invoices__status__in=['open', 'half_paid', 'full_paid']
+            ).distinct()
+            
         return queryset
-
     @action(detail=False, methods=['get'])
     def get_valid_vendors(self, request):
         from apps.purchase.serializers import VendorListSerializer
@@ -1108,3 +1156,59 @@ class GoodReceiptNoteSubmitApprovalView(APIView):
             return Response({'detail': 'User belum terhubung dengan data profil Karyawan/Posisi.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from .models import PurchaseInvoice
+from .serializers import PurchaseInvoiceSerializer
+
+class PurchaseInvoiceViewSet(viewsets.ModelViewSet):
+    queryset = PurchaseInvoice.objects.all().order_by('-invoice_date', '-id')
+    serializer_class = PurchaseInvoiceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        vendor_id = self.request.query_params.get('vendor', None)
+        po_id = self.request.query_params.get('po', None)
+        status_val = self.request.query_params.get('status', None)
+
+        if vendor_id:
+            queryset = queryset.filter(vendor_id=vendor_id)
+        if po_id:
+            queryset = queryset.filter(po_id=po_id)
+        if status_val:
+            queryset = queryset.filter(status=status_val)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def get_valid_vendors(self, request):
+        from apps.purchase.serializers import VendorListSerializer
+        from apps.purchase.models import Vendor, PurchaseOrder
+        
+        pos = PurchaseOrder.objects.filter(
+            is_active=True, 
+            approval_status='approved',
+            receipt_reports__approval_status='approved'
+        ).values_list('vendor_id', flat=True)
+        
+        vendors = Vendor.objects.filter(id__in=pos).distinct()
+        serializer = VendorListSerializer(vendors, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def get_valid_pos(self, request):
+        vendor_id = request.query_params.get('vendor_id')
+        if not vendor_id:
+            return Response({'detail': 'vendor_id is required'}, status=400)
+            
+        from apps.purchase.models import PurchaseOrder
+        pos = PurchaseOrder.objects.filter(
+            vendor_id=vendor_id,
+            is_active=True,
+            approval_status='approved',
+            receipt_reports__approval_status='approved'
+        ).distinct()
+        
+        serializer = PurchaseOrderSerializer(pos, many=True)
+        return Response(serializer.data)

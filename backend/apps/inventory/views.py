@@ -345,6 +345,10 @@ class ReceiptReportViewSet(viewsets.ModelViewSet):
         if po_number:
             qs = qs.filter(po__po_number__icontains=po_number)
             
+        po_id = self.request.query_params.get('po')
+        if po_id:
+            qs = qs.filter(po_id=po_id)
+            
         start_date = self.request.query_params.get('start_date')
         if start_date:
             qs = qs.filter(receive_date__gte=start_date)

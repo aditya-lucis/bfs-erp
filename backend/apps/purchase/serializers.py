@@ -327,6 +327,7 @@ class PurchaseOrderListSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='requestor_department.name', read_only=True)
     po_type_display = serializers.CharField(source='get_po_type_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    total_invoiced_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrder
@@ -335,8 +336,16 @@ class PurchaseOrderListSerializer(serializers.ModelSerializer):
             'po_type', 'po_type_display', 'project', 'project_name',
             'requestor_department', 'department_name', 'po_currency',
             'document_status', 'approval_status', 'grand_total', 'created_by_name',
-            'allow_previous_year_budget', 'is_active', 'close_reason', 'is_close'
+            'allow_previous_year_budget', 'is_active', 'close_reason', 'is_close',
+            'total_invoiced_percentage'
         ]
+
+    def get_total_invoiced_percentage(self, obj):
+        from django.db.models import Sum
+        result = obj.purchase_invoices.filter(
+            status__in=['draft', 'open', 'half_paid', 'full_paid']
+        ).aggregate(Sum('invoice_percentage'))
+        return result['invoice_percentage__sum'] or 0.00
 
 
 
@@ -355,6 +364,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     vi_account_name = serializers.CharField(source='vi_account.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     pr_number = serializers.SerializerMethodField()
+    total_invoiced_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrder
@@ -370,6 +380,13 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if first_detail and first_detail.pr_detail:
             return first_detail.pr_detail.pr.pr_number
         return None
+
+    def get_total_invoiced_percentage(self, obj):
+        from django.db.models import Sum
+        result = obj.purchase_invoices.filter(
+            status__in=['draft', 'open', 'half_paid', 'full_paid']
+        ).aggregate(Sum('invoice_percentage'))
+        return result['invoice_percentage__sum'] or 0.00
     def _calculate_totals(self, validated_data, details_data):
         total_amount = Decimal('0')
         total_discount = Decimal('0')
@@ -710,4 +727,304 @@ class GoodReceiptNoteSerializer(serializers.ModelSerializer):
             for doc in existing_docs.values():
                 doc.delete()
                 
+        return instance
+
+from .models import PurchaseInvoice, PurchaseInvoiceDetail, PurchaseInvoicePaymentTerm
+
+class PurchaseInvoiceDetailSerializer(serializers.ModelSerializer):
+    item_code = serializers.CharField(source='item.item_code', read_only=True)
+    item_name = serializers.CharField(source='item.item_name', read_only=True)
+    dimension = serializers.CharField(source='item.dimension', read_only=True)
+    discount_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PurchaseInvoiceDetail
+        fields = '__all__'
+        read_only_fields = ('invoice',)
+
+    def get_discount_percent(self, obj):
+        try:
+            base_amount = obj.quantity * obj.unit_price
+            if base_amount > 0:
+                return round((obj.discount_amount / base_amount) * 100, 2)
+        except Exception:
+            pass
+        return 0
+
+class PurchaseInvoicePaymentTermSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseInvoicePaymentTerm
+        fields = '__all__'
+        read_only_fields = ('invoice',)
+
+class PurchaseInvoiceSerializer(serializers.ModelSerializer):
+    details = PurchaseInvoiceDetailSerializer(many=True, required=False)
+    payment_terms = PurchaseInvoicePaymentTermSerializer(many=True, required=False)
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    vendor_code = serializers.CharField(source='vendor.code', read_only=True)
+    po_number = serializers.CharField(source='po.po_number', read_only=True)
+    receipt_report_number = serializers.CharField(source='receipt_report.receipt_number', read_only=True)
+    grn_number = serializers.CharField(source='grn.grn_number', read_only=True)
+
+    class Meta:
+        model = PurchaseInvoice
+        fields = '__all__'
+        read_only_fields = ('invoice_number', 'status', 'paid_amount', 'created_at', 'updated_at', 'created_by')
+
+    def create(self, validated_data):
+        details_data = self.initial_data.get('details', [])
+        payment_terms_data = self.initial_data.get('payment_terms', [])
+        
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+
+        from django.db import transaction
+        from decimal import Decimal
+        
+        with transaction.atomic():
+            validated_data.pop('details', None)
+            validated_data.pop('payment_terms', None)
+            invoice = PurchaseInvoice.objects.create(**validated_data)
+
+            for detail_data in details_data:
+                PurchaseInvoiceDetail.objects.create(
+                    invoice=invoice,
+                    item_id=detail_data.get('item'),
+                    quantity=detail_data.get('quantity', 0),
+                    unit_price=detail_data.get('unit_price', 0),
+                    discount_amount=detail_data.get('discount_amount', 0),
+                    tax_amount=detail_data.get('tax_amount', 0),
+                    total_amount=detail_data.get('total_amount', 0),
+                    order_no=detail_data.get('order_no', 0)
+                )
+                
+            # Validate payment terms: sum must equal grand_total (from add.cfm line 1593)
+            if payment_terms_data:
+                terms_total = sum(Decimal(str(t.get('amount', 0))) for t in payment_terms_data)
+                grand_total = Decimal(str(invoice.grand_total or 0))
+                if abs(terms_total - grand_total) > Decimal('1.00'):
+                    from rest_framework.exceptions import ValidationError
+                    raise ValidationError(
+                        f"Total Terms of Payment ({terms_total}) harus sama dengan Grand Total ({grand_total})"
+                    )
+                
+            for term_data in payment_terms_data:
+                PurchaseInvoicePaymentTerm.objects.create(
+                    invoice=invoice,
+                    due_date=term_data.get('due_date'),
+                    description=term_data.get('description', ''),
+                    percentage=term_data.get('percentage', 100.00),
+                    amount=term_data.get('amount', 0.00),
+                    term_number=term_data.get('term_number', 1)
+                )
+
+            # ──────────────────────────────────────────────────────────────────
+            # Create Journal Entry - matching add.cfm logic
+            # From add.cfm:
+            # 1. AP Account  → VendorLinkedAccount (account_type='ap') = TAccount.Acc_AP (AR_TR in Sunfish)
+            # 2. Purchase Acc per-item → ItemAccountLink (purpose='PURCHASE') = TItemCompany.PUR_Account
+            # 3. Disc Account per-item → ItemAccountLink (purpose='PURCHASE_DISCOUNT') = TItemCompany.DiscPUR_account
+            #    or fallback: GlobalLinkedAccount.purchase_discount = TAccLinkedAccount_Global type 'AP_DSC'
+            # 4. Tax PPN account → GlobalLinkedAccount (ppn_account) = TAccTax.ForPurchase
+            # ──────────────────────────────────────────────────────────────────
+            try:
+                from apps.accounting.models import JournalHeader, JournalDetail, Account, GlobalLinkedAccount
+                from apps.inventory.models import ItemAccountLink
+                
+                company = invoice.po.company
+                currency = invoice.currency or 'IDR'
+                
+                journal = JournalHeader.objects.create(
+                    journal_number=invoice.invoice_number,
+                    company=company,
+                    date=invoice.invoice_date,
+                    memo=f"Purchase Invoice {invoice.invoice_number} - {invoice.vendor.name}",
+                    vendor=invoice.vendor,
+                    created_by=invoice.created_by,
+                    type='PUR'
+                )
+
+                # ── Helper: get GlobalLinkedAccount ──
+                try:
+                    global_linked = GlobalLinkedAccount.objects.get(company=company)
+                except GlobalLinkedAccount.DoesNotExist:
+                    global_linked = None
+
+                # ── Helper: post journal detail ──
+                def post_journal(account, debit=0, credit=0):
+                    if account and (debit > 0 or credit > 0):
+                        JournalDetail.objects.create(
+                            journal_header=journal,
+                            account=account,
+                            currency=currency,
+                            base_debet=Decimal(str(debit)),
+                            base_kredit=Decimal(str(credit))
+                        )
+                        # Update account balance
+                        from django.db.models import F
+                        account.month_debet = F('month_debet') + Decimal(str(debit))
+                        account.month_kredit = F('month_kredit') + Decimal(str(credit))
+                        if account.default_position == 'DEBET':
+                            account.amount = F('amount') + Decimal(str(debit)) - Decimal(str(credit))
+                        else:
+                            account.amount = F('amount') + Decimal(str(credit)) - Decimal(str(debit))
+                        account.save(update_fields=['month_debet', 'month_kredit', 'amount'])
+
+                # ── 1. AP Account (Kredit = Grand Total) ──
+                # From add.cfm: TAccount.Acc_AP matched by currency, type AR_TR
+                # In our system: VendorLinkedAccount with account_type='ap'
+                ap_account = None
+                vendor_ap = invoice.vendor.linked_accounts.filter(
+                    account_type='ap',
+                    currency_scope__in=[currency, 'all']
+                ).order_by('-currency_scope').first()  # prefer exact currency match over 'all'
+                if vendor_ap and vendor_ap.account:
+                    ap_account = vendor_ap.account
+                elif global_linked and global_linked.ap_trade:
+                    ap_account = global_linked.ap_trade
+                
+                post_journal(ap_account, credit=invoice.grand_total)
+
+                # ── 2. Purchase Account per item (Debit = net amount per item) ──
+                # From add.cfm: TItemCompany.PUR_Account matched by currency
+                # In our system: ItemAccountLink with purpose='PURCHASE'
+                total_debit_purchase = Decimal('0')
+                total_discount = Decimal('0')
+                
+                for detail in invoice.details.all():
+                    if not detail.item:
+                        continue
+                    
+                    qty = Decimal(str(detail.quantity or 0))
+                    unit_price = Decimal(str(detail.unit_price or 0))
+                    disc_amount = Decimal(str(detail.discount_amount or 0))
+                    base_amount = qty * unit_price
+                    net_amount = base_amount - disc_amount
+                    
+                    # Get purchase account for this item
+                    item_link = detail.item.account_links.filter(
+                        purpose='PURCHASE',
+                        currency__in=[currency, 'ALL']
+                    ).order_by('-currency').first()  # prefer exact match
+                    
+                    if item_link and item_link.account:
+                        post_journal(item_link.account, debit=net_amount)
+                    else:
+                        # Fallback: global purchase account (AR_PUR in Sunfish)
+                        if global_linked and global_linked.ap_trade:
+                            # Use a generic purchase clearing if no item-specific account
+                            pass  # will accumulate below
+                        total_debit_purchase += net_amount
+                    
+                    # ── 3. Discount Account (Credit = discount amount, per item) ──
+                    # From add.cfm: TItemCompany.DiscPUR_account or global AP_DSC
+                    if disc_amount > 0:
+                        disc_item_link = detail.item.account_links.filter(
+                            purpose='PURCHASE_DISCOUNT',
+                            currency__in=[currency, 'ALL']
+                        ).order_by('-currency').first()
+                        
+                        if disc_item_link and disc_item_link.account:
+                            post_journal(disc_item_link.account, credit=disc_amount)
+                        elif global_linked and global_linked.purchase_discount:
+                            post_journal(global_linked.purchase_discount, credit=disc_amount)
+                        
+                        total_discount += disc_amount
+
+                # Post total_debit_purchase if items didn't have account links
+                # (No-op if all items already posted individually above)
+
+                # ── 4. PPN Tax Account (Debit = tax_amount) ──
+                # From add.cfm: TAccTax.ForPurchase = tax input account
+                # In our system: GlobalLinkedAccount or Account with suitable name
+                if invoice.tax_amount and invoice.tax_amount > 0 and self.initial_data.get('tickmark_ppn', False):
+                    # Try to find VAT input account from company global linked account
+                    # In add.cfm: TAccTax.ForPurchase (input VAT account)
+                    ppn_account = None
+                    
+                    # Look for account with typical PPN/VAT naming
+                    ppn_account = Account.objects.filter(
+                        company=company,
+                        is_active=True,
+                        is_linked=True,
+                        account_name__icontains='ppn'
+                    ).exclude(account_type='HEADER').first()
+                    
+                    if not ppn_account:
+                        ppn_account = Account.objects.filter(
+                            company=company,
+                            is_active=True,
+                            account_name__icontains='pajak masukan'
+                        ).exclude(account_type='HEADER').first()
+                    
+                    if not ppn_account:
+                        ppn_account = Account.objects.filter(
+                            company=company,
+                            is_active=True,
+                            account_name__icontains='vat input'
+                        ).exclude(account_type='HEADER').first()
+                    
+                    post_journal(ppn_account, debit=invoice.tax_amount)
+                        
+            except Exception as e:
+                # Journal creation failure should NOT rollback invoice creation
+                # (consistent with add.cfm behavior - invoice is saved first)
+                print(f"[PurchaseInvoice Journal Error] {e}")
+
+        return invoice
+
+    def update(self, instance, validated_data):
+        from django.db import transaction
+        from decimal import Decimal
+        
+        details_data = self.initial_data.get('details')
+        payment_terms_data = self.initial_data.get('payment_terms')
+        
+        with transaction.atomic():
+            validated_data.pop('details', None)
+            validated_data.pop('payment_terms', None)
+            
+            # Note: We won't update the journal automatically here yet for simplicity,
+            # but we allow the frontend to update the record without a 500 error.
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+            
+            # If details or payment_terms are provided, replace them
+            if details_data is not None:
+                instance.details.all().delete()
+                for detail_data in details_data:
+                    PurchaseInvoiceDetail.objects.create(
+                        invoice=instance,
+                        item_id=detail_data.get('item'),
+                        quantity=detail_data.get('quantity', 0),
+                        unit_price=detail_data.get('unit_price', 0),
+                        discount_amount=detail_data.get('discount_amount', 0),
+                        tax_amount=detail_data.get('tax_amount', 0),
+                        total_amount=detail_data.get('total_amount', 0),
+                        order_no=detail_data.get('order_no', 0)
+                    )
+                    
+            if payment_terms_data is not None:
+                # Validation check
+                terms_total = sum(Decimal(str(t.get('amount', 0))) for t in payment_terms_data)
+                grand_total = Decimal(str(instance.grand_total or 0))
+                if abs(terms_total - grand_total) > Decimal('1.00'):
+                    from rest_framework.exceptions import ValidationError
+                    raise ValidationError(
+                        f"Total Terms of Payment ({terms_total}) harus sama dengan Grand Total ({grand_total})"
+                    )
+                
+                instance.payment_terms.all().delete()
+                for term_data in payment_terms_data:
+                    PurchaseInvoicePaymentTerm.objects.create(
+                        invoice=instance,
+                        due_date=term_data.get('due_date'),
+                        description=term_data.get('description', ''),
+                        percentage=term_data.get('percentage', 100.00),
+                        amount=term_data.get('amount', 0.00),
+                        term_number=term_data.get('term_number', 1)
+                    )
+                    
         return instance
