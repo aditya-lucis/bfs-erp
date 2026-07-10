@@ -924,7 +924,7 @@ class GoodReceiptNoteViewSet(viewsets.ModelViewSet):
                 is_active=True,
                 void_reason__isnull=True
             ).exclude(
-                purchase_invoices__status__in=['open', 'half_paid', 'full_paid']
+                purchase_invoices__status__in=['not_paid', 'half_paid', 'full_paid']
             ).distinct()
             
         return queryset

@@ -820,8 +820,7 @@ class GoodReceiptNoteDocument(models.Model):
 
 class PurchaseInvoice(models.Model):
     class StatusChoices(models.TextChoices):
-        DRAFT = 'draft', 'Draft'
-        OPEN = 'open', 'Open'
+        NOT_PAID = 'not_paid', 'Not Paid'
         HALF_PAID = 'half_paid', 'Half Paid'
         FULL_PAID = 'full_paid', 'Full Paid'
         VOID = 'void', 'Void'
@@ -837,6 +836,8 @@ class PurchaseInvoice(models.Model):
     due_date = models.DateField()
     tax_date = models.DateField()
     tax_number = models.CharField(max_length=100, blank=True, default='')
+    tax_number_ppn = models.CharField(max_length=100, blank=True, default='')
+    tax_number_pph = models.CharField(max_length=100, blank=True, default='')
     vendor_invoice_number = models.CharField(max_length=100, blank=True, default='')
     notes = models.TextField(blank=True, default='')
     currency = models.CharField(max_length=10, default='IDR')
@@ -847,7 +848,7 @@ class PurchaseInvoice(models.Model):
     grand_total = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     paid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.OPEN)
+    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.NOT_PAID)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -21,9 +21,9 @@
           <div class="border border-gray-200 rounded-lg px-3 py-1.5 relative bg-white flex items-center gap-2 shadow-sm min-h-[38px]">
             <span class="absolute -top-2 left-2 bg-white px-1 text-[9px] font-bold text-gray-500 uppercase tracking-wider">Status</span>
             <button @click="filterStatus = ''" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === '' ? 'bg-bfs-navy text-white' : 'hover:bg-gray-100 text-gray-400'">ALL</button>
-            <button @click="filterStatus = 'not_paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'not_paid' ? 'bg-amber-500 text-white' : 'hover:bg-gray-100 text-gray-400'">NOT PAID</button>
-            <button @click="filterStatus = 'half_paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'half_paid' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 text-gray-400'">HALF PAID</button>
-            <button @click="filterStatus = 'full_paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'full_paid' ? 'bg-green-500 text-white' : 'hover:bg-gray-100 text-gray-400'">FULL PAID</button>
+            <button @click="filterStatus = 'draft'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'draft' ? 'bg-amber-500 text-white' : 'hover:bg-gray-100 text-gray-400'">DRAFT</button>
+            <button @click="filterStatus = 'open'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'open' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 text-gray-400'">OPEN</button>
+            <button @click="filterStatus = 'paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'paid' ? 'bg-green-500 text-white' : 'hover:bg-gray-100 text-gray-400'">PAID</button>
           </div>
         </div>
 
@@ -85,12 +85,12 @@
               <td class="px-4 py-2 text-center">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold"
                   :class="{
-                    'bg-amber-100 text-amber-700': item.status === 'not_paid',
-                    'bg-blue-100 text-blue-700': item.status === 'half_paid',
+                    'bg-amber-100 text-amber-700': item.status === 'draft',
+                    'bg-blue-100 text-blue-700': item.status === 'open',
                     'bg-green-100 text-green-700': item.status === 'full_paid',
                     'bg-gray-100 text-gray-700': item.status === 'void',
                   }">
-                  {{ item.status === 'full_paid' ? 'FULL PAID' : item.status === 'half_paid' ? 'HALF PAID' : 'NOT PAID' }}
+                  {{ item.status ? item.status.toUpperCase() : 'DRAFT' }}
                 </span>
               </td>
             </tr>
@@ -196,7 +196,7 @@
                   placeholder="Select GRN"
                   :label-fn="(g) => `${g.grn_number} - ${g.document_date}`"
                   value-key="id"
-                  @change="blastGRN"
+                  @change="onReceiptReportChange"
                   class="w-full"
                 />
               </template>
@@ -243,12 +243,12 @@
               <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
               <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold"
                 :class="{
-                  'bg-amber-100 text-amber-700': formData.status === 'not_paid' || !formData.status,
-                  'bg-blue-100 text-blue-700': formData.status === 'half_paid',
+                  'bg-amber-100 text-amber-700': formData.status === 'draft',
+                  'bg-blue-100 text-blue-700': formData.status === 'open' || !formData.status,
                   'bg-green-100 text-green-700': formData.status === 'full_paid',
                   'bg-gray-100 text-gray-700': formData.status === 'void',
                 }">
-                {{ formData.status === 'full_paid' ? 'FULL PAID' : formData.status === 'half_paid' ? 'HALF PAID' : 'NOT PAID' }}
+                {{ formData.status === 'full_paid' ? 'Full Paid' : formData.status === 'half_paid' ? 'Half Paid' : formData.status ? formData.status.toUpperCase() : 'OPEN' }}
               </span>
             </div>
           </div>
@@ -695,53 +695,12 @@ const calculateDueDate = () => {
   formData.value.due_date = date.toISOString().split('T')[0]
 }
 
-const blastGRN = async () => {
+const blastGRN = () => {
   if (!formData.value.grn) return
   const selectedGRN = grns.value.find(g => g.id === formData.value.grn)
   if (selectedGRN) {
-    const termPercentage = parseFloat(selectedGRN.term_percentage) || 100
-    formData.value.invoice_percentage = termPercentage
-    formData.value.invoice_rcv_amount = parseFloat(selectedGRN.amount) || 0
-    
-    // Fetch PO details and scale them by invoice_percentage (simulating add.cfm logic)
-    try {
-      const poRes = await api.get(`/purchase/po/${formData.value.po}/`)
-      if (poRes.data && poRes.data.details) {
-        const factor = termPercentage / 100
-        formData.value.details = poRes.data.details.map((d, index) => {
-          const qty = parseFloat(d.quantity) || 0
-          // scale unit price by GRN percentage
-          const unitPrice = (parseFloat(d.unit_price) || 0) * factor
-          const discPercent = parseFloat(d.discount_percent) || 0
-          const baseAmount = qty * unitPrice
-          const discAmount = baseAmount * (discPercent / 100)
-          const netAmount = baseAmount - discAmount
-          
-          let taxRate = 0
-          const tax1 = (d.tax1 || '').toLowerCase()
-          if (tax1.includes('ppn_11') || tax1.includes('ppn11')) taxRate = 0.11
-          else if (tax1.includes('ppn_10') || tax1.includes('ppn10')) taxRate = 0.10
-          const taxAmount = formData.value.tickmark_ppn ? netAmount * taxRate : 0
-          
-          return {
-            item: d.item,
-            item_code: d.item_code || '',
-            item_name: d.item_name || 'Item',
-            quantity: qty,
-            unit_price: unitPrice, // this scaled price will display in the table
-            discount_percent: discPercent,
-            discount_amount: discAmount,
-            tax_rate: taxRate,
-            tax_amount: taxAmount,
-            total_amount: netAmount + taxAmount,
-            order_no: index + 1
-          }
-        })
-        calculateTotals()
-      }
-    } catch (error) {
-      console.error('Error fetching PO details for GRN', error)
-    }
+    formData.value.invoice_percentage = selectedGRN.term_percentage || 100
+    formData.value.invoice_rcv_amount = selectedGRN.amount || 0
   }
 }
 
@@ -849,16 +808,10 @@ const calculateTotals = () => {
   
   formData.value.invoice_rcv_amount = formData.value.grand_total
   
-  // Don't auto-calculate invoice_percentage dynamically here anymore.
-  // We trust the value that was populated by blastGRN (which comes from GRN)
-  // or the value that was loaded from the DB.
-  
-  if (!formData.value.invoice_percentage) {
-    if (totalPOAmount.value > 0) {
-      formData.value.invoice_percentage = (formData.value.grand_total / totalPOAmount.value) * 100
-    } else {
-      formData.value.invoice_percentage = 0
-    }
+  if (totalPOAmount.value > 0) {
+    formData.value.invoice_percentage = (formData.value.grand_total / totalPOAmount.value) * 100
+  } else {
+    formData.value.invoice_percentage = 0
   }
   
   // Auto update payment term amounts based on percentage (matching add.cfm logic)
