@@ -426,6 +426,11 @@ class ReceiptReport(models.Model):
     approval_status = models.CharField(max_length=50, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
     document_status = models.CharField(max_length=50, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
     
+    # Void tracking fields
+    void_reason = models.TextField(null=True, blank=True)
+    void_date = models.DateTimeField(null=True, blank=True)
+    void_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='voided_receipt_reports')
+    
     # Auditing
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

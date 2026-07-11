@@ -227,6 +227,10 @@
                     <input type="checkbox" v-model="form.is_on_duty" class="w-4 h-4 rounded accent-yellow-500" />
                     <span class="text-sm text-gray-700">Is On Duty</span>
                   </label>
+                  <label class="flex items-center gap-2.5" :class="isTaxInDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'">
+                    <input type="checkbox" v-model="form.is_tax_in" :disabled="isTaxInDisabled" class="w-4 h-4 rounded accent-yellow-500 disabled:bg-gray-200" />
+                    <span class="text-sm text-gray-700">Is Tax In (PPN Masukan)</span>
+                  </label>
                 </div>
               </template>
 
@@ -259,6 +263,9 @@
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { X, Save, Loader2, AlertCircle, ChevronDown } from 'lucide-vue-next'
 import FormField from '../FormField.vue'
+import { useAccountingStore } from '../../stores/accounting.js'
+
+const store = useAccountingStore()
 
 const props = defineProps({
   show:           { type: Boolean, required: true },
@@ -303,6 +310,7 @@ const form = reactive({
   is_inter_company:  false,
   is_cost_component: false,
   is_on_duty:        false,
+  is_tax_in:         false,
   is_active:         true,
 })
 
@@ -315,6 +323,32 @@ const selectedGroup = computed(() =>
 const filteredHeaderAccounts = computed(() => {
   if (!form.account_group) return []
   return props.headerAccounts.filter(acc => acc.account_group === form.account_group)
+})
+
+const isTaxInDisabled = computed(() => {
+  // if current account already has it, it's not disabled (can uncheck)
+  if (props.mode === 'edit' && props.initialData?.is_tax_in) return false
+  
+  // check if any account in the tree has is_tax_in
+  let found = false
+  const checkNodes = (nodes) => {
+    for (const node of nodes) {
+      if (node.is_tax_in && node.id !== props.editId) {
+        found = true
+        return
+      }
+      if (node.children?.length) checkNodes(node.children)
+    }
+  }
+  
+  if (store.coaTree) {
+    for (const group of store.coaTree) {
+      checkNodes(group.accounts)
+      if (found) break
+    }
+  }
+  
+  return found
 })
 
 const fullAccountNumber = computed(() => {
@@ -373,6 +407,7 @@ watch(() => form.account_type, (newType) => {
     form.is_inter_company  = false
     form.is_cost_component = false
     form.is_on_duty        = false
+    form.is_tax_in         = false
   }
 })
 
@@ -408,6 +443,7 @@ function populateForm() {
       is_inter_company:  props.initialData.is_inter_company  ?? false,
       is_cost_component: props.initialData.is_cost_component ?? false,
       is_on_duty:        props.initialData.is_on_duty        ?? false,
+      is_tax_in:         props.initialData.is_tax_in         ?? false,
       is_active:         props.initialData.is_active         ?? true,
     })
 
@@ -435,6 +471,7 @@ function populateForm() {
       is_inter_company:  false,
       is_cost_component: false,
       is_on_duty:        false,
+      is_tax_in:         false,
       is_active:         true,
     })
     accountSuffix.value = ''

@@ -519,6 +519,104 @@ class ReceiptReportViewSet(viewsets.ModelViewSet):
                 
         return Response({'message': 'Receipt Report berhasil disetujui.'})
 
+    @action(detail=True, methods=['post'])
+    def void(self, request, pk=None):
+        from django.utils import timezone
+        from django.db import transaction
+        from django.db.models import F
+        from apps.purchase.models import PurchaseInvoice, PurchaseOrder
+        from apps.accounting.models import JournalHeader, JournalDetail
+        
+        rr = self.get_object()
+        
+        # 1. Validation
+        if rr.approval_status != ReceiptReport.ApprovalStatus.APPROVED:
+            return Response({'detail': 'Hanya Receipt Report berstatus Approved yang dapat di-void.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if PurchaseInvoice.objects.filter(receipt_report=rr).exists():
+            return Response({'detail': 'Tidak dapat melakukan void karena Receipt Report ini sudah digunakan pada Purchase Invoice.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        void_reason = request.data.get('void_reason')
+        if not void_reason:
+            return Response({'detail': 'Alasan void wajib diisi.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            with transaction.atomic():
+                # 2. Update status of Receipt Report
+                rr.approval_status = ReceiptReport.ApprovalStatus.VOID
+                rr.void_reason = void_reason
+                rr.void_date = timezone.now()
+                rr.void_by = request.user
+                rr.save(update_fields=['approval_status', 'void_reason', 'void_date', 'void_by'])
+                
+                # 3. Revert po_item.received_qty
+                for item in rr.items.all():
+                    if item.po_item:
+                        po_item = item.po_item
+                        # Revert received_qty using F expression safely
+                        po_item.received_qty = F('received_qty') - item.receive_qty
+                        po_item.save(update_fields=['received_qty'])
+                        
+                # 4. Reopen PO if it was auto-closed
+                if rr.po and rr.po.status == PurchaseOrder.Status.CLOSED:
+                    po = rr.po
+                    po.status = PurchaseOrder.Status.OPEN # Reopen it
+                    po.close_reason = ''
+                    po.save(update_fields=['status', 'close_reason'])
+                    
+                # 5. Reverse accounting journal details if any
+                original_journal = JournalHeader.objects.filter(journal_number=rr.receipt_number).first()
+                if original_journal:
+                    void_journal_number = f"VOID-{rr.receipt_number}"
+                    if not JournalHeader.objects.filter(journal_number=void_journal_number).exists():
+                        void_journal = JournalHeader.objects.create(
+                            journal_number=void_journal_number,
+                            company=rr.company,
+                            date=timezone.now().date(),
+                            memo=f"Void Receipt Report: {rr.receipt_number} - Reason: {void_reason}",
+                            project=rr.po.project if rr.po else None,
+                            created_by=request.user,
+                            type='INV'
+                        )
+                        
+                        # Loop through original details and reverse debits/credits
+                        for detail in original_journal.details.all():
+                            debet_amount = detail.base_kredit
+                            kredit_amount = detail.base_debet
+                            
+                            JournalDetail.objects.create(
+                                journal_header=void_journal,
+                                account=detail.account,
+                                currency=detail.currency,
+                                base_debet=debet_amount,
+                                base_kredit=kredit_amount
+                            )
+                            
+                            # Update account balance
+                            account = detail.account
+                            
+                            if detail.base_debet > 0:
+                                # Reversing debet: we add to month_kredit, and subtract/add from amount
+                                account.month_kredit = F('month_kredit') + detail.base_debet
+                                if account.default_position == 'DEBET':
+                                    account.amount = F('amount') - detail.base_debet
+                                else:
+                                    account.amount = F('amount') + detail.base_debet
+                                    
+                            if detail.base_kredit > 0:
+                                # Reversing kredit: we add to month_debet, and add/subtract from amount
+                                account.month_debet = F('month_debet') + detail.base_kredit
+                                if account.default_position == 'DEBET':
+                                    account.amount = F('amount') + detail.base_kredit
+                                else:
+                                    account.amount = F('amount') - detail.base_kredit
+                                    
+                            account.save(update_fields=['month_debet', 'month_kredit', 'amount'])
+                            
+            return Response({'status': 'success', 'message': 'Receipt Report berhasil di-void'})
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 from datetime import datetime
 from rest_framework import viewsets, permissions, status

@@ -57,7 +57,7 @@ class AccountListSerializer(serializers.ModelSerializer):
             'parent', 'parent_number',
             'default_position', 'currency', 'amount',
             'month_opening_balance', 'month_debet', 'month_kredit',
-            'is_postable', 'is_linked', 'is_active',
+            'is_postable', 'is_linked', 'is_active', 'is_tax_in',
             'bank_type', 'level',
         ]
 
@@ -79,7 +79,7 @@ class AccountTreeSerializer(serializers.ModelSerializer):
             'id', 'account_number', 'account_name',
             'account_type', 'account_type_label',
             'account_group', 'parent',
-            'is_inter_company', 'is_cost_component', 'is_on_duty',
+            'is_inter_company', 'is_cost_component', 'is_on_duty', 'is_tax_in',
             'default_position', 'currency', 'amount',
             'month_opening_balance', 'month_debet', 'month_kredit',
             'is_postable', 'is_linked', 'is_active',
@@ -116,7 +116,7 @@ class AccountDetailSerializer(serializers.ModelSerializer):
             'parent', 'parent_number', 'parent_name',
             'language', 'default_position', 'currency', 'amount',
             'month_opening_balance', 'month_debet', 'month_kredit',
-            'is_inter_company', 'is_cost_component', 'is_on_duty',
+            'is_inter_company', 'is_cost_component', 'is_on_duty', 'is_tax_in',
             'bank_type',
             'is_linked', 'is_postable', 'has_children',
             'is_active', 'level',
@@ -134,7 +134,7 @@ class AccountCreateSerializer(serializers.ModelSerializer):
             'account_type',
             'account_group', 'parent',
             'language', 'default_position', 'currency', 'amount',
-            'is_inter_company', 'is_cost_component', 'is_on_duty',
+            'is_inter_company', 'is_cost_component', 'is_on_duty', 'is_tax_in',
             'bank_type',
             'is_linked', 'is_active',
         ]
@@ -176,11 +176,22 @@ class AccountCreateSerializer(serializers.ModelSerializer):
 
         # HEADER cannot have postable flags set
         if account_type == AccountType.HEADER:
-            for flag in ('is_inter_company', 'is_cost_component', 'is_on_duty'):
+            for flag in ('is_inter_company', 'is_cost_component', 'is_on_duty', 'is_tax_in'):
                 if attrs.get(flag, False):
                     raise serializers.ValidationError({
                         flag: 'Header accounts cannot have this flag enabled.'
                     })
+
+        # Enforce single is_tax_in account per company
+        is_tax_in = attrs.get('is_tax_in', getattr(self.instance, 'is_tax_in', False))
+        if is_tax_in:
+            existing_tax_in = Account.objects.filter(company=company, is_tax_in=True)
+            if self.instance:
+                existing_tax_in = existing_tax_in.exclude(pk=self.instance.pk)
+            if existing_tax_in.exists():
+                raise serializers.ValidationError({
+                    'is_tax_in': 'Another account in this company is already marked as Tax In. Please uncheck it first.'
+                })
 
         # Parent must belong to same company
         if parent and parent.company_id != company.id:

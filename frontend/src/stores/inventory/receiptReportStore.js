@@ -70,6 +70,15 @@ export const useReceiptReportStore = defineStore('receiptReport', {
         throw error.response?.data || error
       }
     },
+    async voidReceiptReport(id, payload) {
+      try {
+        const { data } = await api.post(`/inventory/receipt-reports/${id}/void/`, payload)
+        await this.fetchReceiptReports()
+        return data
+      } catch (error) {
+        throw error.response?.data || error
+      }
+    },
     setFilters(filters) {
       this.filters = { ...this.filters, ...filters }
       this.pagination.page = 1

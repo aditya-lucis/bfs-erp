@@ -140,9 +140,13 @@ class Account(models.Model):
                             help_text='Used in cost component calculation',
                         )
     is_on_duty        = models.BooleanField(
-                            default=False,
-                            help_text='On-duty / operational flag',
-                        )
+                          default=False,
+                          help_text='Indicates if this account is used for duty/tax logic in other modules.'
+                      )
+    is_tax_in         = models.BooleanField(
+                          default=False,
+                          help_text='Indicates if this account is the Input Tax (PPN Masukan) account.'
+                      )
  
     # ── Bank-specific ─────────────────────────────────────────────────────────
     bank_type       = models.CharField(

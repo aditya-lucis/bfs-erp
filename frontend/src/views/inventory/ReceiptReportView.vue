@@ -217,6 +217,9 @@
                     <button v-if="rr.approval_status === 'awaiting'" @click="approveRR(rr.id)" class="p-1 text-gray-400 hover:text-green-500 transition-colors cursor-pointer" title="Approve">
                       <FileCheck class="w-3.5 h-3.5" />
                     </button>
+                    <button v-if="rr.approval_status === 'approved'" @click="voidRR(rr.id)" class="p-1 text-gray-400 hover:text-red-500 transition-colors cursor-pointer" title="Void Document">
+                      <FileX class="w-3.5 h-3.5" />
+                    </button>
                   </div>
               </td>
             </tr>
@@ -400,6 +403,33 @@ async function approveRR(id) {
       Swal.fire({ icon: 'success', title: 'Approved', text: 'Receipt Report has been approved.' })
     } catch (error) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.detail || 'Failed to approve.' })
+    }
+  }
+}
+
+async function voidRR(id) {
+  const { value: reason, isConfirmed } = await Swal.fire({
+    title: 'Void Receipt Report?',
+    text: 'Please enter the reason for voiding this Receipt Report:',
+    input: 'text',
+    inputPlaceholder: 'Reason for void...',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, void it!',
+    confirmButtonColor: '#d33',
+    inputValidator: (value) => {
+      if (!value) {
+        return 'You need to write a reason!'
+      }
+    }
+  })
+
+  if (isConfirmed && reason) {
+    try {
+      await store.voidReceiptReport(id, { void_reason: reason })
+      Swal.fire({ icon: 'success', title: 'Voided', text: 'Receipt Report has been voided.' })
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Error', text: error.detail || 'Failed to void.' })
     }
   }
 }

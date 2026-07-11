@@ -25,6 +25,14 @@
             <button @click="filterStatus = 'half_paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'half_paid' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 text-gray-400'">HALF PAID</button>
             <button @click="filterStatus = 'full_paid'" class="px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer" :class="filterStatus === 'full_paid' ? 'bg-green-500 text-white' : 'hover:bg-gray-100 text-gray-400'">FULL PAID</button>
           </div>
+          
+          <!-- Filter Date -->
+          <div class="border border-gray-200 rounded-lg px-4 py-1.5 relative bg-white flex items-center gap-3 shadow-sm min-h-[38px]">
+            <span class="absolute -top-2 left-2 bg-white px-1 text-[9px] font-bold text-gray-500 uppercase tracking-wider">Date Range</span>
+            <input type="date" v-model="filterStartDate" class="text-xs font-medium focus:outline-none border-none bg-transparent p-0 cursor-pointer text-gray-700" />
+            <span class="text-gray-300 font-medium">to</span>
+            <input type="date" v-model="filterEndDate" class="text-xs font-medium focus:outline-none border-none bg-transparent p-0 cursor-pointer text-gray-700" />
+          </div>
         </div>
 
         <div class="flex gap-2">
@@ -62,7 +70,7 @@
               </td>
             </tr>
             <tr
-              v-for="item in filteredInvoices"
+              v-for="item in paginatedInvoices"
               :key="item.id"
               class="hover:bg-bfs-navy/5 transition-colors group"
             >
@@ -73,6 +81,9 @@
                   </button>
                   <button @click="openModal('edit', item)" class="p-1 text-gray-400 hover:text-bfs-gold rounded cursor-pointer" title="Edit">
                     <Edit class="w-4 h-4" />
+                  </button>
+                  <button @click="openPrintPreview(item)" class="p-1 text-gray-400 hover:text-blue-500 rounded cursor-pointer" title="Print">
+                    <Printer class="w-4 h-4" />
                   </button>
                 </div>
               </td>
@@ -96,6 +107,17 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Pagination -->
+      <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-white text-xs rounded-b-xl">
+        <div class="text-gray-500">
+          Showing <span class="font-semibold text-gray-800">{{ paginationStart }}</span> to <span class="font-semibold text-gray-800">{{ paginationEnd }}</span> of <span class="font-semibold text-gray-800">{{ filteredInvoices.length }}</span> entries
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 rounded-md border border-gray-200 bg-white text-gray-600 font-medium hover:bg-gray-50 hover:text-bfs-navy hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
+          <span class="px-3 py-1.5 text-gray-600 font-medium bg-gray-50 rounded-md border border-gray-100">Page {{ currentPage }} of {{ totalPages || 1 }}</span>
+          <button @click="currentPage++" :disabled="currentPage === totalPages || totalPages === 0" class="px-3 py-1.5 rounded-md border border-gray-200 bg-white text-gray-600 font-medium hover:bg-gray-50 hover:text-bfs-navy hover:border-gray-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+        </div>
       </div>
     </div>
 
@@ -509,6 +531,145 @@
         </div>
       </template>
     </Modal>
+    <!-- Print Modal Overlay -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="printModal.show" class="fixed inset-0 z-[9999] bg-gray-900/75 backdrop-blur-sm flex items-start justify-center overflow-y-auto print-modal-overlay py-8">
+          <div class="bg-white mx-auto shadow-2xl relative print-modal-container max-w-[210mm] w-full shrink-0" @click.stop>
+            
+            <!-- Controls (Hidden in Print) -->
+            <div class="sticky top-0 left-0 right-0 bg-gray-50 border-b px-6 py-4 flex justify-between items-center no-print z-10 shadow-sm">
+              <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                <Printer class="w-5 h-5 text-bfs-gold" />
+                Print Preview: {{ printModal.invoice?.invoice_number }}
+              </h3>
+              <div class="flex gap-2">
+                <button @click="printDocument" class="btn-primary text-sm px-4 flex items-center gap-2 shadow-md bg-bfs-navy text-white py-1.5 rounded-lg font-bold">
+                  <Printer class="w-4 h-4" /> Print Document
+                </button>
+                <button @click="printModal.show = false" class="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-lg transition-colors">
+                  <X class="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Print Content -->
+            <div class="p-[10mm] print:p-0 text-black bg-white font-sans text-[11px] relative flex flex-col min-h-full">
+              <!-- Header -->
+              <div class="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
+                <div class="flex-1">
+                  <h1 class="text-xl font-black uppercase tracking-widest text-black">{{ orgStore.company?.company_name || 'BFS ERP' }}</h1>
+                  <p class="text-[10px] text-gray-500 font-medium whitespace-pre-line">{{ printAddress }}</p>
+                </div>
+                <div class="text-right flex flex-col items-end">
+                  <h2 class="text-lg font-bold uppercase tracking-wider text-black">Fund Requisition Form</h2>
+                  <div class="inline-block bg-black text-white px-2 py-0.5 text-[9px] uppercase font-bold tracking-widest mt-1">Duplicate</div>
+                </div>
+              </div>
+              
+              <!-- Doc Info Grid -->
+              <div class="grid grid-cols-2 gap-6 mb-6">
+                <div class="flex flex-col gap-1.5">
+                  <div class="grid grid-cols-[100px_10px_1fr] items-start">
+                    <div class="font-bold">No</div>
+                    <div>:</div>
+                    <div class="font-semibold text-bfs-navy">{{ printModal.invoice?.invoice_number || '-' }}</div>
+                  </div>
+                  <div class="grid grid-cols-[100px_10px_1fr] items-start">
+                    <div class="font-bold">Vendor</div>
+                    <div>:</div>
+                    <div class="font-bold text-black uppercase">{{ printModal.invoice?.vendor_name || printModal.invoice?.vendor || '-' }}</div>
+                  </div>
+                </div>
+                
+                <div class="flex flex-col gap-1.5">
+                  <div class="grid grid-cols-[120px_10px_1fr] items-start">
+                    <div class="font-bold">Date of Invoice</div>
+                    <div>:</div>
+                    <div>{{ formatDatePrint(printModal.invoice?.invoice_date) }}</div>
+                  </div>
+                  <div class="grid grid-cols-[120px_10px_1fr] items-start">
+                    <div class="font-bold">Due Date</div>
+                    <div>:</div>
+                    <div class="font-bold text-red-600">{{ formatDatePrint(printModal.invoice?.due_date) }}</div>
+                  </div>
+                  <div class="grid grid-cols-[120px_10px_1fr] items-start">
+                    <div class="font-bold">Receipt Report</div>
+                    <div>:</div>
+                    <div>{{ printModal.invoice?.receipt_report_number || printModal.invoice?.receipt_report || '-' }}</div>
+                  </div>
+                  <div class="grid grid-cols-[120px_10px_1fr] items-start">
+                    <div class="font-bold">Vendor Inv No</div>
+                    <div>:</div>
+                    <div>{{ printModal.invoice?.vendor_invoice_number || '-' }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Amount Box -->
+              <div class="border-y border-black py-4 mb-6">
+                <div class="grid grid-cols-[100px_10px_1fr] items-start gap-y-3">
+                  <div class="font-bold mt-1">Amount</div>
+                  <div class="mt-1">:</div>
+                  <div>
+                    <div class="font-bold text-lg mb-1">{{ formatCurrencyRaw(printModal.invoice?.grand_total || 0, printModal.invoice?.currency) }}</div>
+                    <div class="italic font-medium text-gray-700 bg-gray-50 p-2 rounded border border-gray-200 inline-block">
+                      ( {{ numberToWordsEn(printModal.invoice?.grand_total || 0) }} {{ (printModal.invoice?.currency === 'IDR' || !printModal.invoice?.currency) ? 'Rupiahs' : printModal.invoice?.currency }} )
+                    </div>
+                  </div>
+                  
+                  <div class="font-bold">Descriptions</div>
+                  <div>:</div>
+                  <div class="whitespace-pre-wrap">{{ printModal.invoice?.notes || 'Purchase Invoice Payment' }}</div>
+                </div>
+              </div>
+
+            <!-- Checklist -->
+              <div class="mb-8 px-4">
+                <table class="w-full text-left text-[11px] border border-gray-300">
+                  <thead>
+                    <tr class="bg-gray-100 text-gray-700 font-bold border-b border-gray-300">
+                      <th class="p-2 border-r border-gray-300 w-10 text-center">NO</th>
+                      <th class="p-2 border-r border-gray-300">DESCRIPTION</th>
+                      <th class="p-2 border-r border-gray-300 w-20 text-center">TICK</th>
+                      <th class="p-2">REMARKS/ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="border-b border-gray-200"><td class="p-2 border-r border-gray-200 text-center">1</td><td class="p-2 border-r border-gray-200 font-medium">Invoice</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                    <tr class="border-b border-gray-200"><td class="p-2 border-r border-gray-200 text-center">2</td><td class="p-2 border-r border-gray-200 font-medium">Receipt With Materai</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                    <tr class="border-b border-gray-200"><td class="p-2 border-r border-gray-200 text-center">3</td><td class="p-2 border-r border-gray-200 font-medium">Delivery Order</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                    <tr class="border-b border-gray-200"><td class="p-2 border-r border-gray-200 text-center">4</td><td class="p-2 border-r border-gray-200 font-medium">Purchase Order</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                    <tr class="border-b border-gray-200"><td class="p-2 border-r border-gray-200 text-center">5</td><td class="p-2 border-r border-gray-200 font-medium">Faktur Pajak</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                    <tr><td class="p-2 border-r border-gray-200 text-center">6</td><td class="p-2 border-r border-gray-200 font-medium">Others</td><td class="p-2 border-r border-gray-200 text-center text-gray-300">[ &nbsp; &nbsp; ]</td><td class="p-2"></td></tr>
+                  </tbody>
+                </table>
+                <p class="mt-4 text-[10px] font-bold italic text-gray-600 bg-gray-50 p-2 border-l-4 border-bfs-navy rounded">Note: All invoices must tie in with Delivery Order and Purchase Order.<br>Invoices must be verified by person in-charge.</p>
+              </div>
+
+              <!-- Signatures -->
+              <div class="grid grid-cols-2 gap-16 mb-8 px-12">
+                <div class="flex flex-col items-center">
+                  <span class="font-bold mb-16 text-sm">Checked By:</span>
+                  <div class="w-full border-b-2 border-black"></div>
+                  <span class="mt-2 font-bold text-gray-700">Accounting Dept</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="font-bold mb-16 text-sm">Approved By:</span>
+                  <div class="w-full border-b-2 border-black"></div>
+                </div>
+              </div>
+              
+              <div class="mt-auto text-[8px] flex justify-between">
+                <span>REV#01</span>
+                <span>{{ formatDatePrint(new Date()) }}</span>
+                <span>FRM-FIN-02-03</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </Panel>
 </template>
 
@@ -516,12 +677,15 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../../services/api'
+import { useOrganizationStore } from '../../stores/organization'
 import Panel from '../../components/Panel.vue'
 import Modal from '../../components/Modal.vue'
 import SearchableSelect from '../../components/SearchableSelect.vue'
 import {
-  Plus, Search, Edit, Eye, Trash2, FileText, List, Save, FileX, Folder, FolderOpen, FolderCheck
+  Plus, Search, Edit, Eye, Trash2, FileText, List, Save, FileX, Folder, FolderOpen, FolderCheck, Printer, X
 } from 'lucide-vue-next'
+
+const orgStore = useOrganizationStore()
 
 const invoices = ref([])
 
@@ -530,6 +694,17 @@ const loading = ref(false)
 const isSaving = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref('')
+
+// Initialize dates for current month
+const now = new Date()
+const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+
+const filterStartDate = ref(firstDay)
+const filterEndDate = ref(lastDay)
+
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
 
 const isModalOpen = ref(false)
 const modalMode = ref('add') // add, edit, view
@@ -830,7 +1005,11 @@ const calculateTotals = () => {
     const itemDisc = base * (discPercent / 100)
     const net = base - itemDisc
     // Recalculate tax based on tickmark_ppn toggle
-    const taxRate = parseFloat(d.tax_rate) || 0
+    let taxRate = parseFloat(d.tax_rate)
+    if (isNaN(taxRate)) {
+      taxRate = (net > 0 && d.tax_amount) ? (parseFloat(d.tax_amount) / net) : 0
+      d.tax_rate = taxRate
+    }
     const itemTax = formData.value.tickmark_ppn ? net * taxRate : 0
     d.discount_amount = itemDisc
     d.tax_amount = itemTax
@@ -1033,6 +1212,14 @@ const fetchInvoices = async () => {
 const filteredInvoices = computed(() => {
   let result = invoices.value || []
   
+  if (filterStartDate.value) {
+    result = result.filter(item => item.invoice_date >= filterStartDate.value)
+  }
+  
+  if (filterEndDate.value) {
+    result = result.filter(item => item.invoice_date <= filterEndDate.value)
+  }
+  
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     result = result.filter(item => 
@@ -1050,7 +1237,143 @@ const filteredInvoices = computed(() => {
   return result
 })
 
+const totalPages = computed(() => Math.ceil(filteredInvoices.value.length / itemsPerPage.value))
+
+const paginatedInvoices = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return filteredInvoices.value.slice(start, end)
+})
+
+const paginationStart = computed(() => {
+  if (filteredInvoices.value.length === 0) return 0
+  return ((currentPage.value - 1) * itemsPerPage.value) + 1
+})
+
+const paginationEnd = computed(() => {
+  const end = currentPage.value * itemsPerPage.value
+  return end > filteredInvoices.value.length ? filteredInvoices.value.length : end
+})
+
+// Reset to page 1 if filters change
+watch([searchQuery, filterStatus, filterStartDate, filterEndDate], () => {
+  currentPage.value = 1
+})
+
+const printModal = ref({
+  show: false,
+  invoice: null
+})
+
+const printAddress = computed(() => {
+  const addr1 = orgStore.company?.company_address || 'Company Address'
+  const addr2 = orgStore.company?.company_address2 || ''
+  if (addr2 && addr2.trim().toLowerCase() !== addr1.trim().toLowerCase()) {
+    return `${addr1}\n${addr2}`
+  }
+  return addr1
+})
+
+const openPrintPreview = async (invoice) => {
+  printModal.value.invoice = invoice
+  printModal.value.show = true
+  
+  if (!orgStore.company) {
+    orgStore.fetchCompany()
+  }
+  
+  // Optionally fetch full details if needed
+  try {
+    const res = await api.get(`/purchase/purchase-invoices/${invoice.id}/`)
+    if (res.data) {
+      printModal.value.invoice = res.data
+    }
+  } catch (e) {
+    console.error('Failed to fetch invoice details', e)
+  }
+}
+
+const printDocument = () => {
+  window.print()
+}
+
+const formatDatePrint = (dateStr) => {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const formatCurrencyRaw = (val, currency = 'IDR') => {
+  if (!val) return '0.00'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(val)
+}
+
+const numberToWordsEn = (num) => {
+  if (num === 0 || !num) return 'Zero'
+  if (typeof num === 'string') num = parseFloat(num)
+  num = Math.floor(num) // ensure integer for the words
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen ']
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+  const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/)
+  if (!n) return ''
+  let str = ''
+  str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Million ' : ''
+  str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Hundred ' : ''
+  str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : ''
+  str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : ''
+  str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : ''
+  
+  if (num > 999999999) {
+     const billionPart = Math.floor(num / 1000000000)
+     const remainder = num % 1000000000
+     return (numberToWordsEn(billionPart) + 'Billion ' + (remainder > 0 ? numberToWordsEn(remainder) : '')).trim()
+  }
+  
+  return str.trim()
+}
+
 onMounted(() => {
   fetchInvoices()
 })
 </script>
+
+<style scoped>
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  .print-modal-overlay {
+    position: static !important;
+    background: none !important;
+  }
+  .print-modal-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    background-color: white !important;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Hide the rest of the application when printing */
+  :global(body > *:not(.print-modal-overlay)) {
+    display: none !important;
+  }
+  :global(#app > *:not(.print-modal-overlay)) {
+    display: none !important;
+  }
+  
+  /* Additional hide rules based on standard app structure */
+  :global(.flex-1.flex.overflow-hidden) {
+    display: none !important;
+  }
+}
+</style>
