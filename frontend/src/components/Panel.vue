@@ -1,9 +1,9 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-erp-border overflow-hidden">
+  <div class="bg-white rounded-lg shadow-sm border border-erp-border">
     <!-- Header -->
     <div 
       v-if="title"
-      class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-erp-border"
+      class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b border-erp-border rounded-t-lg"
     >
       <component 
         v-if="icon" 

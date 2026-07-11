@@ -846,7 +846,7 @@ export const menuData = {
       name: 'System Setting', url: '', children: [
         { name: 'Global Setting', url: '' },
         { name: 'Application Parameter', url: '' },
-        { name: 'Master Type', url: '' },
+        { name: 'Master Type', url: '/settings/master-type' },
         { name: 'Dashboard Setting', url: '' },
         { name: 'B2B Setting', url: '' },
         { name: 'Business Type Setting', url: '' },
