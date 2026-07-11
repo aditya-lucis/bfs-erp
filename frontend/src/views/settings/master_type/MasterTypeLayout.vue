@@ -52,6 +52,7 @@
 import { ref, computed } from 'vue'
 import Panel from '../../../components/Panel.vue'
 import { FileText, Building2, FileSignature, ChevronRight } from 'lucide-vue-next'
+import MasterBankTab from '../../../components/settings/master_type/MasterBankTab.vue'
 import TransactionTypeTab from '../../../components/settings/master_type/TransactionTypeTab.vue'
 
 // Dummy component for upcoming tabs
@@ -71,7 +72,7 @@ const ComingSoonTab = {
 
 const tabs = [
   { id: 'transaction-type', name: 'Transaction Type', icon: FileText, component: TransactionTypeTab },
-  { id: 'master-bank', name: 'Master Bank', icon: Building2, component: ComingSoonTab },
+  { id: 'master-bank', name: 'Master Bank', icon: Building2, component: MasterBankTab },
   { id: 'master-amandement', name: 'Master Amandement', icon: FileSignature, component: ComingSoonTab },
 ]
 

@@ -52,3 +52,44 @@ class TransactionType(models.Model):
                         
                 self.type_code = f"TrsType_{max_num + 1}"
         super().save(*args, **kwargs)
+class MasterBank(models.Model):
+    """
+    Master data for Bank. Code format TAccBank_X with auto-increment.
+    """
+    bank_code = models.CharField(max_length=50, unique=True, blank=True)
+    bank_name = models.CharField(max_length=150)
+    bank_name_id = models.CharField(max_length=150)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='master_banks')
+    is_not_active = models.BooleanField(default=False)
+    order_no = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'master_bank'
+        ordering = ['order_no', 'bank_code']
+        verbose_name = 'Bank'
+        verbose_name_plural = 'Banks'
+
+    def __str__(self):
+        return f"{self.bank_code} - {self.bank_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.bank_code:
+            # Auto-increment logic TAccBank_1, TAccBank_2, ...
+            with transaction.atomic():
+                last = (
+                    MasterBank.objects.select_for_update()
+                    .filter(bank_code__startswith='TAccBank_')
+                    .order_by('-id')
+                )
+                max_num = 0
+                for item in last:
+                    try:
+                        num = int(item.bank_code.split('_')[1])
+                        if num > max_num:
+                            max_num = num
+                    except (IndexError, ValueError):
+                        continue
+                self.bank_code = f"TAccBank_{max_num + 1}"
+        super().save(*args, **kwargs)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import TransactionType
+from .models import TransactionType, MasterBank
 
 class TransactionTypeSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.company_name', read_only=True)
@@ -8,3 +8,11 @@ class TransactionTypeSerializer(serializers.ModelSerializer):
         model = TransactionType
         fields = '__all__'
         read_only_fields = ('type_code', 'company')
+
+class MasterBankSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.company_name', read_only=True)
+
+    class Meta:
+        model = MasterBank
+        fields = '__all__'
+        read_only_fields = ('bank_code', 'company')
