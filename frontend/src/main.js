@@ -53,6 +53,7 @@ const implementedRoutes = [
   { path: '/inventory/receipt-report', component: ReceiptReportView, meta: { title: 'Receipt Report', moduleId: 'inventory', moduleName: 'Inventory', layout: 'default' } },
   { path: '/settings/company-information', component: CompanyInformationView, meta: { title: 'Company Information', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/organizational-level', component: DepartmentView, meta: { title: 'Organizational Level', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/payment-to', component: () => import('./views/settings/payment_to/PaymentToLayout.vue'), meta: { title: 'Master Payment To', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/user-authorization-group', component: AuthGroupListView, meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/employee-data', component: EmployeeView, meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/gl/chart-of-accounts', component: ChartOfAccountView, meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },

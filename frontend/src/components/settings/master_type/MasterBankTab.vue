@@ -80,9 +80,6 @@
                   <button @click="openEditModal(item)" class="p-1.5 bg-gray-100 hover:bg-bfs-gold hover:text-white text-gray-500 rounded-lg transition-colors shadow-sm" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
-                  <button @click="handleDelete(item.id)" class="p-1.5 bg-gray-100 hover:bg-red-500 hover:text-white text-gray-500 rounded-lg transition-colors shadow-sm" title="Delete">
-                    <Trash2 class="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </td>
             </tr>

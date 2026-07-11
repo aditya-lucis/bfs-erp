@@ -831,7 +831,7 @@ export const menuData = {
         { name: 'Employee Data', url: '/settings/employee-data' },
         { name: 'Company Share Setting', url: '' },
         { name: 'Career History', url: '' },
-        { name: 'Master Payment To', url: '' },
+        { name: 'Master Payment To', url: '/settings/payment-to' },
         { name: 'ISO Document', url: '' },
       ]
     },

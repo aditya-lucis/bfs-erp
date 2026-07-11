@@ -76,12 +76,9 @@
                 </span>
               </td>
               <td class="py-3 px-4 text-right">
-                <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button @click="openEditModal(item)" class="p-1.5 bg-gray-100 hover:bg-bfs-gold hover:text-white text-gray-500 rounded-lg transition-colors shadow-sm" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
-                  </button>
-                  <button @click="handleDelete(item.id)" class="p-1.5 bg-gray-100 hover:bg-red-500 hover:text-white text-gray-500 rounded-lg transition-colors shadow-sm" title="Delete">
-                    <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </td>

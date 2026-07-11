@@ -93,3 +93,37 @@ class MasterBank(models.Model):
                         continue
                 self.bank_code = f"TAccBank_{max_num + 1}"
         super().save(*args, **kwargs)
+
+class PaymentTo(models.Model):
+    """
+    Master data for Payment To.
+    """
+    name = models.CharField(max_length=255)
+    bank = models.ForeignKey(MasterBank, on_delete=models.RESTRICT, related_name='payment_tos')
+    bank_branch = models.CharField(max_length=255)
+    bank_city = models.CharField(max_length=255)
+    account_number = models.CharField(max_length=100)
+    account_name = models.CharField(max_length=255)
+    department = models.ForeignKey(
+        'organization.Department', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='payment_tos'
+    )
+    email = models.EmailField()
+    description = models.TextField(blank=True)
+    is_hide = models.BooleanField(default=False)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='payment_tos')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'master_payment_to'
+        ordering = ['-id']
+        verbose_name = 'Payment To'
+        verbose_name_plural = 'Payment To'
+
+    def __str__(self):
+        return self.name
