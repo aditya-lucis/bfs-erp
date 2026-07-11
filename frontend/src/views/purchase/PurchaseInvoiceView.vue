@@ -426,15 +426,15 @@
               </button>
             </div>
             <div class="p-4 overflow-x-auto flex-1">
-              <table class="w-full text-[11px] text-left border-collapse">
+              <table class="w-full min-w-[550px] text-[11px] text-left border-collapse">
                 <thead class="bg-gray-100 text-gray-600">
                   <tr>
-                    <th class="px-2 py-2 font-semibold text-center rounded-tl">#</th>
-                    <th class="px-2 py-2 font-semibold text-center">Due Date</th>
-                    <th class="px-2 py-2 font-semibold">Description</th>
-                    <th class="px-2 py-2 font-semibold text-center">%</th>
-                    <th class="px-2 py-2 font-semibold text-right">Amount (IDR)</th>
-                    <th class="px-2 py-2 text-center rounded-tr"></th>
+                    <th class="px-2 py-2 font-semibold text-center rounded-tl w-8">#</th>
+                    <th class="px-2 py-2 font-semibold text-center w-28">Due Date</th>
+                    <th class="px-2 py-2 font-semibold w-40">Description</th>
+                    <th class="px-2 py-2 font-semibold text-center w-20">%</th>
+                    <th class="px-2 py-2 font-semibold text-right w-36">Amount (IDR)</th>
+                    <th class="px-2 py-2 text-center rounded-tr w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,18 +442,18 @@
                     <td colspan="6" class="px-2 py-4 text-center text-gray-400 italic border-b">No payment terms defined.</td>
                   </tr>
                   <tr v-for="(term, index) in formData.payment_terms" :key="index" class="border-b border-gray-50">
-                    <td class="px-2 py-2 text-center text-gray-400">{{ index + 1 }}</td>
+                    <td class="px-2 py-2 text-center text-gray-400 w-8">{{ index + 1 }}</td>
                     <td class="px-1 py-1 w-28">
                       <input v-model="term.due_date" type="date" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded" />
                     </td>
-                    <td class="px-1 py-1">
+                    <td class="px-1 py-1 w-40">
                       <input v-model="term.description" type="text" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded" placeholder="Desc..." />
                     </td>
-                    <td class="px-1 py-1 w-16">
-                      <input v-model.number="term.percentage" type="number" step="0.01" @input="onTermPercentChange(term)" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded text-center" />
+                    <td class="px-1 py-1 w-20">
+                      <input v-model.number="term.percentage" type="number" step="0.01" @input="onTermPercentChange(term)" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                     </td>
-                    <td class="px-1 py-1 w-28">
-                      <input v-model.number="term.amount" type="number" step="0.01" @input="onTermAmountChange(term)" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded text-right font-mono" />
+                    <td class="px-1 py-1 w-36">
+                      <input v-model.number="term.amount" type="number" step="0.01" @input="onTermAmountChange(term)" :readonly="modalMode === 'view'" class="w-full form-input text-[10px] py-1 border-gray-300 rounded text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                     </td>
                     <td class="px-1 py-1 text-center w-8">
                       <button v-if="modalMode !== 'view'" @click="removePaymentTerm(index)" class="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors" title="Remove Term">

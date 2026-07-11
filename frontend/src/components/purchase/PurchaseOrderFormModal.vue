@@ -314,51 +314,53 @@
                       </button>
                     </div>
                     
-                    <table class="w-full text-left border-collapse border border-gray-200">
-                      <thead>
-                        <tr class="bg-gray-100 text-[10px] uppercase text-gray-600">
-                          <th class="p-1.5 border border-gray-200 w-6 text-center"></th>
-                          <th class="p-1.5 border border-gray-200">Term Desc</th>
-                          <th class="p-1.5 border border-gray-200">Duration Due</th>
-                          <th class="p-1.5 border border-gray-200 w-16">%</th>
-                          <th class="p-1.5 border border-gray-200">Amount</th>
-                          <th class="p-1.5 border border-gray-200">Due Date</th>
-                          <th class="p-1.5 border border-gray-200">Doc Reff</th>
-                        </tr>
-                      </thead>
-                      <tbody class="text-xs">
-                        <tr v-for="(term, idx) in form.payment_terms" :key="idx">
-                          <td class="p-1 border border-gray-200 text-center">
-                            <button @click="removePaymentTerm(idx)" class="text-red-400 hover:text-red-600"><Trash2 class="w-3 h-3" /></button>
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <input v-model="term.term_desc" type="text" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <select v-model="term.duration_due" @change="updateDueDate(idx)" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs">
-                              <option value="none">None</option>
-                              <option value="14">14 HARI</option>
-                              <option value="21">21 HARI</option>
-                              <option value="30">30 HARI</option>
-                              <option value="45">45 HARI</option>
-                              <option value="60">60 HARI</option>
-                            </select>
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <input v-model.number="term.percentage" @input="calculatePaymentTerms" type="number" step="0.1" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-right" />
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <input v-model.number="term.amount" type="number" @input="calculateSummary" class="w-full p-1 bg-white border border-gray-300 rounded text-xs text-right" />
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <input v-model="term.due_date" type="date" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
-                          </td>
-                          <td class="p-1 border border-gray-200">
-                            <input v-model="term.doc_reff" type="text" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <div class="overflow-x-auto">
+                      <table class="w-full min-w-[700px] text-left border-collapse border border-gray-200">
+                        <thead>
+                          <tr class="bg-gray-100 text-[10px] uppercase text-gray-600">
+                            <th class="p-1.5 border border-gray-200 w-6 text-center"></th>
+                            <th class="p-1.5 border border-gray-200 w-44">Term Desc</th>
+                            <th class="p-1.5 border border-gray-200 w-28">Duration Due</th>
+                            <th class="p-1.5 border border-gray-200 w-20">%</th>
+                            <th class="p-1.5 border border-gray-200 w-36">Amount</th>
+                            <th class="p-1.5 border border-gray-200 w-28">Due Date</th>
+                            <th class="p-1.5 border border-gray-200 w-24">Doc Reff</th>
+                          </tr>
+                        </thead>
+                        <tbody class="text-xs">
+                          <tr v-for="(term, idx) in form.payment_terms" :key="idx">
+                            <td class="p-1 border border-gray-200 text-center w-6">
+                              <button @click="removePaymentTerm(idx)" class="text-red-400 hover:text-red-600"><Trash2 class="w-3 h-3" /></button>
+                            </td>
+                            <td class="p-1 border border-gray-200 w-44">
+                              <input v-model="term.term_desc" type="text" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
+                            </td>
+                            <td class="p-1 border border-gray-200 w-28">
+                              <select v-model="term.duration_due" @change="updateDueDate(idx)" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs">
+                                <option value="none">None</option>
+                                <option value="14">14 HARI</option>
+                                <option value="21">21 HARI</option>
+                                <option value="30">30 HARI</option>
+                                <option value="45">45 HARI</option>
+                                <option value="60">60 HARI</option>
+                              </select>
+                            </td>
+                            <td class="p-1 border border-gray-200 w-20">
+                              <input v-model.number="term.percentage" @input="calculatePaymentTerms" type="number" step="0.1" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            </td>
+                            <td class="p-1 border border-gray-200 w-36">
+                              <input v-model.number="term.amount" type="number" @input="calculateSummary" class="w-full p-1 bg-white border border-gray-300 rounded text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            </td>
+                            <td class="p-1 border border-gray-200 w-28">
+                              <input v-model="term.due_date" type="date" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
+                            </td>
+                            <td class="p-1 border border-gray-200 w-24">
+                              <input v-model="term.doc_reff" type="text" class="w-full p-1 bg-gray-50 border border-gray-300 rounded text-xs" />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                     <button 
                       v-if="form.approval_status === 'approved'"
                       @click="updatePaymentTerms" 
