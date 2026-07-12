@@ -39,6 +39,11 @@ class MasterBankViewSet(viewsets.ModelViewSet):
             raise ValidationError("User has no associated company.")
         serializer.save(company=company)
 
+    def get_permissions(self):
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
 class TransactionTypeViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionTypeSerializer
     permission_classes = [IsAuthenticated, HasFunctionPermission]
@@ -77,6 +82,11 @@ class TransactionTypeViewSet(viewsets.ModelViewSet):
 
         serializer.save(company=company)
 
+    def get_permissions(self):
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
 class PaymentToViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentToSerializer
     permission_classes = [IsAuthenticated, HasFunctionPermission]
@@ -114,3 +124,8 @@ class PaymentToViewSet(viewsets.ModelViewSet):
             raise ValidationError("User has no associated company.")
 
         serializer.save(company=company)
+
+    def get_permissions(self):
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return [IsAuthenticated()]
+        return super().get_permissions()

@@ -415,7 +415,7 @@ export const menuData = {
     { name: 'Invoice Payment Selection', url: '' },
     {
       name: 'Payment Request', url: '', children: [
-        { name: 'Payment Request', url: '' },
+        { name: 'Payment Request', url: '/finance/payment-request' },
         { name: 'Payment Request Inbox', url: '' },
         { name: 'Petty Cash Usage', url: '' },
       ]

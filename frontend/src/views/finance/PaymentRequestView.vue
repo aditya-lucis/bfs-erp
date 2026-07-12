@@ -164,12 +164,6 @@
                 </button>
               </div>
               
-              <button
-                @click="openAddModal"
-                class="btn-primary text-xs flex items-center gap-1.5"
-              >
-                <Plus class="w-3.5 h-3.5" /> Add Request
-              </button>
             </div>
           </div>
         </div>
@@ -206,10 +200,9 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <!-- Dummy Row -->
             <tr
-              v-for="(item, idx) in currentDummyData"
-              :key="idx"
+              v-for="(item, idx) in tableData"
+              :key="item.id || idx"
               class="hover:bg-yellow-50/20 transition-colors text-xs text-gray-700"
             >
               <td class="py-3 px-2 text-center">
@@ -218,10 +211,10 @@
               <td class="py-3 px-2 text-gray-500">{{ idx + 1 }}.</td>
               <td class="py-3 px-2 font-mono text-gray-600 font-semibold">{{ item.document_number }}</td>
               <td class="py-3 px-2">{{ item.date }}</td>
-              <td class="py-3 px-2">{{ item.pic }}</td>
-              <td class="py-3 px-2">{{ item.vendor_name }}</td>
+              <td class="py-3 px-2">{{ item.created_by || 'N/A' }}</td>
+              <td class="py-3 px-2">{{ item.payment_to_display || item.vendor_name || '-' }}</td>
               <td class="py-3 px-2 truncate max-w-[150px]" :title="item.description">{{ item.description }}</td>
-              <td class="py-3 px-2 text-right font-semibold text-bfs-gold">{{ formatCurrency(item.amount) }}</td>
+              <td class="py-3 px-2 text-right font-semibold text-bfs-gold">{{ formatCurrency(item.unpaid_amount || item.amount) }}</td>
               <td class="py-3 px-2 text-center">
                 <div class="inline-flex items-center justify-center p-1 rounded-md" :title="'Document Status: ' + item.document_status">
                   <Folder v-if="item.document_status === 'draft'" class="w-4 h-4 text-amber-500 fill-amber-500/10" />
@@ -242,15 +235,19 @@
                 </button>
               </td>
               <td class="py-3 px-2 text-center">
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold"
-                  :class="item.paid_status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                  :class="{
+                    'bg-amber-100 text-amber-700': item.paid_status === 'not_paid',
+                    'bg-blue-100 text-blue-700': item.paid_status === 'half_paid',
+                    'bg-green-100 text-green-700': item.paid_status === 'full_paid'
+                  }"
                 >
-                  {{ item.paid_status }}
+                  {{ (item.paid_status || '').replace('_', ' ') }}
                 </span>
               </td>
-              <td class="py-3 px-2">{{ item.transaction_type }}</td>
-              <td class="py-3 px-2">{{ item.project_name }}</td>
-              <td class="py-3 px-2">{{ item.rap_name }}</td>
+              <td class="py-3 px-2">{{ item.transaction_type_display || '-' }}</td>
+              <td class="py-3 px-2">{{ item.project_display || '-' }}</td>
+              <td class="py-3 px-2">{{ item.rap_name || '-' }}</td>
               <td v-if="filterUsageFor === 'Project Cash Advanced'" class="py-3 px-2 text-center">
                 <span v-if="item.declaration_letter" class="text-green-500 font-bold text-base">✓</span>
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
@@ -260,22 +257,19 @@
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-2 text-center">
-                <span v-if="item.allow_pre_year" class="text-green-500 font-bold text-base">✓</span>
+                <span v-if="item.allow_previous_year_budget" class="text-green-500 font-bold text-base">✓</span>
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
-              <td v-if="filterUsageFor === 'Purchase Invoice Payment'" class="py-3 px-2 text-gray-500 font-mono">{{ item.invoice }}</td>
+              <td v-if="filterUsageFor === 'Purchase Invoice Payment'" class="py-3 px-2">{{ item.purchase_invoice_display || item.vendor_invoice_number || '-' }}</td>
               <td class="py-3 px-2 text-right">
                 <div class="flex justify-end gap-1.5">
-                  <button class="p-1 text-gray-400 hover:text-bfs-gold transition-colors" title="Edit">
+                  <button @click="editData(item)" class="p-1 text-gray-400 hover:text-bfs-gold transition-colors" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
-                  </button>
-                  <button class="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
-                    <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </td>
             </tr>
-            <tr v-if="currentDummyData.length === 0">
+            <tr v-if="tableData.length === 0">
               <td colspan="19" class="text-center py-10 text-gray-400">
                 <FileText class="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p class="text-sm">No Payment Request found for {{ filterUsageFor }}.</p>
@@ -287,8 +281,8 @@
     </div>
     
     <!-- Bulk Actions (Dynamic based on Usage For) -->
-    <div class="flex flex-wrap items-center gap-2 mt-4" v-if="currentDummyData.length > 0">
-      <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+    <div class="flex flex-wrap items-center gap-2 mt-4" v-if="tableData.length > 0">
+      <button @click="openAddModal" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300 cursor-pointer">
         New Cash Book
       </button>
       <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
@@ -346,7 +340,10 @@
               </div>
 
               <!-- Modal Form Content -->
-              <div class="px-6 py-4 space-y-6">
+              <div v-if="filterUsageFor === 'Purchase Invoice Payment'">
+                <PurchaseInvoicePaymentForm :form="form" @update:form="form = $event" />
+              </div>
+              <div v-else class="px-6 py-4 space-y-6">
                 <!-- Data is context dependent -->
                 <div class="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-200">
                   Form depends on the selected <strong>Usage For</strong>: {{ filterUsageFor }}
@@ -375,17 +372,18 @@
                 </div>
               </div>
 
-              <!-- Modal Actions -->
-              <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-                <button @click="closeModal" class="btn-secondary text-sm">Cancel</button>
-                <button class="btn-secondary text-sm flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50">
-                  <Save class="w-3.5 h-3.5" />
-                  Save Draft
+              <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                <button @click="closeModal" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors font-semibold">
+                  Cancel
                 </button>
-                <button class="btn-primary text-sm flex items-center gap-1.5">
-                  <Send class="w-3.5 h-3.5" />
-                  Save Confirm
-                </button>
+                <div class="flex gap-2">
+                  <button @click="saveData(false)" :disabled="isSaving" class="btn-secondary text-sm px-5 flex items-center gap-2">
+                    <Save class="w-4 h-4" /> Save as Draft
+                  </button>
+                  <button @click="saveData(true)" :disabled="isSaving" class="bg-bfs-navy hover:bg-bfs-navy-dark text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-bfs-navy/20">
+                    <Send class="w-4 h-4" /> Submit to Approval
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -401,7 +399,10 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
+import PurchaseInvoicePaymentForm from './PurchaseInvoicePaymentForm.vue'
 import { Plus, Pencil, Trash2, Save, X, Search, FileText, Folder, FolderOpen, FolderCheck, FileClock, FileCheck, FileX, FileWarning, Send } from 'lucide-vue-next'
+import api from '../../services/api'
+import Swal from 'sweetalert2'
 
 // Date helpers for current month defaults
 const getFirstDayOfMonth = () => {
@@ -431,57 +432,16 @@ const filterDeclaration = ref('') // Only for Project Cash Advanced
 const filterDocStatus = ref('')
 const filterAppStatus = ref('')
 
-// Dummy Data
-const dummyDataPI = [
-  {
-    document_number: 'CBR512952601-0022909',
-    date: '13 Jan 2026',
-    pic: 'N/A',
-    vendor_name: 'Sokka Kreatif Teknologi',
-    description: 'CC TRAP Fakhry IDR',
-    amount: 60000.00,
-    document_status: 'draft',
-    approval_status: 'approved',
-    paid_status: 'Full Paid (13 Jan 2026)',
-    transaction_type: 'HPP Farmasi',
-    project_name: 'Project TRAP Fakhry',
-    rap_name: 'RAP TRAP Fakhry(Activity ID TRAP Fakhry)',
-    declaration_letter: false,
-    is_close: false,
-    allow_pre_year: false,
-    invoice: 'MIN512952601-0002117'
-  }
-]
+const tableData = ref([])
 
-const dummyDataPCA = [
-  {
-    document_number: 'CBR512952601-0022910',
-    date: '13 Jan 2026',
-    pic: 'SOKKA KREATIF TEKNOLOGI, PT',
-    vendor_name: 'N/A',
-    description: 'PR CA TRAP Fakhry',
-    amount: 46300.00,
-    document_status: 'draft',
-    approval_status: 'approved',
-    paid_status: 'Full Paid (13 Jan 2026)',
-    transaction_type: 'HPP Farmasi',
-    project_name: 'Project TRAP Fakhry',
-    rap_name: 'RAP TRAP Fakhry(Activity ID TRAP Fakhry)',
-    declaration_letter: false, // X mark
-    is_close: false,
-    allow_pre_year: false,
-    invoice: ''
+const fetchTableData = async () => {
+  try {
+    const res = await api.get('accounting/cashbook-request/')
+    tableData.value = res.data.results || res.data
+  } catch (err) {
+    console.error('Error fetching cashbook requests:', err)
   }
-]
-
-const currentDummyData = computed(() => {
-  if (filterUsageFor.value === 'Purchase Invoice Payment') {
-    return dummyDataPI
-  } else if (filterUsageFor.value === 'Project Cash Advanced') {
-    return dummyDataPCA
-  }
-  return [] // Other usages have no dummy data yet
-})
+}
 
 const handleSearch = () => {
   // To be implemented with backend integration
@@ -527,21 +487,97 @@ const modal = reactive({
 })
 
 const form = reactive({
+  id: null,
+  document_number: '',
   date: '',
   pic: '',
   vendor_name: '',
   amount: null,
-  description: ''
+  description: '',
+  // Purchase Invoice Payment specific fields
+  transaction_type: null,
+  duration_due_date: '',
+  invoice_date: '',
+  due_date: '',
+  currency: 'IDR',
+  project: null,
+  payment_to: null,
+  notes_payment_to: '',
+  notes: '',
+  requestor_department: null,
+  purchase_invoice: null,
+  purchase_invoice_display: '',
+  vendor_invoice_number: '',
+  unpaid_amount: '0.00',
+  is_sumbangan: false,
+  budget_component: null,
+  budget_component_name: ''
 })
 
 const openAddModal = () => {
   modal.mode = 'add'
   // Reset form
+  form.id = null
+  form.document_number = ''
   form.date = new Date().toLocaleDateString('en-CA')
   form.pic = ''
   form.vendor_name = ''
   form.amount = null
   form.description = ''
+  
+  form.transaction_type = null
+  form.duration_due_date = ''
+  form.invoice_date = ''
+  form.due_date = ''
+  form.currency = 'IDR'
+  form.project = null
+  form.payment_to = null
+  form.notes_payment_to = ''
+  form.notes = ''
+  form.requestor_department = null
+  form.purchase_invoice = null
+  form.purchase_invoice_display = ''
+  form.vendor_invoice_number = ''
+  form.unpaid_amount = '0.00'
+  form.is_sumbangan = false
+  form.budget_component = null
+  form.budget_component_name = ''
+  
+  modal.show = true
+}
+
+const editData = (item) => {
+  modal.mode = 'edit'
+  // Populate form with existing data
+  form.id = item.id
+  form.document_number = item.document_number
+  form.date = item.date
+  form.pic = item.pic
+  form.vendor_name = item.vendor_name
+  form.amount = item.amount
+  form.description = item.description
+  
+  form.transaction_type = item.transaction_type
+  form.duration_due_date = item.duration_due_date
+  form.invoice_date = item.invoice_date
+  form.due_date = item.due_date
+  form.currency = item.currency || 'IDR'
+  form.project = item.project
+  form.payment_to = item.payment_to
+  form.notes_payment_to = item.notes_payment_to
+  form.notes = item.notes
+  form.requestor_department = item.requestor_department
+  form.purchase_invoice = item.purchase_invoice
+  form.purchase_invoice_display = item.purchase_invoice_display
+  form.vendor_invoice_number = item.vendor_invoice_number
+  form.unpaid_amount = item.unpaid_amount
+  form.is_sumbangan = item.is_sumbangan
+  
+  // Try to load budget_component from item if available, though CashbookReqHeader might not have it natively.
+  // It will be re-fetched by the form component watcher if needed.
+  form.budget_component = item.budget_component || null
+  form.budget_component_name = item.budget_component_name || ''
+  
   modal.show = true
 }
 
@@ -549,7 +585,53 @@ const closeModal = () => {
   modal.show = false
 }
 
+const isSaving = ref(false)
+
+const saveData = async (isSubmit) => {
+  try {
+    isSaving.value = true
+    const payload = {
+      ...form,
+      document_status: isSubmit ? 'ready_to_process' : 'draft',
+      approval_status: isSubmit ? 'awaiting' : 'draft'
+    }
+    
+    // We only need to submit if we're adding for now
+    if (modal.mode === 'add') {
+      await api.post('accounting/cashbook-request/', payload)
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: `Payment Request successfully ${isSubmit ? 'submitted' : 'saved as draft'}.`,
+        confirmButtonColor: '#1d4ed8'
+      })
+      closeModal()
+      fetchTableData()
+    } else if (modal.mode === 'edit') {
+      await api.put(`accounting/cashbook-request/${form.id}/`, payload)
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: `Payment Request successfully ${isSubmit ? 'submitted' : 'updated'}.`,
+        confirmButtonColor: '#1d4ed8'
+      })
+      closeModal()
+      fetchTableData()
+    }
+  } catch (error) {
+    console.error('Error saving Payment Request:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Oops...',
+      text: 'Failed to save Payment Request: ' + (error.response?.data ? JSON.stringify(error.response.data) : error.message),
+      confirmButtonColor: '#d33'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
 onMounted(() => {
-  // Any initial fetching can be done here when backend is ready
+  fetchTableData()
 })
 </script>

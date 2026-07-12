@@ -17,9 +17,11 @@ from .views import (
 )
 
 from rest_framework.routers import DefaultRouter
+from .views import CashbookReqViewSet
 
 router = DefaultRouter()
 router.register(r'general-journals', GeneralJournalTransactionViewSet, basename='general-journal')
+router.register(r'cashbook-request', CashbookReqViewSet, basename='cashbook-request')
 
 urlpatterns = [
     path('global-linked-accounts/', GlobalLinkedAccountView.as_view(), name='global-linked-accounts'),

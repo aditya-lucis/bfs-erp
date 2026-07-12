@@ -885,9 +885,9 @@ class Command(BaseCommand):
     _used_codes = set()
 
     def handle(self, *args, **options):
-        self._used_codes = set(
-            Function.objects.values_list('code', flat=True)
-        )
+        # Always start with an empty set of used codes so that existing codes
+        # get updated rather than generating -2, -3, -4 duplicates.
+        self._used_codes = set()
         total_modules = total_functions = 0
 
         for mod_key, mod_data in MENU_DATA.items():
@@ -908,6 +908,11 @@ class Command(BaseCommand):
             )
             total_functions += count
             self.stdout.write(f'  📦 {module.name}: {count} functions')
+
+        # DELETE any functions that were NOT generated in this run to clean up duplicates
+        deleted_count, _ = Function.objects.exclude(code__in=self._used_codes).delete()
+        if deleted_count > 0:
+            self.stdout.write(self.style.WARNING(f'  🗑️ Deleted {deleted_count} duplicate/obsolete functions'))
 
         self.stdout.write(self.style.SUCCESS(
             f'\n✅ {total_modules} modules, {total_functions} functions seeded'

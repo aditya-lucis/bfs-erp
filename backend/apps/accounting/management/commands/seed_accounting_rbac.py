@@ -25,6 +25,13 @@ ACCOUNTING_FUNCTIONS = [
         'url_path': '',   # dikelola dari halaman COA, bukan halaman sendiri
         'order':    1,
     },
+    {
+        'code':     'FINANCE-PAYMENT-REQUEST-2',
+        'name':     'Payment Request',
+        'url_path': '/finance/payment-request',
+        'order':    2,
+        'module_code': 'finance',
+    },
 ]
 
 
@@ -33,7 +40,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Pastikan module GL sudah ada (dibuat oleh seed_rbac)
-        module, created = Module.objects.get_or_create(
+        module_gl, _ = Module.objects.get_or_create(
             code='gl',
             defaults={
                 'name':      'General Ledger',
@@ -41,27 +48,27 @@ class Command(BaseCommand):
                 'is_active': True,
             },
         )
-
-        if created:
-            self.stdout.write('  📦 Module GL dibuat baru')
-        else:
-            self.stdout.write('  📦 Module GL sudah ada, skip')
+        
+        module_finance, _ = Module.objects.get_or_create(
+            code='finance',
+            defaults={
+                'name':      'Finance',
+                'order':     3,
+                'is_active': True,
+            },
+        )
 
         # Seed functions
         for fn_data in ACCOUNTING_FUNCTIONS:
-            fn, created = Function.objects.update_or_create(
-                code=fn_data['code'],
-                defaults={
-                    'module':    module,
-                    'parent':    None,
-                    'name':      fn_data['name'],
-                    'url_path':  fn_data['url_path'],
-                    'order':     fn_data['order'],
-                    'is_active': True,
-                },
+            target_module = module_finance if fn_data.get('module_code') == 'finance' else module_gl
+            
+            # Use update to only update url_path instead of update_or_create
+            # so we don't accidentally overwrite parent relations set by seed_rbac
+            Function.objects.filter(code=fn_data['code']).update(
+                url_path=fn_data['url_path'],
+                module=target_module
             )
-            status = '✨ Dibuat' if created else '🔄 Updated'
-            self.stdout.write(f'  {status}: [{fn.code}] {fn.name}')
+            self.stdout.write(f"  🔄 Updated URL for: [{fn_data['code']}] {fn_data['name']}")
 
         self.stdout.write(self.style.SUCCESS(
             f'\n✅ {len(ACCOUNTING_FUNCTIONS)} accounting functions seeded ke module GL'

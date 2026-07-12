@@ -502,3 +502,94 @@ class GlobalLinkedAccount(models.Model):
 
     def __str__(self):
         return f"Global Linked Accounts - {self.company.name}"
+
+# ─── Cashbook Request (Payment Request) ─────────────────────────────────────────
+
+class CashbookReqHeader(models.Model):
+    class DocumentStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        READY_TO_PROCESS = 'ready_to_process', 'Ready to Process'
+        CLOSE = 'close', 'Close'
+
+    class ApprovalStatus(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        AWAITING = 'awaiting', 'Awaiting'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Reject'
+        REVISED = 'revised', 'Revised'
+
+    class PaidStatus(models.TextChoices):
+        NOT_PAID = 'not_paid', 'Not Paid'
+        HALF_PAID = 'half_paid', 'Half Paid'
+        FULL_PAID = 'full_paid', 'Full Paid'
+
+    document_number = models.CharField(max_length=50, unique=True, editable=False)
+    date = models.DateField()
+    transaction_type = models.ForeignKey('master_type.TransactionType', on_delete=models.PROTECT)
+    duration_due_date = models.CharField(max_length=50, null=True, blank=True)
+    invoice_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    currency = models.CharField(max_length=10, default='IDR')
+    
+    project = models.ForeignKey('projects.Project', on_delete=models.PROTECT)
+    payment_to = models.ForeignKey('master_type.PaymentTo', on_delete=models.PROTECT)
+    notes_payment_to = models.TextField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    
+    requestor_department = models.ForeignKey('organization.Department', on_delete=models.PROTECT, null=True, blank=True)
+    purchase_invoice = models.ForeignKey('purchase.PurchaseInvoice', on_delete=models.PROTECT, null=True, blank=True)
+    vendor_invoice_number = models.CharField(max_length=100, null=True, blank=True)
+    unpaid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    is_sumbangan = models.BooleanField(default=False)
+    
+    document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
+    approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
+    paid_status = models.CharField(max_length=20, choices=PaidStatus.choices, default=PaidStatus.NOT_PAID)
+    
+    is_close = models.BooleanField(default=False)
+    allow_previous_year_budget = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('authentication.User', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = 'acc_cashbook_req_header'
+        verbose_name = 'Cashbook Request Header'
+        ordering = ['-date', '-id']
+
+    def save(self, *args, **kwargs):
+        if not self.document_number:
+            from django.utils import timezone
+            timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
+            prefix = f'CBR{timestamp}'
+            last = CashbookReqHeader.objects.order_by('id').last()
+            if last:
+                try:
+                    seq_str = last.document_number.split('-')[-1]
+                    next_seq = int(seq_str) + 1
+                except ValueError:
+                    next_seq = 1
+            else:
+                next_seq = 1
+            self.document_number = f'{prefix}-{next_seq:07d}'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.document_number
+
+
+class CashbookReqDetail(models.Model):
+    header = models.ForeignKey(CashbookReqHeader, on_delete=models.CASCADE, related_name='details')
+    item = models.ForeignKey('inventory.Item', on_delete=models.PROTECT, null=True, blank=True)
+    
+    quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = 'acc_cashbook_req_detail'
+        verbose_name = 'Cashbook Request Detail'

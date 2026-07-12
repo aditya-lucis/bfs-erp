@@ -311,3 +311,48 @@ class GlobalLinkedAccountSerializer(serializers.ModelSerializer):
         if request and hasattr(request, 'user'):
             validated_data['updated_by'] = request.user
         return super().update(instance, validated_data)
+
+from .models import CashbookReqHeader, CashbookReqDetail
+
+class CashbookReqDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CashbookReqDetail
+        fields = '__all__'
+        read_only_fields = ('header',)
+
+class CashbookReqHeaderSerializer(serializers.ModelSerializer):
+    details = CashbookReqDetailSerializer(many=True, read_only=True)
+    transaction_type_display = serializers.CharField(source='transaction_type.type_name_en', read_only=True)
+    project_display = serializers.CharField(source='project.project_name', read_only=True)
+    payment_to_display = serializers.CharField(source='payment_to.name', read_only=True)
+    requestor_department_display = serializers.CharField(source='requestor_department.name', read_only=True)
+    purchase_invoice_display = serializers.CharField(source='purchase_invoice.invoice_number', read_only=True)
+
+    class Meta:
+        model = CashbookReqHeader
+        fields = '__all__'
+        read_only_fields = ('document_number', 'created_at', 'updated_at', 'created_by')
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        
+        # Create header
+        header = super().create(validated_data)
+        
+        # Automatically pull details from PurchaseInvoiceDetail
+        if header.purchase_invoice:
+            pi_details = header.purchase_invoice.details.all()
+            for pid in pi_details:
+                CashbookReqDetail.objects.create(
+                    header=header,
+                    item=pid.item,
+                    quantity=pid.quantity,
+                    unit_price=pid.unit_price,
+                    discount_amount=pid.discount_amount,
+                    tax_amount=pid.tax_amount,
+                    total_amount=pid.total_amount
+                )
+        
+        return header

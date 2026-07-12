@@ -464,3 +464,14 @@ class GlobalLinkedAccountView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from .models import CashbookReqHeader
+from .serializers import CashbookReqHeaderSerializer
+
+class CashbookReqViewSet(viewsets.ModelViewSet):
+    serializer_class = CashbookReqHeaderSerializer
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    rbac_function_code = 'FINANCE-PAYMENT-REQUEST'
+    
+    def get_queryset(self):
+        return CashbookReqHeader.objects.all().order_by('-date', '-id')
