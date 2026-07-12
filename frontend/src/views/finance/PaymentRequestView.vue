@@ -177,7 +177,12 @@
           <thead>
             <tr class="bg-gray-200 border-b border-gray-300 text-[11px] font-bold text-gray-700 tracking-wider">
               <th class="py-2 px-2 text-center w-10">
-                <input type="checkbox" class="rounded border-gray-300 text-bfs-gold focus:ring-bfs-gold cursor-pointer" />
+                <input 
+                  type="checkbox" 
+                  :checked="isAllSelected"
+                  @change="toggleSelectAll"
+                  class="rounded border-gray-300 text-bfs-gold focus:ring-bfs-gold cursor-pointer" 
+                />
               </th>
               <th class="py-2 px-2">No.</th>
               <th class="py-2 px-2">Document<br/>Number</th>
@@ -206,7 +211,12 @@
               class="hover:bg-yellow-50/20 transition-colors text-xs text-gray-700"
             >
               <td class="py-3 px-2 text-center">
-                <input type="checkbox" class="rounded border-gray-300 text-bfs-gold focus:ring-bfs-gold cursor-pointer" />
+                <input 
+                  type="checkbox" 
+                  v-model="selectedItems" 
+                  :value="item.id"
+                  class="rounded border-gray-300 text-bfs-gold focus:ring-bfs-gold cursor-pointer" 
+                />
               </td>
               <td class="py-3 px-2 text-gray-500">{{ idx + 1 }}.</td>
               <td class="py-3 px-2 font-mono text-gray-600 font-semibold">{{ item.document_number }}</td>
@@ -263,6 +273,9 @@
               <td v-if="filterUsageFor === 'Purchase Invoice Payment'" class="py-3 px-2">{{ item.purchase_invoice_display || item.vendor_invoice_number || '-' }}</td>
               <td class="py-3 px-2 text-right">
                 <div class="flex justify-end gap-1.5">
+                  <button @click="handlePrint(item)" class="p-1 text-gray-400 hover:text-bfs-navy transition-colors" title="Print Document">
+                    <Printer class="w-3.5 h-3.5" />
+                  </button>
                   <button @click="editData(item)" class="p-1 text-gray-400 hover:text-bfs-gold transition-colors" title="Edit">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
@@ -282,39 +295,48 @@
     
     <!-- Bulk Actions (Dynamic based on Usage For) -->
     <div class="flex flex-wrap items-center gap-2 mt-4" v-if="tableData.length > 0">
-      <button @click="openAddModal" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300 cursor-pointer">
+      <button @click="openAddModal" class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300 cursor-pointer">
+        <Plus class="w-3.5 h-3.5 text-bfs-gold" />
         New Cash Book
       </button>
-      <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
-        Print This Document
+      <button 
+        @click="handleInactive" 
+        class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="selectedItems.length === 0"
+      >
+        <PowerOff class="w-3.5 h-3.5 text-red-500" />
+        Inactive
       </button>
       
       <template v-if="filterUsageFor === 'Project Cash Advanced'">
-        <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
-          Inactive
-        </button>
-        <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+        <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+          <Paperclip class="w-3.5 h-3.5 text-blue-500" />
           Cost Control Check List Attachment
         </button>
-        <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+        <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+          <FileText class="w-3.5 h-3.5 text-green-500" />
           Use LPJ
         </button>
       </template>
 
-      <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+      <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+        <Printer class="w-3.5 h-3.5 text-bfs-navy" />
         Print SLA
       </button>
 
       <template v-if="filterUsageFor === 'Project Cash Advanced'">
-        <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+        <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+          <Calendar class="w-3.5 h-3.5 text-orange-500" />
           Yearly Budget
         </button>
-        <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+        <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+          <AlertCircle class="w-3.5 h-3.5 text-red-500" />
           Over Budget
         </button>
       </template>
 
-      <button class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold rounded transition-colors shadow-sm border border-gray-300">
+      <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+        <CalendarCheck class="w-3.5 h-3.5 text-teal-500" />
         Allow Previous year Budget RAP
       </button>
     </div>
@@ -377,10 +399,10 @@
                   Cancel
                 </button>
                 <div class="flex gap-2">
-                  <button @click="saveData(false)" :disabled="isSaving" class="btn-secondary text-sm px-5 flex items-center gap-2">
+                  <button v-if="['draft', 'revised', 'rejected', ''].includes((form.approval_status || '').toLowerCase())" @click="saveData(false)" :disabled="isSaving" class="btn-secondary text-sm px-5 flex items-center gap-2">
                     <Save class="w-4 h-4" /> Save as Draft
                   </button>
-                  <button @click="saveData(true)" :disabled="isSaving" class="bg-bfs-navy hover:bg-bfs-navy-dark text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-bfs-navy/20">
+                  <button v-if="['draft', 'revised', 'rejected', ''].includes((form.approval_status || '').toLowerCase())" @click="saveData(true)" :disabled="isSaving" class="bg-bfs-navy hover:bg-bfs-navy-dark text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-bfs-navy/20">
                     <Send class="w-4 h-4" /> Submit to Approval
                   </button>
                 </div>
@@ -392,6 +414,14 @@
       </Transition>
     </Teleport>
 
+    <!-- Print Template -->
+    <PaymentRequestPrintTemplate 
+      :show="printModal.show" 
+      :document="printModal.document" 
+      :signatures="printModal.signatures" 
+      @close="printModal.show = false" 
+    />
+
   </Panel>
 </template>
 
@@ -400,7 +430,8 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import PurchaseInvoicePaymentForm from './PurchaseInvoicePaymentForm.vue'
-import { Plus, Pencil, Trash2, Save, X, Search, FileText, Folder, FolderOpen, FolderCheck, FileClock, FileCheck, FileX, FileWarning, Send } from 'lucide-vue-next'
+import PaymentRequestPrintTemplate from '../../components/finance/PaymentRequestPrintTemplate.vue'
+import { Plus, Pencil, Trash2, Save, X, Search, FileText, Folder, FolderOpen, FolderCheck, FileClock, FileCheck, FileX, FileWarning, Send, Printer, PowerOff, Paperclip, Calendar, AlertCircle, CalendarCheck } from 'lucide-vue-next'
 import api from '../../services/api'
 import Swal from 'sweetalert2'
 
@@ -434,27 +465,81 @@ const filterAppStatus = ref('')
 
 const tableData = ref([])
 
-const fetchTableData = async () => {
-  try {
-    const res = await api.get('accounting/cashbook-request/')
-    tableData.value = res.data.results || res.data
-  } catch (err) {
-    console.error('Error fetching cashbook requests:', err)
+const printModal = reactive({
+  show: false,
+  document: null,
+  signatures: []
+})
+
+const selectedItems = ref([])
+
+const isAllSelected = computed(() => {
+  return tableData.value.length > 0 && selectedItems.value.length === tableData.value.length
+})
+
+const toggleSelectAll = (e) => {
+  if (e.target.checked) {
+    selectedItems.value = tableData.value.map(i => i.id)
+  } else {
+    selectedItems.value = []
   }
 }
 
+const fetchTableData = async () => {
+  try {
+    let url = `/accounting/cashbook-request/?usage_for=${filterUsageFor.value}`
+    
+    if (searchQuery.value) {
+      url += `&search=${searchQuery.value}`
+    }
+    if (filterDateFrom.value && filterDateTo.value) {
+      url += `&start_date=${filterDateFrom.value}&end_date=${filterDateTo.value}`
+    }
+    if (filterDocStatus.value !== 'ALL') {
+      url += `&document_status=${filterDocStatus.value}`
+    }
+    if (filterAppStatus.value !== 'ALL') {
+      url += `&approval_status=${filterAppStatus.value}`
+    }
+    
+    const response = await api.get(url)
+    tableData.value = response.data.results || response.data
+    selectedItems.value = [] // Reset selection on fetch
+  } catch (error) {
+    console.error('Error fetching cashbook requests:', error)
+  }
+}
+
+const handlePrint = async (item) => {
+  printModal.document = item
+  printModal.signatures = []
+  
+  try {
+    // Only fetch signatures if it's already awaiting/approved
+    if (item.approval_status && item.approval_status !== 'draft') {
+      let docCode = 'CBR_PI'
+      if (item.usage_for !== 'Purchase Invoice Payment') {
+        docCode = 'CBR_OTHER' // generic fallback
+      }
+      const res = await api.get('/approval/signatures/', {
+        params: {
+          document_code: docCode,
+          document_id: item.id
+        }
+      })
+      printModal.signatures = res.data
+    }
+  } catch (err) {
+    console.error('Failed to load signatures', err)
+  }
+  
+  printModal.show = true
+}
+
+
+
 const handleSearch = () => {
-  // To be implemented with backend integration
-  console.log('Search triggered with:', {
-    query: searchQuery.value,
-    dateFrom: filterDateFrom.value,
-    dateTo: filterDateTo.value,
-    type: filterType.value,
-    usageFor: filterUsageFor.value,
-    declaration: filterDeclaration.value,
-    docStatus: filterDocStatus.value,
-    appStatus: filterAppStatus.value
-  })
+  fetchTableData()
 }
 
 const handleUsageForChange = () => {
@@ -500,6 +585,7 @@ const form = reactive({
   invoice_date: '',
   due_date: '',
   currency: 'IDR',
+  usage_for: 'Purchase Invoice Payment',
   project: null,
   payment_to: null,
   notes_payment_to: '',
@@ -511,7 +597,9 @@ const form = reactive({
   unpaid_amount: '0.00',
   is_sumbangan: false,
   budget_component: null,
-  budget_component_name: ''
+  budget_component_name: '',
+  document_status: '',
+  approval_status: ''
 })
 
 const openAddModal = () => {
@@ -525,6 +613,7 @@ const openAddModal = () => {
   form.amount = null
   form.description = ''
   
+  form.usage_for = filterUsageFor.value
   form.transaction_type = null
   form.duration_due_date = ''
   form.invoice_date = ''
@@ -542,6 +631,8 @@ const openAddModal = () => {
   form.is_sumbangan = false
   form.budget_component = null
   form.budget_component_name = ''
+  form.document_status = 'draft'
+  form.approval_status = 'draft'
   
   modal.show = true
 }
@@ -557,6 +648,7 @@ const editData = (item) => {
   form.amount = item.amount
   form.description = item.description
   
+  form.usage_for = item.usage_for || filterUsageFor.value
   form.transaction_type = item.transaction_type
   form.duration_due_date = item.duration_due_date
   form.invoice_date = item.invoice_date
@@ -577,6 +669,8 @@ const editData = (item) => {
   // It will be re-fetched by the form component watcher if needed.
   form.budget_component = item.budget_component || null
   form.budget_component_name = item.budget_component_name || ''
+  form.document_status = item.document_status || ''
+  form.approval_status = item.approval_status || ''
   
   modal.show = true
 }
@@ -592,32 +686,31 @@ const saveData = async (isSubmit) => {
     isSaving.value = true
     const payload = {
       ...form,
-      document_status: isSubmit ? 'ready_to_process' : 'draft',
-      approval_status: isSubmit ? 'awaiting' : 'draft'
+      document_status: 'draft',
+      approval_status: 'draft'
     }
     
-    // We only need to submit if we're adding for now
+    let savedId = form.id
+    
     if (modal.mode === 'add') {
-      await api.post('accounting/cashbook-request/', payload)
-      Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: `Payment Request successfully ${isSubmit ? 'submitted' : 'saved as draft'}.`,
-        confirmButtonColor: '#1d4ed8'
-      })
-      closeModal()
-      fetchTableData()
+      const res = await api.post('accounting/cashbook-request/', payload)
+      savedId = res.data.id
     } else if (modal.mode === 'edit') {
-      await api.put(`accounting/cashbook-request/${form.id}/`, payload)
-      Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: `Payment Request successfully ${isSubmit ? 'submitted' : 'updated'}.`,
-        confirmButtonColor: '#1d4ed8'
-      })
-      closeModal()
-      fetchTableData()
+      await api.patch(`accounting/cashbook-request/${savedId}/`, payload)
     }
+    
+    if (isSubmit && savedId) {
+      await api.post(`accounting/cashbook-request/${savedId}/submit_approval/`)
+    }
+    
+    Swal.fire({
+      icon: 'success',
+      title: 'Success!',
+      text: `Payment Request successfully ${isSubmit ? 'submitted for approval' : 'saved as draft'}.`,
+      confirmButtonColor: '#1d4ed8'
+    })
+    closeModal()
+    fetchTableData()
   } catch (error) {
     console.error('Error saving Payment Request:', error)
     Swal.fire({
@@ -628,6 +721,34 @@ const saveData = async (isSubmit) => {
     })
   } finally {
     isSaving.value = false
+  }
+}
+
+const handleInactive = async () => {
+  if (selectedItems.value.length === 0) return
+
+  const confirm = await Swal.fire({
+    title: 'Are you sure?',
+    text: `You are about to toggle Inactive (is_close) for ${selectedItems.value.length} selected document(s).`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, toggle it!'
+  })
+
+  if (confirm.isConfirmed) {
+    try {
+      await api.post('/accounting/cashbook-request/toggle_inactive/', {
+        ids: selectedItems.value
+      })
+      Swal.fire('Success', 'The selected documents have been updated.', 'success')
+      fetchTableData()
+    } catch (error) {
+      console.error(error)
+      const errorMsg = error.response?.data?.detail || 'Failed to update documents.'
+      Swal.fire('Error', errorMsg, 'error')
+    }
   }
 }
 

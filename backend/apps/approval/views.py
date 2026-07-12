@@ -179,11 +179,14 @@ class ApprovalRequestListCreateView(generics.ListCreateAPIView):
             )
 
         document_code = self.request.query_params.get('document_code')
+        document_code__startswith = self.request.query_params.get('document_code__startswith')
         status_filter = self.request.query_params.get('status')
         document_number = self.request.query_params.get('document_number')
 
         if document_code:
             qs = qs.filter(document_code=document_code)
+        if document_code__startswith:
+            qs = qs.filter(document_code__startswith=document_code__startswith)
         if status_filter:
             qs = qs.filter(status=status_filter)
         if document_number:

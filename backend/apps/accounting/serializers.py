@@ -315,6 +315,8 @@ class GlobalLinkedAccountSerializer(serializers.ModelSerializer):
 from .models import CashbookReqHeader, CashbookReqDetail
 
 class CashbookReqDetailSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source='item.item_name', read_only=True)
+    item_code = serializers.CharField(source='item.item_code', read_only=True)
     class Meta:
         model = CashbookReqDetail
         fields = '__all__'
@@ -328,10 +330,76 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     requestor_department_display = serializers.CharField(source='requestor_department.name', read_only=True)
     purchase_invoice_display = serializers.CharField(source='purchase_invoice.invoice_number', read_only=True)
 
+    # Print-specific dynamic fields
+    po_number = serializers.SerializerMethodField()
+    term_desc = serializers.SerializerMethodField()
+    term_duration = serializers.SerializerMethodField()
+    site_name = serializers.SerializerMethodField()
+    rap_name = serializers.SerializerMethodField()
+    rap_total_cost = serializers.SerializerMethodField()
+    created_by_name = serializers.CharField(source='created_by.first_name', read_only=True)
+    payment_to_bank_details = serializers.SerializerMethodField()
+    total_quantity = serializers.SerializerMethodField()
+
     class Meta:
         model = CashbookReqHeader
         fields = '__all__'
         read_only_fields = ('document_number', 'created_at', 'updated_at', 'created_by')
+
+    def get_po_number(self, obj):
+        if obj.purchase_invoice and obj.purchase_invoice.po:
+            return obj.purchase_invoice.po.po_number
+        return None
+
+    def get_term_desc(self, obj):
+        if obj.purchase_invoice and obj.purchase_invoice.grn and obj.purchase_invoice.grn.cc and obj.purchase_invoice.grn.cc.payment_term:
+            return obj.purchase_invoice.grn.cc.payment_term.term_desc
+        return None
+
+    def get_term_duration(self, obj):
+        if obj.purchase_invoice and obj.purchase_invoice.grn and obj.purchase_invoice.grn.cc and obj.purchase_invoice.grn.cc.payment_term:
+            return obj.purchase_invoice.grn.cc.payment_term.duration_due
+        return None
+
+    def get_site_name(self, obj):
+        if obj.project:
+            return obj.project.site_name
+        return None
+
+    def get_rap_name(self, obj):
+        if obj.project:
+            from apps.projects.models import RAP
+            active_rap = RAP.objects.filter(project=obj.project, is_active=True).first()
+            if active_rap:
+                return active_rap.rap_number
+        return None
+
+    def get_rap_total_cost(self, obj):
+        if obj.project:
+            from apps.projects.models import RAP
+            active_rap = RAP.objects.filter(project=obj.project, is_active=True).first()
+            if active_rap:
+                return str(active_rap.total_cost)
+        return None
+
+    def get_payment_to_bank_details(self, obj):
+        if obj.payment_to:
+            details = []
+            if obj.payment_to.bank:
+                details.append(f"{obj.payment_to.bank.bank_name}")
+            if obj.payment_to.bank_city:
+                details.append(f"{obj.payment_to.bank_city}")
+            if obj.payment_to.account_number:
+                details.append(f"{obj.payment_to.account_number}")
+            if obj.payment_to.account_name:
+                details.append(f"{obj.payment_to.account_name}")
+            return "\\n".join(details)
+        return None
+
+    def get_total_quantity(self, obj):
+        from django.db.models import Sum
+        result = obj.details.aggregate(total=Sum('quantity'))['total']
+        return result if result is not None else 0
 
     def create(self, validated_data):
         request = self.context.get('request')

@@ -75,6 +75,7 @@ const implementedRoutes = [
   { path: '/finance/budget-component', component: BudgetComponentView, meta: { title: 'Budget Component', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/annual-budget', component: AnnualBudgetView, meta: { title: 'Annual Budget', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request', component: () => import('./views/finance/PaymentRequestView.vue'), meta: { title: 'Payment Request', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/payment-request-inbox', component: () => import('./views/finance/PaymentRequestInboxView.vue'), meta: { title: 'Payment Request Inbox', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/settings/annual-period', component: AnnualPeriodView, meta: { title: 'Annual Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/quarter-period', component: QuarterPeriodView, meta: { title: 'Quarter Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/monthly-period', component: MonthlyPeriodView, meta: { title: 'Monthly Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },

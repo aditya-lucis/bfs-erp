@@ -314,6 +314,16 @@ def approve_step(
     if request.status != ApprovalStatus.PENDING:
         raise ApprovalMatrixError("Request approval tidak dalam status PENDING.")
         
+    # Check due date for Payment Requests (CBR_*)
+    if request.document_code and request.document_code.startswith('CBR_'):
+        try:
+            from apps.accounting.models import CashbookReqHeader
+            transaction = CashbookReqHeader.objects.get(id=int(request.document_id))
+            if transaction.due_date and timezone.localtime().date() > transaction.due_date:
+                raise ApprovalMatrixError("The due date for this document has passed. Please reject this document manually.")
+        except CashbookReqHeader.DoesNotExist:
+            pass
+        
     current_step = request.steps.filter(
         step_number=request.current_step_number,
         status=StepStatus.PENDING

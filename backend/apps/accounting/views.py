@@ -467,6 +467,7 @@ class GlobalLinkedAccountView(APIView):
 
 from .models import CashbookReqHeader
 from .serializers import CashbookReqHeaderSerializer
+from rest_framework.decorators import action
 
 class CashbookReqViewSet(viewsets.ModelViewSet):
     serializer_class = CashbookReqHeaderSerializer
@@ -474,4 +475,82 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
     rbac_function_code = 'FINANCE-PAYMENT-REQUEST'
     
     def get_queryset(self):
-        return CashbookReqHeader.objects.all().order_by('-date', '-id')
+        qs = CashbookReqHeader.objects.all().order_by('-date', '-id')
+        usage_for = self.request.query_params.get('usage_for', None)
+        document_status = self.request.query_params.get('document_status', None)
+        approval_status = self.request.query_params.get('approval_status', None)
+        
+        if usage_for:
+            qs = qs.filter(usage_for=usage_for)
+        if document_status:
+            qs = qs.filter(document_status=document_status)
+        if approval_status:
+            qs = qs.filter(approval_status=approval_status)
+            
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def submit_approval(self, request, pk=None):
+        """Submit Payment Request for approval."""
+        transaction = self.get_object()
+        
+        if transaction.approval_status not in [CashbookReqHeader.ApprovalStatus.DRAFT, CashbookReqHeader.ApprovalStatus.REVISED]:
+            return Response({'detail': 'Only draft or revised transactions can be submitted.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            from apps.approval.services import create_approval_request
+            from apps.projects.models import RAP
+            from django.utils import timezone
+            
+            today = timezone.localtime().date()
+            if transaction.due_date and today > transaction.due_date:
+                return Response({'detail': 'Cannot submit to approval. The due date has already passed.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            if transaction.project:
+                active_rap = RAP.objects.filter(project=transaction.project, is_active=True).first()
+                if active_rap and transaction.amount > active_rap.total_cost:
+                    return Response({'detail': 'Total amount exceeds the active RAP total cost.'}, status=status.HTTP_400_BAD_REQUEST)
+                    
+            # Determine document code dynamically based on usage_for
+            if transaction.usage_for == CashbookReqHeader.UsageFor.PURCHASE_INVOICE_PAYMENT:
+                doc_code = 'CBR_PI'
+            else:
+                # Fallback for future transaction usages (e.g. Project Cash Advance)
+                return Response({'detail': f'Approval for usage {transaction.usage_for} is not configured yet.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            create_approval_request(
+                document_code=doc_code,
+                document_id=str(transaction.id),
+                document_number=transaction.document_number,
+                creator_user=request.user,
+                amount=transaction.amount,
+                company=transaction.project.company if transaction.project else getattr(request.user, 'employee_profile', None).position.company
+            )
+            
+            transaction.document_status = CashbookReqHeader.DocumentStatus.READY_TO_PROCESS
+            transaction.approval_status = CashbookReqHeader.ApprovalStatus.AWAITING
+            transaction.save()
+            
+            return Response({'status': 'Submitted for approval'})
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def toggle_inactive(self, request):
+        ids = request.data.get('ids', [])
+        if not ids:
+            return Response({'detail': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        with transaction.atomic():
+            headers = CashbookReqHeader.objects.filter(id__in=ids)
+            
+            # Validation: Only approved CBRs can be toggled
+            unapproved = [h.document_number for h in headers if h.approval_status != CashbookReqHeader.ApprovalStatus.APPROVED]
+            if unapproved:
+                return Response({'detail': f'Cannot toggle inactive. The following documents are not approved: {", ".join(unapproved)}'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            for header in headers:
+                header.is_close = not header.is_close
+                header.save(update_fields=['is_close'])
+                
+        return Response({'status': 'success', 'message': f'Updated {len(ids)} records.'})

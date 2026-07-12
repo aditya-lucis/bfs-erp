@@ -125,8 +125,10 @@
         <FormField label="Unpaid Amount">
           <input v-model="form.unpaid_amount" type="number" step="0.01" class="form-input bg-gray-100 cursor-not-allowed" disabled />
         </FormField>
-
-
+        
+        <FormField label="Amount (Requested)" required>
+          <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+        </FormField>
       </div>
     </div>
   </div>
@@ -278,6 +280,11 @@ watch(() => props.form.purchase_invoice, async (newVal) => {
       // Unpaid Amount Calculation
       const unpaid = parseFloat(pi.grand_total) - parseFloat(pi.paid_amount || 0)
       props.form.unpaid_amount = unpaid.toFixed(2)
+      
+      // Auto-fill Amount only if not already set or it's new
+      if (!props.form.id && !props.form.amount) {
+        props.form.amount = unpaid.toFixed(2)
+      }
 
       // Try to get Requestor Department from PO
       try {

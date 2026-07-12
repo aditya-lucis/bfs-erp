@@ -523,9 +523,17 @@ class CashbookReqHeader(models.Model):
         HALF_PAID = 'half_paid', 'Half Paid'
         FULL_PAID = 'full_paid', 'Full Paid'
 
+    class UsageFor(models.TextChoices):
+        PURCHASE_INVOICE_PAYMENT = 'Purchase Invoice Payment', 'Purchase Invoice Payment'
+        PROJECT_CASH_ADVANCED = 'Project Cash Advanced', 'Project Cash Advanced'
+        PO_DOWN_PAYMENT = 'Purchase Order Down Payment', 'Purchase Order Down Payment'
+        BANK_OBLIGATION_PRINCIPAL = 'Bank Obligation Principal', 'Bank Obligation Principal'
+        BANK_OBLIGATION_INTEREST = 'Bank Obligation Interest', 'Bank Obligation Interest'
+
     document_number = models.CharField(max_length=50, unique=True, editable=False)
     date = models.DateField()
     transaction_type = models.ForeignKey('master_type.TransactionType', on_delete=models.PROTECT)
+    usage_for = models.CharField(max_length=50, choices=UsageFor.choices, default=UsageFor.PURCHASE_INVOICE_PAYMENT)
     duration_due_date = models.CharField(max_length=50, null=True, blank=True)
     invoice_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
@@ -541,6 +549,9 @@ class CashbookReqHeader(models.Model):
     purchase_invoice = models.ForeignKey('purchase.PurchaseInvoice', on_delete=models.PROTECT, null=True, blank=True)
     vendor_invoice_number = models.CharField(max_length=100, null=True, blank=True)
     unpaid_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    paid_tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     is_sumbangan = models.BooleanField(default=False)
     
     document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)

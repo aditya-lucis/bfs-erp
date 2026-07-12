@@ -15,6 +15,7 @@ class DocumentType(models.TextChoices):
     COMPLETION_CERTIFICATE = 'CC', 'Completion Certificate (CC)'
     GOOD_RECEIPT_NOTE = 'GRN', 'Good Receipt Note (GRN)'
     RECEIPT_REPORT = 'RECEIPT_REPORT', 'Receipt Report (RR)'
+    PAYMENT_REQUEST_PI = 'CBR_PI', 'Payment Request (Purchase Invoice)'
 
 class ApprovalBasis(models.TextChoices):
     AMOUNT   = 'AMOUNT',   'Total Amount (After Disc & Tax)'
