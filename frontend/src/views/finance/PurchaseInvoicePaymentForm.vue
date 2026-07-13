@@ -51,6 +51,14 @@
         <FormField label="Description">
           <textarea v-model="form.description" class="form-input h-20 resize-none"></textarea>
         </FormField>
+        
+        <FormField label="Unpaid Amount">
+          <input v-model="form.unpaid_amount" type="number" step="0.01" class="form-input bg-gray-100 cursor-not-allowed" disabled />
+        </FormField>
+        
+        <FormField label="Amount (Requested)" required>
+          <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+        </FormField>
       </div>
 
       <!-- Right Column -->
@@ -122,12 +130,12 @@
           <input v-model="form.vendor_invoice_number" type="text" class="form-input bg-gray-100 cursor-not-allowed" disabled />
         </FormField>
 
-        <FormField label="Unpaid Amount">
-          <input v-model="form.unpaid_amount" type="number" step="0.01" class="form-input bg-gray-100 cursor-not-allowed" disabled />
+        <FormField label="Tax Amount">
+          <input v-model="form.tax_amount" type="number" step="0.01" class="form-input bg-gray-100 cursor-not-allowed" disabled />
         </FormField>
         
-        <FormField label="Amount (Requested)" required>
-          <input v-model="form.amount" type="number" step="0.01" class="form-input" />
+        <FormField label="Unpaid Tax Amount">
+          <input v-model="form.unpaid_tax_amount" type="number" step="0.01" class="form-input bg-gray-100 cursor-not-allowed" disabled />
         </FormField>
       </div>
     </div>
@@ -171,7 +179,7 @@ const fetchOptions = async () => {
   try {
     const [trsTypeRes, projRes, paymentToRes, deptRes] = await Promise.all([
       api.get('master-type/transaction-type/'),
-      api.get('projects/projects/'),
+      api.get(`projects/projects/?usage=purchase_invoice_payment${props.form.id ? '&exclude_cbr=' + props.form.id : ''}&_t=${Date.now()}`),
       api.get('master-type/payment-to/'),
       api.get('org/departments/')
     ])
@@ -220,55 +228,7 @@ watch(() => props.form.payment_to, (newVal) => {
   }
 })
 
-watch(() => props.form.project, async (newVal, oldVal) => {
-  const isInitialLoad = (oldVal === undefined || oldVal === null) && newVal !== null
-  if (!isInitialLoad) {
-    props.form.purchase_invoice = null
-  }
-  purchaseInvoiceOptions.value = []
-  if (newVal) {
-    try {
-      // Fetch POs connected to this project
-      const poRes = await api.get('purchase/po/')
-      const pos = (poRes.data.results || poRes.data).filter(po => po.project === newVal)
-      const poIds = pos.map(po => po.id)
-
-      // Fetch PIs connected to those POs
-      const piRes = await api.get('purchase/purchase-invoices/')
-      purchaseInvoiceOptions.value = (piRes.data.results || piRes.data)
-        .filter(pi => poIds.includes(pi.po))
-        .map(pi => ({
-          id: pi.id,
-          label: pi.invoice_number,
-          raw: pi
-        }))
-
-      // Fetch RAP for this project
-      const rapRes = await api.get(`projects/raps/?project=${newVal}`)
-      const raps = rapRes.data.results || rapRes.data
-      if (raps && raps.length > 0) {
-        props.form.budget_component = raps[0].budget_component || null
-        props.form.budget_component_name = raps[0].budget_component_name || ''
-      }
-      
-      // Inject initial purchase invoice if it's an edit and it wasn't fetched
-      if (isInitialLoad && props.form.purchase_invoice) {
-        const exists = purchaseInvoiceOptions.value.find(p => p.id === props.form.purchase_invoice)
-        if (!exists) {
-          purchaseInvoiceOptions.value.push({
-            id: props.form.purchase_invoice,
-            label: props.form.purchase_invoice_display || `Invoice ID: ${props.form.purchase_invoice}`,
-            raw: null
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching data for project:', error)
-    }
-  }
-}, { immediate: true })
-
-watch(() => props.form.purchase_invoice, async (newVal) => {
+const updateInvoiceDetails = async (newVal) => {
   if (newVal) {
     const selected = purchaseInvoiceOptions.value.find(p => p.id === newVal)
     if (selected && selected.raw) {
@@ -278,8 +238,17 @@ watch(() => props.form.purchase_invoice, async (newVal) => {
       props.form.description = pi.notes || `Payment for invoice ${pi.invoice_number}`
       props.form.vendor_invoice_number = pi.vendor_invoice_number || '-'
       // Unpaid Amount Calculation
-      const unpaid = parseFloat(pi.grand_total) - parseFloat(pi.paid_amount || 0)
+      let calculatedAmount = 0
+      if (pi.details && Array.isArray(pi.details)) {
+        calculatedAmount = pi.details.reduce((sum, d) => sum + (parseFloat(d.quantity || 0) * parseFloat(d.unit_price || 0)), 0)
+      } else {
+        // Fallback if details are somehow missing
+        calculatedAmount = parseFloat(pi.grand_total) - parseFloat(pi.tax_amount || 0) 
+      }
+      const unpaid = calculatedAmount - parseFloat(pi.paid_amount || 0)
       props.form.unpaid_amount = unpaid.toFixed(2)
+      props.form.tax_amount = parseFloat(pi.tax_amount || 0).toFixed(2)
+      props.form.unpaid_tax_amount = parseFloat(pi.tax_amount || 0).toFixed(2) // We can assume unpaid tax is the whole tax for now
       
       // Auto-fill Amount only if not already set or it's new
       if (!props.form.id && !props.form.amount) {
@@ -315,9 +284,69 @@ watch(() => props.form.purchase_invoice, async (newVal) => {
     props.form.description = ''
     props.form.vendor_invoice_number = ''
     props.form.unpaid_amount = '0.00'
+    props.form.tax_amount = '0.00'
+    props.form.unpaid_tax_amount = '0.00'
     props.form.requestor_department = null
     props.form.duration_due_date = ''
   }
+}
+
+watch(() => props.form.project, async (newVal, oldVal) => {
+  const isInitialLoad = (oldVal === undefined || oldVal === null) && newVal !== null
+  if (!isInitialLoad) {
+    props.form.purchase_invoice = null
+  }
+  purchaseInvoiceOptions.value = []
+  if (newVal) {
+    try {
+      // Fetch POs connected to this project
+      const poRes = await api.get(`purchase/po/?project=${newVal}`)
+      const pos = (poRes.data.results || poRes.data)
+      const poIds = pos.map(po => po.id)
+
+      // Fetch PIs connected to those POs
+      if (poIds.length > 0) {
+        const piRes = await api.get(`purchase/purchase-invoices/?po__in=${poIds.join(',')}`)
+        purchaseInvoiceOptions.value = (piRes.data.results || piRes.data)
+          .map(pi => ({
+            id: pi.id,
+            label: pi.invoice_number,
+            raw: pi
+          }))
+      }
+
+      // Fetch RAP for this project
+      const rapRes = await api.get(`projects/raps/?project=${newVal}`)
+      const raps = rapRes.data.results || rapRes.data
+      if (raps && raps.length > 0) {
+        props.form.budget_component = raps[0].budget_component || null
+        props.form.budget_component_name = raps[0].budget_component_name || ''
+      }
+      
+      // Inject initial purchase invoice if it's an edit and it wasn't fetched
+      if (isInitialLoad && props.form.purchase_invoice) {
+        const exists = purchaseInvoiceOptions.value.find(p => p.id === props.form.purchase_invoice)
+        if (!exists) {
+          purchaseInvoiceOptions.value.push({
+            id: props.form.purchase_invoice,
+            label: props.form.purchase_invoice_display || `Invoice ID: ${props.form.purchase_invoice}`,
+            raw: null
+          })
+        }
+      }
+      
+      // Update invoice details if we already have one selected
+      if (props.form.purchase_invoice) {
+        updateInvoiceDetails(props.form.purchase_invoice)
+      }
+    } catch (error) {
+      console.error('Error fetching data for project:', error)
+    }
+  }
+}, { immediate: true })
+
+watch(() => props.form.purchase_invoice, async (newVal) => {
+  updateInvoiceDetails(newVal)
 })
 
 onMounted(() => {

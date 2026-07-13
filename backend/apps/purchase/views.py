@@ -543,6 +543,10 @@ class PurchaseOrderListView(generics.ListCreateAPIView):
         end_date = self.request.query_params.get('end_date')
         if end_date:
             qs = qs.filter(po_date__lte=end_date)
+            
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
 
         return qs
 
@@ -1170,12 +1174,15 @@ class PurchaseInvoiceViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         vendor_id = self.request.query_params.get('vendor', None)
         po_id = self.request.query_params.get('po', None)
+        po_in = self.request.query_params.get('po__in', None)
         status_val = self.request.query_params.get('status', None)
 
         if vendor_id:
             queryset = queryset.filter(vendor_id=vendor_id)
         if po_id:
             queryset = queryset.filter(po_id=po_id)
+        if po_in:
+            queryset = queryset.filter(po_id__in=po_in.split(','))
         if status_val:
             queryset = queryset.filter(status=status_val)
 

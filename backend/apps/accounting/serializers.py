@@ -393,7 +393,7 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
                 details.append(f"{obj.payment_to.account_number}")
             if obj.payment_to.account_name:
                 details.append(f"{obj.payment_to.account_name}")
-            return "\\n".join(details)
+            return "\n".join(details)
         return None
 
     def get_total_quantity(self, obj):
@@ -410,8 +410,10 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         header = super().create(validated_data)
         
         # Automatically pull details from PurchaseInvoiceDetail
-        if header.purchase_invoice:
+        if header.usage_for == CashbookReqHeader.UsageFor.PURCHASE_INVOICE_PAYMENT and header.purchase_invoice:
             pi_details = header.purchase_invoice.details.all()
+            total_amt = 0
+            total_tax = 0
             for pid in pi_details:
                 CashbookReqDetail.objects.create(
                     header=header,
@@ -422,5 +424,13 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
                     tax_amount=pid.tax_amount,
                     total_amount=pid.total_amount
                 )
+                total_amt += (pid.unit_price * pid.quantity)
+                total_tax += pid.tax_amount
+                
+            header.amount = total_amt
+            header.unpaid_amount = total_amt
+            header.tax_amount = total_tax
+            header.unpaid_tax_amount = total_tax
+            header.save(update_fields=['amount', 'unpaid_amount', 'tax_amount', 'unpaid_tax_amount'])
         
         return header

@@ -187,7 +187,6 @@
               <th class="py-2 px-2">No.</th>
               <th class="py-2 px-2">Document<br/>Number</th>
               <th class="py-2 px-2">Date</th>
-              <th class="py-2 px-2">PIC</th>
               <th class="py-2 px-2">Vendor<br/>Name</th>
               <th class="py-2 px-2">Description</th>
               <th class="py-2 px-2 text-right">Amount</th>
@@ -221,10 +220,9 @@
               <td class="py-3 px-2 text-gray-500">{{ idx + 1 }}.</td>
               <td class="py-3 px-2 font-mono text-gray-600 font-semibold">{{ item.document_number }}</td>
               <td class="py-3 px-2">{{ item.date }}</td>
-              <td class="py-3 px-2">{{ item.created_by || 'N/A' }}</td>
               <td class="py-3 px-2">{{ item.payment_to_display || item.vendor_name || '-' }}</td>
               <td class="py-3 px-2 truncate max-w-[150px]" :title="item.description">{{ item.description }}</td>
-              <td class="py-3 px-2 text-right font-semibold text-bfs-gold">{{ formatCurrency(item.unpaid_amount || item.amount) }}</td>
+              <td class="py-3 px-2 text-right font-semibold text-bfs-gold">{{ formatCurrency(parseFloat(item.unpaid_amount || item.amount || 0) + parseFloat(item.unpaid_tax_amount || item.tax_amount || 0)) }}</td>
               <td class="py-3 px-2 text-center">
                 <div class="inline-flex items-center justify-center p-1 rounded-md" :title="'Document Status: ' + item.document_status">
                   <Folder v-if="item.document_status === 'draft'" class="w-4 h-4 text-amber-500 fill-amber-500/10" />
@@ -267,8 +265,17 @@
                 <span v-else class="text-red-500 font-bold text-base">✗</span>
               </td>
               <td class="py-3 px-2 text-center">
-                <span v-if="item.allow_previous_year_budget" class="text-green-500 font-bold text-base">✓</span>
-                <span v-else class="text-red-500 font-bold text-base">✗</span>
+                <div class="flex items-center justify-center gap-1">
+                  <span v-if="item.allow_previous_year_budget" class="text-green-500 font-bold text-base">&#10003;</span>
+                  <span v-else class="text-red-500 font-bold text-base">&#10007;</span>
+                  <div v-if="item.allow_previous_year_budget && item.reason_allow_previous_year_budget" class="relative group flex items-center justify-center">
+                    <AlertCircle class="w-4 h-4 text-pink-500 cursor-help" />
+                    <div class="absolute bottom-full mb-1 hidden group-hover:block w-max max-w-xs bg-pink-500 text-white text-xs px-2 py-1 rounded shadow-lg z-50 text-left">
+                      {{ item.reason_allow_previous_year_budget }}
+                      <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-pink-500"></div>
+                    </div>
+                  </div>
+                </div>
               </td>
               <td v-if="filterUsageFor === 'Purchase Invoice Payment'" class="py-3 px-2">{{ item.purchase_invoice_display || item.vendor_invoice_number || '-' }}</td>
               <td class="py-3 px-2 text-right">
@@ -335,11 +342,54 @@
         </button>
       </template>
 
-      <button class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300">
+      <button 
+        @click="openAllowPreviousYearModal"
+        class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="selectedItems.length === 0"
+      >
         <CalendarCheck class="w-3.5 h-3.5 text-teal-500" />
         Allow Previous year Budget RAP
       </button>
     </div>
+
+    <!-- Allow Previous Year Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="allowPreYearModal.show" class="fixed inset-0 z-[60] overflow-y-auto">
+          <div class="fixed inset-0 bg-black/40" @click="allowPreYearModal.show = false" />
+          <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md z-10 p-6" @click.stop>
+              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <AlertCircle class="w-5 h-5 text-bfs-gold" />
+                Alasan Penggunaan Budget Tahun Lalu
+              </h3>
+              <p class="text-sm text-gray-600 mb-4">
+                Anda memilih {{ selectedItems.length }} dokumen. Silakan masukkan alasan kenapa Anda menggunakan budget RAP dari tahun sebelumnya.
+              </p>
+              <textarea 
+                v-model="allowPreYearModal.reason" 
+                class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-bfs-gold focus:border-bfs-gold mb-4" 
+                rows="4" 
+                placeholder="Masukkan alasan..."
+              ></textarea>
+              <div class="flex justify-end gap-2">
+                <button @click="allowPreYearModal.show = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
+                  Batal
+                </button>
+                <button 
+                  @click="confirmAllowPreviousYear" 
+                  class="px-4 py-2 text-sm font-medium text-white bg-bfs-navy rounded-md hover:bg-opacity-90 transition-colors disabled:opacity-50"
+                  :disabled="!allowPreYearModal.reason.trim() || allowPreYearModal.isSubmitting"
+                >
+                  <span v-if="allowPreYearModal.isSubmitting">Menyimpan...</span>
+                  <span v-else>Simpan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- Add/Edit Modal -->
     <Teleport to="body">
@@ -728,13 +778,14 @@ const handleInactive = async () => {
   if (selectedItems.value.length === 0) return
 
   const confirm = await Swal.fire({
-    title: 'Are you sure?',
-    text: `You are about to toggle Inactive (is_close) for ${selectedItems.value.length} selected document(s).`,
+    title: 'Apakah Anda Yakin?',
+    text: `Anda akan mengubah status ${selectedItems.value.length} dokumen yang dipilih.`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#d33',
     cancelButtonColor: '#3085d6',
-    confirmButtonText: 'Yes, toggle it!'
+    confirmButtonText: 'Ya, Ubah Status!',
+    cancelButtonText: 'Batal'
   })
 
   if (confirm.isConfirmed) {
@@ -742,13 +793,45 @@ const handleInactive = async () => {
       await api.post('/accounting/cashbook-request/toggle_inactive/', {
         ids: selectedItems.value
       })
-      Swal.fire('Success', 'The selected documents have been updated.', 'success')
+      Swal.fire('Berhasil!', 'Dokumen berhasil diperbarui.', 'success')
       fetchTableData()
     } catch (error) {
       console.error(error)
-      const errorMsg = error.response?.data?.detail || 'Failed to update documents.'
-      Swal.fire('Error', errorMsg, 'error')
+      const errorMsg = error.response?.data?.detail || 'Gagal memperbarui dokumen.'
+      Swal.fire('Gagal!', errorMsg, 'error')
     }
+  }
+}
+
+const allowPreYearModal = reactive({
+  show: false,
+  reason: '',
+  isSubmitting: false
+})
+
+const openAllowPreviousYearModal = () => {
+  if (selectedItems.value.length === 0) return
+  allowPreYearModal.reason = ''
+  allowPreYearModal.show = true
+}
+
+const confirmAllowPreviousYear = async () => {
+  try {
+    allowPreYearModal.isSubmitting = true
+    await api.post('/accounting/cashbook-request/allow_previous_year/', {
+      ids: selectedItems.value,
+      reason: allowPreYearModal.reason
+    })
+    allowPreYearModal.show = false
+    selectedItems.value = [] // Clear selection
+    Swal.fire('Berhasil!', 'Budget tahun lalu berhasil diizinkan.', 'success')
+    fetchTableData()
+  } catch (error) {
+    console.error(error)
+    const errorMsg = error.response?.data?.detail || 'Gagal menyimpan alasan.'
+    Swal.fire('Gagal!', errorMsg, 'error')
+  } finally {
+    allowPreYearModal.isSubmitting = false
   }
 }
 

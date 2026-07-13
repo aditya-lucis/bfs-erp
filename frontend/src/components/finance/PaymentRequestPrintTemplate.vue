@@ -108,6 +108,14 @@
                       <td class="border border-black px-2 py-1 text-center">{{ document?.total_quantity || '0' }}</td>
                       <td class="border border-black px-2 py-1 text-right font-semibold">{{ document?.currency_id || 'IDR' }} {{ formatCurrencyRaw(document?.amount || 0) }}</td>
                     </tr>
+                    <tr v-if="parseFloat(document?.tax_amount || 0) > 0">
+                      <td colspan="4" class="border border-black px-2 py-1 text-right font-semibold">Tax Amount</td>
+                      <td class="border border-black px-2 py-1 text-right font-semibold">{{ document?.currency_id || 'IDR' }} {{ formatCurrencyRaw(document?.tax_amount || 0) }}</td>
+                    </tr>
+                    <tr v-if="parseFloat(document?.tax_amount || 0) > 0">
+                      <td colspan="4" class="border border-black px-2 py-1 text-right font-bold bg-gray-100">Grand Total</td>
+                      <td class="border border-black px-2 py-1 text-right font-bold bg-gray-100">{{ document?.currency_id || 'IDR' }} {{ formatCurrencyRaw((parseFloat(document?.amount || 0) + parseFloat(document?.tax_amount || 0)).toFixed(2)) }}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -125,7 +133,7 @@
                 <div class="space-y-4">
                   <div class="border border-black p-2 min-h-[40px]">
                     <p class="font-semibold bg-gray-100 border-b border-black -mx-2 -mt-2 px-2 py-1 mb-2">In Word :</p>
-                    <p class="font-bold italic text-black">{{ terbilangEnglish(document?.amount || 0) }} Rupiahs</p>
+                    <p class="font-bold italic text-black">{{ terbilangEnglish(parseFloat(document?.amount || 0) + parseFloat(document?.tax_amount || 0)) }} Rupiahs</p>
                   </div>
                   
                   <div class="border border-black p-2 min-h-[40px]">

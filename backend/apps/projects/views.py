@@ -139,6 +139,31 @@ class ProjectListView(generics.ListCreateAPIView):
                 qs = qs.filter(Q(raps__isnull=True) | Q(pk=include_project))
             else:
                 qs = qs.filter(raps__isnull=True)
+                
+        usage = self.request.query_params.get('usage')
+        if usage == 'purchase_invoice_payment':
+            from apps.accounting.models import CashbookReqHeader
+            from apps.purchase.models import PurchaseInvoice
+            from django.db.models import Exists, OuterRef
+            
+            active_cbrs = CashbookReqHeader.objects.filter(
+                purchase_invoice=OuterRef('pk'),
+                usage_for=CashbookReqHeader.UsageFor.PURCHASE_INVOICE_PAYMENT,
+            ).exclude(
+                approval_status=CashbookReqHeader.ApprovalStatus.REJECTED
+            ).exclude(
+                is_close=True
+            )
+
+            exclude_cbr = self.request.query_params.get('exclude_cbr')
+            if exclude_cbr:
+                active_cbrs = active_cbrs.exclude(pk=exclude_cbr)
+
+            valid_invoices = PurchaseInvoice.objects.annotate(
+                has_active_cbr=Exists(active_cbrs)
+            ).filter(has_active_cbr=False)
+
+            qs = qs.filter(purchase_orders__purchase_invoices__in=valid_invoices).distinct()
             
         return qs
 

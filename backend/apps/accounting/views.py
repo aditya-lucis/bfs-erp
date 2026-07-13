@@ -503,6 +503,9 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
             from django.utils import timezone
             
             today = timezone.localtime().date()
+            if transaction.date and transaction.date.year != today.year and not transaction.allow_previous_year_budget:
+                return Response({'detail': 'Payment request from a previous year cannot be submitted unless explicitly allowed (Allow Previous Year Budget).'}, status=status.HTTP_400_BAD_REQUEST)
+
             if transaction.due_date and today > transaction.due_date:
                 return Response({'detail': 'Cannot submit to approval. The due date has already passed.'}, status=status.HTTP_400_BAD_REQUEST)
                 
@@ -541,16 +544,72 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
         if not ids:
             return Response({'detail': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
             
+        from django.db import transaction
         with transaction.atomic():
             headers = CashbookReqHeader.objects.filter(id__in=ids)
             
-            # Validation: Only approved CBRs can be toggled
-            unapproved = [h.document_number for h in headers if h.approval_status != CashbookReqHeader.ApprovalStatus.APPROVED]
-            if unapproved:
-                return Response({'detail': f'Cannot toggle inactive. The following documents are not approved: {", ".join(unapproved)}'}, status=status.HTTP_400_BAD_REQUEST)
+            # Validation: Only APPROVED and NOT_PAID CBRs can be toggled
+            invalid_docs = []
+            for h in headers:
+                if h.approval_status != CashbookReqHeader.ApprovalStatus.APPROVED:
+                    invalid_docs.append(f"{h.document_number} (Bukan Approved)")
+                elif h.paid_status != CashbookReqHeader.PaidStatus.NOT_PAID:
+                    invalid_docs.append(f"{h.document_number} (Sudah/Sebagian Dibayar)")
+                    
+            if invalid_docs:
+                return Response({'detail': f'Gagal! Dokumen berikut tidak memenuhi syarat Inactive: {", ".join(invalid_docs)}'}, status=status.HTTP_400_BAD_REQUEST)
                 
             for header in headers:
+                if header.is_close:
+                    from django.db.models import Sum
+                    from apps.projects.models import RAP
+                    active_rap = RAP.objects.filter(project=header.project, is_active=True).first()
+                    if active_rap:
+                        active_cbrs = CashbookReqHeader.objects.filter(
+                            project=header.project,
+                            is_close=False
+                        ).exclude(
+                            approval_status=CashbookReqHeader.ApprovalStatus.REJECTED
+                        )
+                        current_total = active_cbrs.aggregate(total=Sum('amount'))['total'] or 0
+                        if current_total + header.amount > active_rap.total_cost:
+                            return Response({
+                                'detail': f'Gagal! Dokumen {header.document_number} tidak dapat diaktifkan kembali karena akan melebihi budget RAP.'
+                            }, status=status.HTTP_400_BAD_REQUEST)
+
                 header.is_close = not header.is_close
                 header.save(update_fields=['is_close'])
                 
         return Response({'status': 'success', 'message': f'Updated {len(ids)} records.'})
+
+    @action(detail=False, methods=['post'])
+    def allow_previous_year(self, request):
+        ids = request.data.get('ids', [])
+        reason = request.data.get('reason', '')
+        if not ids:
+            return Response({'detail': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+        if not reason:
+            return Response({'detail': 'Reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.db import transaction
+        from django.utils import timezone
+        
+        today = timezone.localtime().date()
+        with transaction.atomic():
+            headers = CashbookReqHeader.objects.filter(id__in=ids)
+            invalid_docs = []
+            for header in headers:
+                if header.date and header.date.year >= today.year:
+                    invalid_docs.append(f"{header.document_number} (Bukan tahun sebelumnya)")
+                elif header.approval_status != CashbookReqHeader.ApprovalStatus.DRAFT:
+                    invalid_docs.append(f"{header.document_number} (Bukan Draft)")
+            
+            if invalid_docs:
+                return Response({'detail': f'Gagal! Dokumen berikut tidak memenuhi syarat: {", ".join(invalid_docs)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            for header in headers:
+                header.allow_previous_year_budget = True
+                header.reason_allow_previous_year_budget = reason
+                header.save(update_fields=['allow_previous_year_budget', 'reason_allow_previous_year_budget'])
+                
+        return Response({'status': 'success', 'message': f'Allowed previous year budget for {len(ids)} records.'})
