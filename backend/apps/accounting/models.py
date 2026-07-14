@@ -554,6 +554,13 @@ class CashbookReqHeader(models.Model):
     unpaid_tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     is_sumbangan = models.BooleanField(default=False)
     
+    # PCA-specific fields
+    account = models.ForeignKey('accounting.Account', on_delete=models.PROTECT, null=True, blank=True, related_name='cashbook_requests')
+    is_reimbursement = models.BooleanField(default=False)
+    is_pr_for_lpj = models.BooleanField(default=False)
+    is_vendor = models.BooleanField(default=False)
+    vendor = models.ForeignKey('purchase.Vendor', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_requests')
+    
     document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
     approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
     paid_status = models.CharField(max_length=20, choices=PaidStatus.choices, default=PaidStatus.NOT_PAID)
@@ -595,12 +602,20 @@ class CashbookReqHeader(models.Model):
 class CashbookReqDetail(models.Model):
     header = models.ForeignKey(CashbookReqHeader, on_delete=models.CASCADE, related_name='details')
     item = models.ForeignKey('inventory.Item', on_delete=models.PROTECT, null=True, blank=True)
+    rap_detail = models.ForeignKey('projects.RAPDetail', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_details')
     
     quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    
+    # PCA Tax fields
+    is_tax_in = models.BooleanField(default=False)
+    no_faktur = models.CharField(max_length=50, null=True, blank=True)
+    npwp = models.CharField(max_length=30, null=True, blank=True)
+    tax_account = models.ForeignKey('accounting.Account', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    tax_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'acc_cashbook_req_detail'

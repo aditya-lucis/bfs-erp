@@ -517,8 +517,13 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
             # Determine document code dynamically based on usage_for
             if transaction.usage_for == CashbookReqHeader.UsageFor.PURCHASE_INVOICE_PAYMENT:
                 doc_code = 'CBR_PI'
+            elif transaction.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED:
+                # Advance if Is LPJ OR Is Reimbursement is checked
+                if transaction.is_pr_for_lpj or transaction.is_reimbursement:
+                    doc_code = 'uang muka'
+                else:
+                    doc_code = 'non uang muka'
             else:
-                # Fallback for future transaction usages (e.g. Project Cash Advance)
                 return Response({'detail': f'Approval for usage {transaction.usage_for} is not configured yet.'}, status=status.HTTP_400_BAD_REQUEST)
                 
             create_approval_request(
@@ -537,6 +542,49 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Submitted for approval'})
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def available_rap_details(self, request, pk=None):
+        """Return RAP detail items available for selection in PCA form."""
+        header = self.get_object()
+        if not header.project:
+            return Response([])
+
+        from apps.projects.models import RAP
+        from django.db.models import Q
+
+        active_rap = RAP.objects.filter(project=header.project, is_active=True).first()
+        if not active_rap:
+            return Response([])
+
+        rap_items = active_rap.details.filter(item_type='item')
+
+        current_detail_rap_ids = list(header.details.values_list('rap_detail_id', flat=True))
+
+        used_in_other_pca = CashbookReqDetail.objects.filter(
+            header__project=header.project,
+            header__usage_for=CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED,
+            rap_detail__isnull=False
+        ).exclude(
+            header__id=header.id
+        ).exclude(
+            Q(header__is_close=True) | Q(header__approval_status=CashbookReqHeader.ApprovalStatus.REJECTED)
+        ).values_list('rap_detail_id', flat=True)
+
+        try:
+            from apps.purchase.models import PRDetail
+            used_in_purchasing = PRDetail.objects.filter(
+                rap_detail__rap=active_rap
+            ).exclude(pr__status='cancelled').values_list('rap_detail_id', flat=True)
+        except Exception:
+            used_in_purchasing = []
+
+        exclude_ids = set(list(current_detail_rap_ids) + list(used_in_other_pca) + list(used_in_purchasing))
+        available = rap_items.exclude(id__in=exclude_ids)
+
+        from apps.projects.serializers import RAPDetailSerializer
+        serializer = RAPDetailSerializer(available, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def toggle_inactive(self, request):

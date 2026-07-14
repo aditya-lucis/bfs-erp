@@ -415,6 +415,9 @@
               <div v-if="filterUsageFor === 'Purchase Invoice Payment'">
                 <PurchaseInvoicePaymentForm :form="form" @update:form="form = $event" />
               </div>
+              <div v-else-if="filterUsageFor === 'Project Cash Advanced'">
+                <ProjectCashAdvancedForm :form="form" />
+              </div>
               <div v-else class="px-6 py-4 space-y-6">
                 <!-- Data is context dependent -->
                 <div class="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-200">
@@ -480,6 +483,7 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import PurchaseInvoicePaymentForm from './PurchaseInvoicePaymentForm.vue'
+import ProjectCashAdvancedForm from './ProjectCashAdvancedForm.vue'
 import PaymentRequestPrintTemplate from '../../components/finance/PaymentRequestPrintTemplate.vue'
 import { Plus, Pencil, Trash2, Save, X, Search, FileText, Folder, FolderOpen, FolderCheck, FileClock, FileCheck, FileX, FileWarning, Send, Printer, PowerOff, Paperclip, Calendar, AlertCircle, CalendarCheck } from 'lucide-vue-next'
 import api from '../../services/api'
@@ -637,6 +641,7 @@ const form = reactive({
   currency: 'IDR',
   usage_for: 'Purchase Invoice Payment',
   project: null,
+  project_display: '',
   payment_to: null,
   notes_payment_to: '',
   notes: '',
@@ -649,7 +654,14 @@ const form = reactive({
   budget_component: null,
   budget_component_name: '',
   document_status: '',
-  approval_status: ''
+  approval_status: '',
+  // PCA-specific fields
+  is_pr_for_lpj: false,
+  is_reimbursement: false,
+  is_vendor: false,
+  vendor: null,
+  account: null,
+  details: []
 })
 
 const openAddModal = () => {
@@ -670,6 +682,7 @@ const openAddModal = () => {
   form.due_date = ''
   form.currency = 'IDR'
   form.project = null
+  form.project_display = ''
   form.payment_to = null
   form.notes_payment_to = ''
   form.notes = ''
@@ -683,6 +696,13 @@ const openAddModal = () => {
   form.budget_component_name = ''
   form.document_status = 'draft'
   form.approval_status = 'draft'
+  // PCA-specific reset
+  form.is_pr_for_lpj = false
+  form.is_reimbursement = false
+  form.is_vendor = false
+  form.vendor = null
+  form.account = null
+  form.details = []
   
   modal.show = true
 }
@@ -705,6 +725,7 @@ const editData = (item) => {
   form.due_date = item.due_date
   form.currency = item.currency || 'IDR'
   form.project = item.project
+  form.project_display = item.project_display || ''
   form.payment_to = item.payment_to
   form.notes_payment_to = item.notes_payment_to
   form.notes = item.notes
@@ -714,13 +735,36 @@ const editData = (item) => {
   form.vendor_invoice_number = item.vendor_invoice_number
   form.unpaid_amount = item.unpaid_amount
   form.is_sumbangan = item.is_sumbangan
-  
-  // Try to load budget_component from item if available, though CashbookReqHeader might not have it natively.
-  // It will be re-fetched by the form component watcher if needed.
   form.budget_component = item.budget_component || null
   form.budget_component_name = item.budget_component_name || ''
   form.document_status = item.document_status || ''
   form.approval_status = item.approval_status || ''
+  
+  // PCA-specific fields
+  form.is_pr_for_lpj = item.is_pr_for_lpj || false
+  form.is_reimbursement = item.is_reimbursement || false
+  form.is_vendor = item.is_vendor || false
+  form.vendor = item.vendor || null
+  form.account = item.account || null
+  // Map details with display fields for editing
+  form.details = (item.details || []).map(d => ({
+    id: d.id,
+    rap_detail: d.rap_detail,
+    item: d.item,
+    item_code: d.item_code,
+    item_name: d.item_name,
+    unit_name: d.unit_name,
+    rap_detail_volume: parseFloat(d.rap_detail_volume || 0),
+    quantity: parseFloat(d.quantity || 0),
+    unit_price: parseFloat(d.unit_price || 0),
+    total_amount: parseFloat(d.total_amount || 0),
+    is_tax_in: d.is_tax_in || false,
+    tax_amount: parseFloat(d.tax_amount || 0),
+    no_faktur: d.no_faktur || '',
+    npwp: d.npwp || '',
+    tax_account: d.tax_account || null,
+    tax_date: d.tax_date || ''
+  }))
   
   modal.show = true
 }

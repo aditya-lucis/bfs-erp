@@ -317,6 +317,9 @@ from .models import CashbookReqHeader, CashbookReqDetail
 class CashbookReqDetailSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source='item.item_name', read_only=True)
     item_code = serializers.CharField(source='item.item_code', read_only=True)
+    unit_name = serializers.CharField(source='item.unit.unit_name', read_only=True)
+    rap_detail_volume = serializers.DecimalField(source='rap_detail.volume', read_only=True, max_digits=18, decimal_places=2)
+    tax_account_display = serializers.CharField(source='tax_account.account_name', read_only=True)
     class Meta:
         model = CashbookReqDetail
         fields = '__all__'
@@ -329,6 +332,8 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     payment_to_display = serializers.CharField(source='payment_to.name', read_only=True)
     requestor_department_display = serializers.CharField(source='requestor_department.name', read_only=True)
     purchase_invoice_display = serializers.CharField(source='purchase_invoice.invoice_number', read_only=True)
+    account_display = serializers.CharField(source='account.account_name', read_only=True)
+    vendor_display = serializers.CharField(source='vendor.vendor_name', read_only=True)
 
     # Print-specific dynamic fields
     po_number = serializers.SerializerMethodField()
@@ -433,4 +438,63 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
             header.unpaid_tax_amount = total_tax
             header.save(update_fields=['amount', 'unpaid_amount', 'tax_amount', 'unpaid_tax_amount'])
         
+        # For PCA, details come from request.data
+        if header.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED and request:
+            self._sync_pca_details(header, request.data.get('details', []))
+        
         return header
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        request = self.context.get('request')
+        # For PCA, sync details on update
+        if instance.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED and request:
+            self._sync_pca_details(instance, request.data.get('details', []))
+        return instance
+
+    def _sync_pca_details(self, header, details_data):
+        """Create/update/delete PCA detail lines and recalculate header amounts."""
+        import datetime
+        today = datetime.date.today()
+        incoming_ids = [d.get('id') for d in details_data if d.get('id')]
+        # Delete lines removed from payload
+        header.details.exclude(id__in=incoming_ids).delete()
+
+        total_amt = 0
+        total_tax = 0
+
+        for d in details_data:
+            detail_id = d.get('id')
+            quantity = float(d.get('quantity', 0))
+            unit_price = float(d.get('unit_price', 0))
+            price = quantity * unit_price
+            is_tax_in = bool(d.get('is_tax_in', False))
+            tax_amount = float(d.get('tax_amount', 0)) if is_tax_in else 0
+
+            defaults = {
+                'item_id': d.get('item'),
+                'rap_detail_id': d.get('rap_detail'),
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'total_amount': price,
+                'is_tax_in': is_tax_in,
+                'tax_amount': tax_amount,
+                'no_faktur': d.get('no_faktur', '') if is_tax_in else '',
+                'npwp': d.get('npwp', '') if is_tax_in else '',
+                'tax_account_id': d.get('tax_account') if is_tax_in else None,
+                'tax_date': d.get('tax_date') or str(today) if is_tax_in else None,
+            }
+
+            if detail_id:
+                CashbookReqDetail.objects.filter(id=detail_id, header=header).update(**defaults)
+            else:
+                CashbookReqDetail.objects.create(header=header, **defaults)
+
+            total_amt += price
+            total_tax += tax_amount
+
+        header.amount = total_amt
+        header.unpaid_amount = total_amt
+        header.tax_amount = total_tax
+        header.save(update_fields=['amount', 'unpaid_amount', 'tax_amount'])
+

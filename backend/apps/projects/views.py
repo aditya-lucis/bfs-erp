@@ -164,8 +164,61 @@ class ProjectListView(generics.ListCreateAPIView):
             ).filter(has_active_cbr=False)
 
             qs = qs.filter(purchase_orders__purchase_invoices__in=valid_invoices).distinct()
-            
+
+        elif usage == 'project_cash_advanced':
+            # Show only 'start' status projects that still have at least 1 available RAP item
+            from apps.accounting.models import CashbookReqHeader, CashbookReqDetail
+            from apps.projects.models import RAP, RAPDetail
+            from django.db.models import Exists, OuterRef, Q
+
+            qs = qs.filter(status='start')
+
+            # Project must have an active RAP
+            active_rap_exists = RAP.objects.filter(project=OuterRef('pk'), is_active=True)
+            qs = qs.filter(Exists(active_rap_exists))
+
+            # For each candidate project, we check if it has at least one free item
+            # We do this in Python for clarity (projects with start status are typically not thousands)
+            available_project_ids = []
+            exclude_cbr = self.request.query_params.get('exclude_cbr')
+
+            for project in qs:
+                active_rap = RAP.objects.filter(project=project, is_active=True).first()
+                if not active_rap:
+                    continue
+                rap_items = active_rap.details.filter(item_type='item')
+                if not rap_items.exists():
+                    continue
+
+                used_in_pca = CashbookReqDetail.objects.filter(
+                    header__project=project,
+                    header__usage_for=CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED,
+                    rap_detail__rap=active_rap
+                ).exclude(
+                    Q(header__is_close=True) | Q(header__approval_status=CashbookReqHeader.ApprovalStatus.REJECTED)
+                )
+                if exclude_cbr:
+                    used_in_pca = used_in_pca.exclude(header__id=exclude_cbr)
+
+                try:
+                    from apps.purchase.models import PRDetail
+                    used_in_purchasing = PRDetail.objects.filter(
+                        rap_detail__rap=active_rap
+                    ).exclude(pr__status='cancelled')
+                    used_rap_ids = set(
+                        list(used_in_pca.values_list('rap_detail_id', flat=True)) +
+                        list(used_in_purchasing.values_list('rap_detail_id', flat=True))
+                    )
+                except Exception:
+                    used_rap_ids = set(used_in_pca.values_list('rap_detail_id', flat=True))
+
+                if rap_items.exclude(id__in=used_rap_ids).exists():
+                    available_project_ids.append(project.id)
+
+            qs = qs.filter(id__in=available_project_ids)
+
         return qs
+
 
     def perform_create(self, serializer):
         company = Company.get_default()
