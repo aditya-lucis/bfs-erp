@@ -108,6 +108,7 @@ class EmployeeCreateSerializer(serializers.Serializer):
 class EmployeeListSerializer(serializers.ModelSerializer):
     """Untuk list view."""
     position_name   = serializers.CharField(source='position.name',            read_only=True)
+    department      = serializers.IntegerField(source='position.department.id', read_only=True)
     department_name = serializers.CharField(source='position.department.name', read_only=True)
     username        = serializers.CharField(source='user.username',            read_only=True, default=None)
     has_signature   = serializers.BooleanField(read_only=True)
@@ -117,7 +118,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
         model  = Employee
         fields = [
             'id', 'employee_id', 'full_name', 'email', 'phone',
-            'position', 'position_name', 'department_name',
+            'position', 'position_name', 'department', 'department_name',
             'status', 'join_date', 'has_signature',
             'user', 'username', 'groups', 'created_at',
         ]

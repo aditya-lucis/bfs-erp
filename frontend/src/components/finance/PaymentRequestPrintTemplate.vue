@@ -70,7 +70,7 @@
                     </tr>
                     <tr>
                       <td class="border border-black px-2 py-1 font-semibold bg-gray-100">Termin</td>
-                      <td class="border border-black px-2 py-1">{{ document?.term_duration || '-' }}</td>
+                      <td class="border border-black px-2 py-1">{{ document?.usage_for === 'Project Cash Advanced' ? (document?.duration_due_date || '-') : (document?.term_duration || '-') }}</td>
                       <td class="border border-black px-2 py-1 font-semibold bg-gray-100">Transaction</td>
                       <td class="border border-black px-2 py-1">{{ document?.transaction_type_display || '-' }}</td>
                     </tr>

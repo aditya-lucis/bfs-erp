@@ -94,11 +94,14 @@ class EmployeeListCreateView(APIView):
         status_filter = request.query_params.get('status')
         dept_filter   = request.query_params.get('department')
         search        = request.query_params.get('search')
+        user_filter   = request.query_params.get('user')
 
         if status_filter:
             qs = qs.filter(status=status_filter)
         if dept_filter:
             qs = qs.filter(position__department_id=dept_filter)
+        if user_filter:
+            qs = qs.filter(user_id=user_filter)
         if search:
             qs = qs.filter(
                 django_models.Q(full_name__icontains=search) |

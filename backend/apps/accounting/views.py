@@ -465,7 +465,7 @@ class GlobalLinkedAccountView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-from .models import CashbookReqHeader
+from .models import CashbookReqHeader, CashbookReqDetail
 from .serializers import CashbookReqHeaderSerializer
 from rest_framework.decorators import action
 
@@ -520,9 +520,9 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
             elif transaction.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED:
                 # Advance if Is LPJ OR Is Reimbursement is checked
                 if transaction.is_pr_for_lpj or transaction.is_reimbursement:
-                    doc_code = 'uang muka'
+                    doc_code = 'CBR_PCA_UM'
                 else:
-                    doc_code = 'non uang muka'
+                    doc_code = 'CBR_PCA_NON'
             else:
                 return Response({'detail': f'Approval for usage {transaction.usage_for} is not configured yet.'}, status=status.HTTP_400_BAD_REQUEST)
                 
@@ -543,40 +543,51 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'])
-    def available_rap_details(self, request, pk=None):
+    @action(detail=False, methods=['get'])
+    def available_rap_details(self, request):
         """Return RAP detail items available for selection in PCA form."""
-        header = self.get_object()
-        if not header.project:
+        project_id = request.query_params.get('project_id')
+        header_id = request.query_params.get('header_id')
+
+        if not project_id:
             return Response([])
 
         from apps.projects.models import RAP
         from django.db.models import Q
 
-        active_rap = RAP.objects.filter(project=header.project, is_active=True).first()
+        active_rap = RAP.objects.filter(project_id=project_id, is_active=True).first()
         if not active_rap:
             return Response([])
 
         rap_items = active_rap.details.filter(item_type='item')
 
-        current_detail_rap_ids = list(header.details.values_list('rap_detail_id', flat=True))
+        current_detail_rap_ids = []
+        if header_id:
+            header = CashbookReqHeader.objects.filter(id=header_id).first()
+            if header:
+                current_detail_rap_ids = list(header.details.values_list('rap_detail_id', flat=True))
 
         used_in_other_pca = CashbookReqDetail.objects.filter(
-            header__project=header.project,
+            header__project_id=project_id,
             header__usage_for=CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED,
             rap_detail__isnull=False
-        ).exclude(
-            header__id=header.id
-        ).exclude(
+        )
+        if header_id:
+            used_in_other_pca = used_in_other_pca.exclude(header__id=header_id)
+            
+        used_in_other_pca = used_in_other_pca.exclude(
             Q(header__is_close=True) | Q(header__approval_status=CashbookReqHeader.ApprovalStatus.REJECTED)
         ).values_list('rap_detail_id', flat=True)
 
         try:
-            from apps.purchase.models import PRDetail
-            used_in_purchasing = PRDetail.objects.filter(
+            from apps.purchase.models import PurchaseRequisition, PurchaseRequisitionDetail
+            used_in_purchasing = PurchaseRequisitionDetail.objects.filter(
                 rap_detail__rap=active_rap
-            ).exclude(pr__status='cancelled').values_list('rap_detail_id', flat=True)
-        except Exception:
+            ).exclude(
+                pr__approval_status=PurchaseRequisition.ApprovalStatus.REJECTED
+            ).values_list('rap_detail_id', flat=True)
+        except Exception as e:
+            print(f"Error checking used_in_purchasing: {e}")
             used_in_purchasing = []
 
         exclude_ids = set(list(current_detail_rap_ids) + list(used_in_other_pca) + list(used_in_purchasing))

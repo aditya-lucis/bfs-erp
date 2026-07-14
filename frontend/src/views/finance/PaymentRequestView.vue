@@ -301,7 +301,7 @@
     </div>
     
     <!-- Bulk Actions (Dynamic based on Usage For) -->
-    <div class="flex flex-wrap items-center gap-2 mt-4" v-if="tableData.length > 0">
+    <div class="flex flex-wrap items-center gap-2 mt-4">
       <button @click="openAddModal" class="px-3 py-1.5 flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-all shadow-sm border border-gray-300 cursor-pointer">
         <Plus class="w-3.5 h-3.5 text-bfs-gold" />
         New Cash Book
@@ -572,8 +572,11 @@ const handlePrint = async (item) => {
     // Only fetch signatures if it's already awaiting/approved
     if (item.approval_status && item.approval_status !== 'draft') {
       let docCode = 'CBR_PI'
-      if (item.usage_for !== 'Purchase Invoice Payment') {
-        docCode = 'CBR_OTHER' // generic fallback
+      if (item.usage_for === 'Project Cash Advanced') {
+        if (item.is_pr_for_lpj || item.is_reimbursement) docCode = 'CBR_PCA_UM'
+        else docCode = 'CBR_PCA_NON'
+      } else if (item.usage_for !== 'Purchase Invoice Payment') {
+        docCode = 'CBR_OTHER'
       }
       const res = await api.get('/approval/signatures/', {
         params: {
@@ -780,6 +783,8 @@ const saveData = async (isSubmit) => {
     isSaving.value = true
     const payload = {
       ...form,
+      invoice_date: form.invoice_date || null,
+      due_date: form.due_date || null,
       document_status: 'draft',
       approval_status: 'draft'
     }

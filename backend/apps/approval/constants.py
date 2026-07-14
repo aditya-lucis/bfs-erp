@@ -16,6 +16,8 @@ class DocumentType(models.TextChoices):
     GOOD_RECEIPT_NOTE = 'GRN', 'Good Receipt Note (GRN)'
     RECEIPT_REPORT = 'RECEIPT_REPORT', 'Receipt Report (RR)'
     PAYMENT_REQUEST_PI = 'CBR_PI', 'Payment Request (Purchase Invoice)'
+    PAYMENT_REQUEST_PCA_UM = 'CBR_PCA_UM', 'Payment Request (PCA - Uang Muka)'
+    PAYMENT_REQUEST_PCA_NON_UM = 'CBR_PCA_NON', 'Payment Request (PCA - Non Uang Muka)'
 
 class ApprovalBasis(models.TextChoices):
     AMOUNT   = 'AMOUNT',   'Total Amount (After Disc & Tax)'

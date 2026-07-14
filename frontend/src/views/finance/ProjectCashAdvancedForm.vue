@@ -159,22 +159,22 @@
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-xs min-w-[900px]">
+        <table class="w-full text-xs min-w-[1400px]">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th class="px-3 py-2 text-left text-gray-500 w-8">#</th>
-              <th class="px-3 py-2 text-left text-gray-500">Item Code</th>
-              <th class="px-3 py-2 text-left text-gray-500">Item Name</th>
-              <th class="px-3 py-2 text-right text-gray-500 w-24">Qty</th>
-              <th class="px-3 py-2 text-right text-gray-500 w-28">Unit Price</th>
-              <th class="px-3 py-2 text-right text-gray-500 w-28">Price</th>
-              <th class="px-3 py-2 text-center text-gray-500 w-14">Tax In</th>
-              <th class="px-3 py-2 text-right text-gray-500 w-28">Tax Amt</th>
-              <th class="px-3 py-2 text-left text-gray-500 w-28">No Faktur</th>
-              <th class="px-3 py-2 text-left text-gray-500 w-28">NPWP</th>
-              <th class="px-3 py-2 text-left text-gray-500 w-36">Account Tax</th>
-              <th class="px-3 py-2 text-left text-gray-500 w-28">Tax Date</th>
-              <th class="px-3 py-2 w-8"></th>
+              <th class="px-3 py-2 text-left text-gray-500 w-10">#</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[140px]">Item Code</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[180px]">Item Name</th>
+              <th class="px-3 py-2 text-right text-gray-500 min-w-[100px]">Qty</th>
+              <th class="px-3 py-2 text-right text-gray-500 min-w-[120px]">Unit Price</th>
+              <th class="px-3 py-2 text-right text-gray-500 min-w-[120px]">Price</th>
+              <th class="px-3 py-2 text-center text-gray-500 min-w-[70px]">Tax In</th>
+              <th class="px-3 py-2 text-right text-gray-500 min-w-[120px]">Tax Amt</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[130px]">No Faktur</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[130px]">NPWP</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[180px]">Account Tax</th>
+              <th class="px-3 py-2 text-left text-gray-500 min-w-[130px]">Tax Date</th>
+              <th class="px-3 py-2 w-12 text-center">Act</th>
             </tr>
           </thead>
           <tbody>
@@ -209,10 +209,10 @@
               <td class="px-3 py-1.5">
                 <input
                   v-if="row.is_tax_in"
-                  v-model.number="row.tax_amount"
-                  type="number" step="0.01" min="0"
-                  class="form-input text-right text-xs py-1 px-2 w-full"
-                  placeholder="0.00"
+                  :value="formatNumber(row.tax_amount)"
+                  type="text"
+                  readonly
+                  class="form-input text-right text-xs py-1 px-2 w-full bg-gray-50 text-gray-500 cursor-not-allowed font-semibold"
                 />
                 <span v-else class="text-gray-300 block text-right">-</span>
               </td>
@@ -405,7 +405,7 @@ const fetchOptions = async () => {
     }))
 
     vendorOptions.value = (vendorRes.data.results || vendorRes.data).map(v => ({
-      id: v.id, label: v.vendor_name
+      id: v.id, label: v.name
     }))
 
     // Auto-fill requestor department
@@ -427,7 +427,7 @@ const fetchOptions = async () => {
 const fetchUserDepartment = async () => {
   if (props.form.requestor_department) return // already set (edit mode)
   try {
-    const userRes = await api.get('auth/users/me/')
+    const userRes = await api.get('auth/me/')
     const empRes = await api.get(`org/employees/?user=${userRes.data.id}`)
     const emp = (empRes.data.results || empRes.data)[0]
     if (emp?.department) props.form.requestor_department = emp.department
@@ -446,6 +446,11 @@ const taxInTotal = computed(() =>
 )
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
+watch([netAmount, taxInTotal], ([net, tax]) => {
+  props.form.amount = net
+  props.form.tax_amount = tax
+}, { immediate: true })
+
 watch(() => props.form.payment_to, (val) => {
   const sel = paymentToOptions.value.find(p => p.id === val)
   props.form.notes_payment_to = sel?.description || ''
@@ -494,6 +499,9 @@ const onQtyChange = (row) => {
     })
     row.quantity = max
   }
+  if (row.is_tax_in) {
+    row.tax_amount = (parseFloat(row.quantity || 0) * parseFloat(row.unit_price || 0)) * 0.11
+  }
 }
 
 const onTaxInChange = (row) => {
@@ -501,6 +509,7 @@ const onTaxInChange = (row) => {
     row.tax_amount = 0; row.no_faktur = ''; row.npwp = ''; row.tax_account = null; row.tax_date = ''
   } else {
     if (!row.tax_date) row.tax_date = today()
+    row.tax_amount = (parseFloat(row.quantity || 0) * parseFloat(row.unit_price || 0)) * 0.11
   }
 }
 
@@ -514,24 +523,24 @@ const openRapPicker = async () => {
   rapPicker.value = { show: true, loading: true, items: [], selected: [] }
 
   try {
-    let items = []
+    let url = `accounting/cashbook-request/available_rap_details/?project_id=${props.form.project}`
     if (props.form.id) {
-      const res = await api.get(`accounting/cashbook-request/${props.form.id}/available_rap_details/`)
-      items = res.data || []
-    } else {
-      const rapRes = await api.get(`projects/raps/?project=${props.form.project}&is_active=true`)
-      const raps = rapRes.data.results || rapRes.data
-      if (!raps?.length) {
-        rapPicker.value.loading = false
-        Swal.fire('Info', 'Tidak ada RAP aktif untuk project ini.', 'info')
-        rapPicker.value.show = false
-        return
-      }
-      const detailRes = await api.get(`projects/raps/${raps[0].id}/`)
-      const alreadySelectedIds = (props.form.details || []).map(d => d.rap_detail).filter(Boolean)
-      items = (detailRes.data.details || [])
-        .filter(d => d.item_type === 'item' && !alreadySelectedIds.includes(d.id))
+      url += `&header_id=${props.form.id}`
     }
+    
+    const res = await api.get(url)
+    let items = res.data || []
+    
+    if (!items.length) {
+      rapPicker.value.loading = false
+      Swal.fire('Info', 'Tidak ada item RAP yang tersedia untuk project ini (mungkin sudah habis dipakai).', 'info')
+      rapPicker.value.show = false
+      return
+    }
+    
+    // Filter out items that are already selected in the CURRENT frontend form state
+    const alreadySelectedIds = (props.form.details || []).map(d => d.rap_detail).filter(Boolean)
+    items = items.filter(d => !alreadySelectedIds.includes(d.id))
     rapPicker.value.items = items
   } catch (e) {
     console.error(e)

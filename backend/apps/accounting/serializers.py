@@ -334,6 +334,7 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     purchase_invoice_display = serializers.CharField(source='purchase_invoice.invoice_number', read_only=True)
     account_display = serializers.CharField(source='account.account_name', read_only=True)
     vendor_display = serializers.CharField(source='vendor.vendor_name', read_only=True)
+    budget_component_name = serializers.SerializerMethodField()
 
     # Print-specific dynamic fields
     po_number = serializers.SerializerMethodField()
@@ -369,6 +370,13 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     def get_site_name(self, obj):
         if obj.project:
             return obj.project.site_name
+        return None
+
+    def get_budget_component_name(self, obj):
+        if obj.project:
+            active_rap = obj.project.raps.filter(is_active=True).first()
+            if active_rap and active_rap.budget_component:
+                return active_rap.budget_component.name
         return None
 
     def get_rap_name(self, obj):
