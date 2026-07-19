@@ -620,3 +620,58 @@ class CashbookReqDetail(models.Model):
     class Meta:
         db_table = 'acc_cashbook_req_detail'
         verbose_name = 'Cashbook Request Detail'
+
+
+# ─── Bank Obligation ──────────────────────────────────────────────────────────
+
+class LoanType(models.TextChoices):
+    NON_SINDIKASI = 'NON_SINDIKASI', 'Non Sindikasi'
+    SINDIKASI = 'SINDIKASI', 'Sindikasi'
+    TRANCHE_1 = 'TRANCHE_1', 'Tranche 1'
+    TRANCHE_2 = 'TRANCHE_2', 'Tranche 2'
+    TRANCHE_3 = 'TRANCHE_3', 'Tranche 3'
+    KREDIT_INVESTASI = 'KREDIT_INVESTASI', 'Kredit Investasi'
+    KREDIT_MODAL_KERJA = 'KREDIT_MODAL_KERJA', 'Kredit Modal Kerja'
+    KREDIT_REKENING_KORAN = 'KREDIT_REKENING_KORAN', 'Kredit Rekening Koran'
+    BACK_TO_BACK = 'BACK_TO_BACK', 'Back To Back'
+    CAPITAL_LEASE = 'CAPITAL_LEASE', 'Capital Lease'
+    OPERATING_LEASE = 'OPERATING_LEASE', 'Operating Lease'
+
+class BankObligation(models.Model):
+    company = models.ForeignKey('organization.Company', on_delete=models.CASCADE, related_name='bank_obligations')
+    loan_no = models.CharField(max_length=100)
+    transaction_date = models.DateField()
+    contract_number = models.CharField(max_length=100, null=True, blank=True)
+    bank = models.ForeignKey('master_type.MasterBank', on_delete=models.PROTECT, related_name='+')
+    account_pokok = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='+')
+    account_bunga = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='+')
+    due_date = models.DateField()
+    plafond = models.DecimalField(max_digits=18, decimal_places=2)
+    jangka_waktu = models.IntegerField(help_text='In months')
+    bunga_margin = models.DecimalField(max_digits=5, decimal_places=2, help_text='Percentage per year')
+    loan_type = models.CharField(max_length=50, choices=LoanType.choices, default=LoanType.NON_SINDIKASI)
+    
+    is_closed = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'acc_bank_obligation'
+
+class BankObligationDetail(models.Model):
+    header = models.ForeignKey(BankObligation, on_delete=models.CASCADE, related_name='details')
+    no = models.IntegerField()
+    bulan = models.DateField()
+    tanggal_pencairan = models.DateField()
+    sisa_pokok = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    pokok = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    margin = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    diskon_margin = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total_angsuran = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    is_cbr_pokok = models.BooleanField(default=False)
+    is_cbr_bunga = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'acc_bank_obligation_detail'
+        ordering = ['no']

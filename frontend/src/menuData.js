@@ -444,7 +444,7 @@ export const menuData = {
     },
     {
       name: 'Bank Obligation', url: '', children: [
-        { name: 'Bank Obligation', url: '' },
+        { name: 'Bank Obligation', url: '/finance/bank-obligation' },
         { name: 'Bank Obligation Report', url: '' },
       ]
     },

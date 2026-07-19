@@ -3,7 +3,10 @@ BFS ERP — Accounting: Chart of Account Serializers
 """
 
 from rest_framework import serializers
-from .models import Account, AccountGroup, AccountType, BankType, DefaultPosition
+from .models import (
+    Account, AccountGroup, AccountType, BankType, DefaultPosition,
+    BankObligation, BankObligationDetail
+)
 
 
 # ─── Account Group ────────────────────────────────────────────────────────────
@@ -506,3 +509,56 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         header.tax_amount = total_tax
         header.save(update_fields=['amount', 'unpaid_amount', 'tax_amount'])
 
+
+# ─── Bank Obligation ──────────────────────────────────────────────────────────
+
+class BankObligationDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankObligationDetail
+        fields = [
+            'id', 'no', 'bulan', 'tanggal_pencairan', 'sisa_pokok',
+            'pokok', 'margin', 'diskon_margin', 'total_angsuran',
+            'is_cbr_pokok', 'is_cbr_bunga'
+        ]
+        read_only_fields = ['id']
+
+class BankObligationSerializer(serializers.ModelSerializer):
+    details = BankObligationDetailSerializer(many=True, required=False)
+    bank_name = serializers.CharField(source='bank.name', read_only=True)
+    account_pokok_name = serializers.CharField(source='account_pokok.name', read_only=True)
+    account_bunga_name = serializers.CharField(source='account_bunga.name', read_only=True)
+
+    class Meta:
+        model = BankObligation
+        fields = [
+            'id', 'company', 'loan_no', 'transaction_date', 'contract_number',
+            'bank', 'bank_name', 'account_pokok', 'account_pokok_name',
+            'account_bunga', 'account_bunga_name', 'due_date', 'plafond',
+            'jangka_waktu', 'bunga_margin', 'loan_type', 'is_closed',
+            'details', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'company', 'is_closed', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        details_data = validated_data.pop('details', [])
+        header = BankObligation.objects.create(**validated_data)
+        
+        for d in details_data:
+            BankObligationDetail.objects.create(header=header, **d)
+            
+        return header
+
+    def update(self, instance, validated_data):
+        details_data = validated_data.pop('details', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if details_data is not None:
+            # Recreate details for simplicity since they are auto-generated
+            instance.details.all().delete()
+            for d in details_data:
+                BankObligationDetail.objects.create(header=instance, **d)
+                
+        return instance

@@ -213,6 +213,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAccountingStore } from '../../stores/accounting.js'
 import { usePermission } from '../../composables/usePermission.js'
+import Swal from 'sweetalert2'
 import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import AccountTreeNode from '../../components/accounting/AccountTreeNode.vue'
@@ -392,8 +393,17 @@ async function handleGroupSave() {
     await store.createAccountGroup({ ...groupForm })
     groupModal.show = false
     await Promise.all([store.fetchAccountGroups(), store.fetchCoaTree()])
+    Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Account group berhasil disimpan', timer: 1500, showConfirmButton: false })
   } catch (err) {
     console.error(err)
+    const errData = err.response?.data
+    let errMsg = 'Terjadi kesalahan saat menyimpan data.'
+    if (errData) {
+      if (typeof errData === 'string') errMsg = errData
+      else if (errData.code) errMsg = errData.code.join(', ')
+      else errMsg = Object.values(errData).flat().join('\n')
+    }
+    Swal.fire({ icon: 'error', title: 'Gagal Menyimpan', text: errMsg })
   } finally {
     isSaving.value = false
   }

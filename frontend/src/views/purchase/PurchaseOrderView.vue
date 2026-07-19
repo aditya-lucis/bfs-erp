@@ -431,28 +431,32 @@
                 <div class="flex justify-between text-[10px] mt-12 mb-8">
                   <div class="w-56 text-center">
                     <table class="w-full border border-black">
-                      <tr class="border-b border-black"><td class="py-1 text-[9px]">Accepted By</td></tr>
-                      <tr class="border-b border-black"><td class="py-1">Supplier</td></tr>
-                      <tr><td class="h-20 align-middle p-1"></td></tr>
-                      <tr class="border-t border-black"><td class="py-1">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                      <tbody>
+                        <tr class="border-b border-black"><td class="py-1 text-[9px]">Accepted By</td></tr>
+                        <tr class="border-b border-black"><td class="py-1">Supplier</td></tr>
+                        <tr><td class="h-20 align-middle p-1"></td></tr>
+                        <tr class="border-t border-black"><td class="py-1">{{ printModal.po?.vendor_name || '-' }}</td></tr>
+                      </tbody>
                     </table>
                   </div>
                   <div class="w-56 text-center">
                     <table class="w-full border border-black">
-                      <tr class="border-b border-black"><td class="py-1 text-[9px]">Approved By</td></tr>
-                      <tr class="border-b border-black"><td class="py-1">Direktur</td></tr>
-                      <tr>
-                        <td class="h-20 align-middle p-1 relative">
-                          <template v-for="sig in printModal.signatures" :key="sig.id">
-                            <img v-if="sig.is_signed" :src="sig.signature_image" class="max-h-16 max-w-full mx-auto object-contain" />
-                          </template>
-                        </td>
-                      </tr>
-                      <tr class="border-t border-black"><td class="py-1 font-medium">
-                        <span v-for="(sig, i) in printModal.signatures" :key="'name-'+sig.id">
-                          {{ sig.user_name }}<span v-if="i < printModal.signatures.length - 1">, </span>
-                        </span>
-                      </td></tr>
+                      <tbody>
+                        <tr class="border-b border-black"><td class="py-1 text-[9px]">Approved By</td></tr>
+                        <tr class="border-b border-black"><td class="py-1">Direktur</td></tr>
+                        <tr>
+                          <td class="h-20 align-middle p-1 relative">
+                            <template v-for="sig in printModal.signatures" :key="sig.id">
+                              <img v-if="sig.is_signed" :src="sig.signature_image" class="max-h-16 max-w-full mx-auto object-contain" />
+                            </template>
+                          </td>
+                        </tr>
+                        <tr class="border-t border-black"><td class="py-1 font-medium">
+                          <span v-for="(sig, i) in printModal.signatures" :key="'name-'+sig.id">
+                            {{ sig.user_name }}<span v-if="i < printModal.signatures.length - 1">, </span>
+                          </span>
+                        </td></tr>
+                      </tbody>
                     </table>
                   </div>
                 </div>

@@ -20,20 +20,25 @@ Endpoints:
 """
 
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.organization.models import Company
 from apps.rbac.permissions import HasFunctionPermission
 
-from .models import Account, AccountGroup, AccountType, BankType, DefaultPosition
+from .models import (
+    Account, AccountGroup, AccountType, BankType, DefaultPosition,
+    BankObligation, BankObligationDetail
+)
 from .serializers import (
     AccountGroupSerializer,
     AccountListSerializer,
     AccountTreeSerializer,
     AccountDetailSerializer,
     AccountCreateSerializer,
+    BankObligationSerializer,
+    BankObligationDetailSerializer
 )
 
 
@@ -672,3 +677,24 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
                 header.save(update_fields=['allow_previous_year_budget', 'reason_allow_previous_year_budget'])
                 
         return Response({'status': 'success', 'message': f'Allowed previous year budget for {len(ids)} records.'})
+
+# ─── Bank Obligation ──────────────────────────────────────────────────────────
+
+class BankObligationViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
+    required_module = 'accounting'
+    required_function = 'bank_obligation'
+    serializer_class = BankObligationSerializer
+    queryset = BankObligation.objects.all().order_by('-created_at')
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        company_id = self.request.query_params.get('company_id')
+        if company_id and company_id != 'undefined':
+            qs = qs.filter(company_id=company_id)
+        return qs
+
+    def perform_create(self, serializer):
+        company = get_company(self.request)
+        serializer.save(company=company)

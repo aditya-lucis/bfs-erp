@@ -46,6 +46,7 @@ import PurchaseOrderView from './views/purchase/PurchaseOrderView.vue'
 import POInboxView from './views/purchase/POInboxView.vue'
 import GrnSesDocumentView from './views/purchase/GrnSesDocumentView.vue'
 import ReceiptReportView from './views/inventory/ReceiptReportView.vue'
+import BankObligationView from './views/finance/BankObligationView.vue'
 import { menuData } from './menuData.js'
 
 // Route yang sudah punya halaman nyata — jangan generate UnderConstruction
@@ -76,6 +77,9 @@ const implementedRoutes = [
   { path: '/finance/annual-budget', component: AnnualBudgetView, meta: { title: 'Annual Budget', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request', component: () => import('./views/finance/PaymentRequestView.vue'), meta: { title: 'Payment Request', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request-inbox', component: () => import('./views/finance/PaymentRequestInboxView.vue'), meta: { title: 'Payment Request Inbox', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/bank-obligation', component: BankObligationView, meta: { title: 'Bank Obligation', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/bank-obligation/new', component: () => import('./views/finance/BankObligationForm.vue'), meta: { title: 'Bank Obligation | Add', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/bank-obligation/edit/:id', component: () => import('./views/finance/BankObligationForm.vue'), meta: { title: 'Bank Obligation | Edit', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/settings/annual-period', component: AnnualPeriodView, meta: { title: 'Annual Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/quarter-period', component: QuarterPeriodView, meta: { title: 'Quarter Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/settings/monthly-period', component: MonthlyPeriodView, meta: { title: 'Monthly Period', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
