@@ -562,3 +562,11 @@ class BankObligationSerializer(serializers.ModelSerializer):
                 BankObligationDetail.objects.create(header=instance, **d)
                 
         return instance
+
+from .models import BankObligationSetting
+
+class BankObligationSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BankObligationSetting
+        fields = ['id', 'company', 'bunga_budget_component', 'pokok_budget_component', 'created_at', 'updated_at']
+        read_only_fields = ['company']

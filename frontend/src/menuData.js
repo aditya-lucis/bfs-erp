@@ -778,6 +778,7 @@ export const menuData = {
         { name: 'Linked Accounts', url: '' },
         { name: 'Link Account Template', url: '' },
         { name: 'Link Account Board', url: '' },
+        { name: 'Bank Obligation Setting', url: '/settings/bank-obligation-setting' },
         {
           name: 'Closing', url: '', children: [
             { name: 'Closing Module', url: '' },

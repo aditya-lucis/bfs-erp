@@ -57,6 +57,7 @@ const implementedRoutes = [
   { path: '/settings/payment-to', component: () => import('./views/settings/payment_to/PaymentToLayout.vue'), meta: { title: 'Master Payment To', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/user-authorization-group', component: AuthGroupListView, meta: { title: 'User Authorization Group', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/settings/employee-data', component: EmployeeView, meta: { title: 'Employee Data', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
+  { path: '/settings/bank-obligation-setting', component: () => import('./views/settings/BankObligationSettingView.vue'), meta: { title: 'Bank Obligation Setting', moduleId: 'settings', moduleName: 'Settings', layout: 'default' } },
   { path: '/gl/chart-of-accounts', component: ChartOfAccountView, meta: { title: 'Chart of Accounts', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/gl/general-journal-transaction', component: GeneralJournalListView, meta: { title: 'General Journal Transaction', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },
   { path: '/gl/general-journal-transaction/entry', component: GeneralJournalFormView, meta: { title: 'General Journal Entry', moduleId: 'gl', moduleName: 'General Ledger', layout: 'default' } },

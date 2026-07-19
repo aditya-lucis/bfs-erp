@@ -675,3 +675,31 @@ class BankObligationDetail(models.Model):
     class Meta:
         db_table = 'acc_bank_obligation_detail'
         ordering = ['no']
+
+# ─── Bank Obligation Settings ───────────────────────────────────────────────
+
+class BankObligationSetting(models.Model):
+    company = models.OneToOneField(
+        'organization.Company',
+        on_delete=models.CASCADE,
+        related_name='bank_obligation_setting',
+    )
+    bunga_budget_component = models.ForeignKey(
+        'budget_component.BudgetComponent',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bunga_settings',
+    )
+    pokok_budget_component = models.ForeignKey(
+        'budget_component.BudgetComponent',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pokok_settings',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bank_obligation_setting'

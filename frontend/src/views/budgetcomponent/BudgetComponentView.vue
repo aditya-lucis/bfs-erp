@@ -133,11 +133,24 @@
               </div>
 
               <div class="px-6 py-4 space-y-4">
+                <!-- Component Type -->
+                <FormField label="Tipe Komponen" required :error="formError.fieldErrors.component_type">
+                  <select v-model="form.component_type" class="form-input" :class="{ 'border-red-300': formError.fieldErrors.component_type }">
+                    <option value="standard">Standard (Departemen)</option>
+                    <option value="bank_obligation">Bank Obligation</option>
+                  </select>
+                </FormField>
+
                 <!-- Preview: Auto-generated Name -->
                 <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <label class="text-xs text-gray-500 uppercase font-semibold">Component Budget (Auto)</label>
+                  <label class="text-xs text-gray-500 uppercase font-semibold">Component Budget Name</label>
                   <p class="text-sm font-mono text-gray-800 mt-1">{{ previewName }}</p>
                 </div>
+
+                <!-- Custom Name -->
+                <FormField v-if="form.component_type === 'bank_obligation'" label="Nama Komponen" required :error="formError.fieldErrors.custom_name">
+                  <input v-model="form.custom_name" type="text" class="form-input" :class="{ 'border-red-300': formError.fieldErrors.custom_name }" placeholder="e.g. BUNGA BANK" />
+                </FormField>
 
                 <!-- Cost Category -->
                 <FormField label="Cost Category" required :error="formError.fieldErrors.cost_category">
@@ -154,7 +167,7 @@
                 </FormField>
 
                 <!-- Department -->
-                <FormField label="Department" required :error="formError.fieldErrors.department">
+                <FormField v-if="form.component_type === 'standard'" label="Department" required :error="formError.fieldErrors.department">
                   <select v-model="form.department" @change="onDepartmentChange" class="form-input" :class="{ 'border-red-300': formError.fieldErrors.department }">
                     <option :value="null">— Pilih —</option>
                     <option v-for="d in orgStore.departmentList" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -162,7 +175,7 @@
                 </FormField>
 
                 <!-- Cost of Unit (Position) -->
-                <FormField label="Cost of Unit" required :error="formError.fieldErrors.position">
+                <FormField v-if="form.component_type === 'standard'" label="Cost of Unit" required :error="formError.fieldErrors.position">
                   <select 
                     v-model="form.position" 
                     :disabled="!form.department || loadingPositions" 
@@ -302,6 +315,8 @@ function load() {
 // ── Form ───────────────────────────────────────────────────────────────────
 const modal = reactive({ show: false, mode: 'add', editId: null })
 const form = reactive({
+  component_type: 'standard',
+  custom_name: '',
   cost_category: '',
   department: null,
   position: null,
@@ -312,6 +327,7 @@ const form = reactive({
 const availablePositions = ref([])
 
 const previewName = computed(() => {
+  if (form.component_type === 'bank_obligation') return form.custom_name || '-'
   const cat = form.cost_category.toUpperCase() || '???'
   const dept = orgStore.departmentList.find(d => d.id === form.department)?.name?.toUpperCase() || ''
   const pos = availablePositions.value.find(p => p.id === form.position)?.name?.toUpperCase() || ''
@@ -332,6 +348,8 @@ function openAddModal() {
   modal.show = true; modal.mode = 'add'; modal.editId = null
   formError.clearErrors()
   Object.assign(form, {
+    component_type: 'standard',
+    custom_name: '',
     cost_category: '',
     department: null,
     position: null,
@@ -348,6 +366,8 @@ function openEditModal(row) {
   formError.clearErrors()
   
   // Set form values
+  form.component_type = row.component_type || 'standard'
+  form.custom_name = row.custom_name || ''
   form.cost_category = row.cost_category
   form.department = row.department
   form.order_no = row.order_no
@@ -392,14 +412,23 @@ function validate() {
     formError.fieldErrors.cost_category = 'Cost category wajib dipilih.'
     valid = false
   }
-  if (!form.department) {
-    formError.fieldErrors.department = 'Department wajib dipilih.'
-    valid = false
+  
+  if (form.component_type === 'standard') {
+    if (!form.department) {
+      formError.fieldErrors.department = 'Department wajib dipilih.'
+      valid = false
+    }
+    if (!form.position) {
+      formError.fieldErrors.position = 'Cost of unit (position) wajib dipilih.'
+      valid = false
+    }
+  } else if (form.component_type === 'bank_obligation') {
+    if (!form.custom_name) {
+      formError.fieldErrors.custom_name = 'Nama komponen wajib diisi.'
+      valid = false
+    }
   }
-  if (!form.position) {
-    formError.fieldErrors.position = 'Cost of unit (position) wajib dipilih.'
-    valid = false
-  }
+  
   return valid
 }
 
@@ -408,9 +437,11 @@ async function handleSubmit() {
   isSaving.value = true
   try {
     const payload = {
+      component_type: form.component_type,
+      custom_name: form.component_type === 'bank_obligation' ? form.custom_name : '',
       cost_category: form.cost_category,
-      department: form.department,
-      position: form.position,
+      department: form.component_type === 'standard' ? form.department : null,
+      position: form.component_type === 'standard' ? form.position : null,
       order_no: form.order_no,
       is_active: form.is_active,
     }

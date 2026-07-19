@@ -698,3 +698,26 @@ class BankObligationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         company = get_company(self.request)
         serializer.save(company=company)
+
+from .models import BankObligationSetting
+from .serializers import BankObligationSettingSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+class BankObligationSettingView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        company = get_company(request)
+        setting, created = BankObligationSetting.objects.get_or_create(company=company)
+        serializer = BankObligationSettingSerializer(setting)
+        return Response(serializer.data)
+
+    def put(self, request):
+        company = get_company(request)
+        setting, created = BankObligationSetting.objects.get_or_create(company=company)
+        serializer = BankObligationSettingSerializer(setting, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(company=company)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

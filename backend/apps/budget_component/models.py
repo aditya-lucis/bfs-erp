@@ -25,6 +25,10 @@ class BudgetComponent(models.Model):
         NONE  = 'none',  'NONE'
         ADDED = 'added', 'ADDED'
 
+    class ComponentType(models.TextChoices):
+        STANDARD = 'standard', 'Standard'
+        BANK_OBLIGATION = 'bank_obligation', 'Bank Obligation'
+
     company       = models.ForeignKey(
                         Company,
                         on_delete=models.CASCADE,
@@ -40,7 +44,15 @@ class BudgetComponent(models.Model):
                         Department,
                         on_delete=models.PROTECT,
                         related_name='budget_components',
+                        null=True,
+                        blank=True,
                     )
+    component_type = models.CharField(
+                        max_length=20,
+                        choices=ComponentType.choices,
+                        default=ComponentType.STANDARD,
+                    )
+    custom_name   = models.CharField(max_length=200, blank=True, null=True)
     position      = models.ForeignKey(
                         Position,
                         on_delete=models.PROTECT,
@@ -68,17 +80,20 @@ class BudgetComponent(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        # Auto-generate name: COST_CATEGORY - DEPARTMENT - POSITION
-        dept_name = self.department.name if self.department else ''
-        pos_name = self.position.name if self.position else ''
+        if self.component_type == self.ComponentType.BANK_OBLIGATION:
+            self.name = self.custom_name or ''
+        else:
+            # Auto-generate name: COST_CATEGORY - DEPARTMENT - POSITION
+            dept_name = self.department.name if self.department else ''
+            pos_name = self.position.name if self.position else ''
 
-        parts = [self.cost_category.upper()]
-        if dept_name:
-            parts.append(dept_name.upper())
-        if pos_name:
-            parts.append(pos_name.upper())
+            parts = [self.cost_category.upper()]
+            if dept_name:
+                parts.append(dept_name.upper())
+            if pos_name:
+                parts.append(pos_name.upper())
 
-        self.name = ' - '.join(parts)
+            self.name = ' - '.join(parts)
 
         # Deactivate existing active budget components for the same position and cost category
         if self.is_active and self.position:

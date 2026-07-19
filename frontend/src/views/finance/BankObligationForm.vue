@@ -239,6 +239,7 @@ const { canCreate, canUpdate } = usePermission('FINANCE-BANK-OBLIGATION')
 const isEdit = computed(() => !!route.params.id)
 const canSave = computed(() => isEdit.value ? canUpdate.value : canCreate.value)
 const loading = ref(false)
+const isDataLoaded = ref(false)
 
 const getTodayDate = () => {
   return new Date().toLocaleDateString('en-CA')
@@ -292,12 +293,7 @@ const calculatedAngsuranPokok = computed(() => {
 
 // Auto-generate details watcher
 watch([() => form.value.plafond, () => form.value.jangka_waktu, () => form.value.bunga_margin], () => {
-  // Only auto-generate if we are not editing (or if explicitly triggered)
-  if (isEdit.value && details.value.length > 0) {
-    // If editing and details exist, we shouldn't wipe them randomly, 
-    // but if the user clears and re-enters, we might. For now, let's just generate if empty.
-    if (details.value.length === parseInt(form.value.jangka_waktu)) return
-  }
+  if (!isDataLoaded.value) return
 
   const p = parseFloat(form.value.plafond) || 0
   const jw = parseInt(form.value.jangka_waktu) || 0
@@ -307,34 +303,50 @@ watch([() => form.value.plafond, () => form.value.jangka_waktu, () => form.value
     const angsuranPokok = Math.round((p / jw) * 100) / 100
     const angsuranBunga = Math.round((p * (bunga / 100 / 12)) * 100) / 100
     
-    let currentSisa = p
-    let totalPokokDihitung = 0
-    const newDetails = []
-    
-    for (let i = 1; i <= jw; i++) {
-      let d = new Date(form.value.transaction_date || getTodayDate())
-      d.setMonth(d.getMonth() + i)
-      const bulanStr = d.toLocaleDateString('en-CA')
+    if (details.value.length === jw) {
+      let currentSisa = p
+      let totalPokokDihitung = 0
+      for (let i = 0; i < jw; i++) {
+        const row = details.value[i]
+        let pokokBulanIni = (i === jw - 1) ? (Math.round((p - totalPokokDihitung) * 100) / 100) : angsuranPokok
+        
+        row.sisa_pokok = currentSisa
+        row.pokok = pokokBulanIni
+        row.margin = angsuranBunga
+        row.total_angsuran = Math.round((pokokBulanIni + angsuranBunga) * 100) / 100 - (parseFloat(row.diskon_margin) || 0)
+        
+        currentSisa = Math.round((currentSisa - pokokBulanIni) * 100) / 100
+        totalPokokDihitung += pokokBulanIni
+      }
+    } else {
+      let currentSisa = p
+      let totalPokokDihitung = 0
+      const newDetails = []
       
-      // Bulan terakhir menampung sisa rounding
-      let pokokBulanIni = (i === jw) ? (Math.round((p - totalPokokDihitung) * 100) / 100) : angsuranPokok
-      
-      newDetails.push({
-        no: i,
-        bulan: bulanStr,
-        tanggal_pencairan: form.value.transaction_date || getTodayDate(),
-        sisa_pokok: currentSisa,
-        pokok: pokokBulanIni,
-        margin: angsuranBunga,
-        diskon_margin: 0,
-        total_angsuran: Math.round((pokokBulanIni + angsuranBunga) * 100) / 100,
-        is_cbr_pokok: false,
-        is_cbr_bunga: false
-      })
-      currentSisa = Math.round((currentSisa - pokokBulanIni) * 100) / 100
-      totalPokokDihitung += pokokBulanIni
+      for (let i = 1; i <= jw; i++) {
+        let d = new Date(form.value.transaction_date || getTodayDate())
+        d.setMonth(d.getMonth() + i)
+        const bulanStr = d.toLocaleDateString('en-CA')
+        
+        let pokokBulanIni = (i === jw) ? (Math.round((p - totalPokokDihitung) * 100) / 100) : angsuranPokok
+        
+        newDetails.push({
+          no: i,
+          bulan: bulanStr,
+          tanggal_pencairan: form.value.transaction_date || getTodayDate(),
+          sisa_pokok: currentSisa,
+          pokok: pokokBulanIni,
+          margin: angsuranBunga,
+          diskon_margin: 0,
+          total_angsuran: Math.round((pokokBulanIni + angsuranBunga) * 100) / 100,
+          is_cbr_pokok: false,
+          is_cbr_bunga: false
+        })
+        currentSisa = Math.round((currentSisa - pokokBulanIni) * 100) / 100
+        totalPokokDihitung += pokokBulanIni
+      }
+      details.value = newDetails
     }
-    details.value = newDetails
   } else {
     details.value = []
   }
@@ -356,6 +368,8 @@ onMounted(async () => {
   await fetchMasterData()
   if (isEdit.value) {
     await loadData()
+  } else {
+    setTimeout(() => { isDataLoaded.value = true }, 50)
   }
 })
 
@@ -403,6 +417,7 @@ const loadData = async () => {
     Swal.fire('Error', 'Gagal memuat data', 'error')
   } finally {
     loading.value = false
+    setTimeout(() => { isDataLoaded.value = true }, 50)
   }
 }
 

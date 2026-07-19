@@ -16,7 +16,7 @@ class BudgetComponentSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetComponent
         fields = [
-            'id', 'name',
+            'id', 'name', 'component_type', 'custom_name',
             'cost_category', 'department', 'department_name', 'department_code',
             'position', 'position_name', 'position_code',
             'order_no', 'is_active', 'template_rap',
@@ -32,14 +32,21 @@ class BudgetComponentWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = BudgetComponent
         fields = [
-            'id', 'cost_category', 'department', 'position',
-            'order_no', 'is_active',
+            'id', 'component_type', 'custom_name', 'cost_category', 
+            'department', 'position', 'order_no', 'is_active',
         ]
 
     def validate(self, data):
         dept = data.get('department')
         pos = data.get('position')
+        c_type = data.get('component_type', 'standard')
 
+        if c_type == 'standard':
+            if not dept:
+                raise serializers.ValidationError({
+                    'department': 'Department is required for standard components.'
+                })
+        
         if pos and dept and pos.department_id != dept.id:
             raise serializers.ValidationError({
                 'position': 'Position harus berasal dari Department yang dipilih.'
