@@ -540,7 +540,7 @@ class CashbookReqHeader(models.Model):
     description = models.TextField(null=True, blank=True)
     currency = models.CharField(max_length=10, default='IDR')
     
-    project = models.ForeignKey('projects.Project', on_delete=models.PROTECT)
+    project = models.ForeignKey('projects.Project', on_delete=models.PROTECT, null=True, blank=True)
     payment_to = models.ForeignKey('master_type.PaymentTo', on_delete=models.PROTECT)
     notes_payment_to = models.TextField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
@@ -560,6 +560,8 @@ class CashbookReqHeader(models.Model):
     is_pr_for_lpj = models.BooleanField(default=False)
     is_vendor = models.BooleanField(default=False)
     vendor = models.ForeignKey('purchase.Vendor', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_requests')
+    
+    bank_obligation = models.ForeignKey('accounting.BankObligation', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_requests')
     
     document_status = models.CharField(max_length=20, choices=DocumentStatus.choices, default=DocumentStatus.DRAFT)
     approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.DRAFT)
@@ -583,6 +585,8 @@ class CashbookReqHeader(models.Model):
             from django.utils import timezone
             timestamp = timezone.localtime().strftime('%Y%m%d%H%M%S')
             prefix = f'CBR{timestamp}'
+            if self.usage_for in [self.UsageFor.BANK_OBLIGATION_PRINCIPAL, self.UsageFor.BANK_OBLIGATION_INTEREST]:
+                prefix = f'BRC{timestamp}'
             last = CashbookReqHeader.objects.order_by('id').last()
             if last:
                 try:
@@ -603,6 +607,7 @@ class CashbookReqDetail(models.Model):
     header = models.ForeignKey(CashbookReqHeader, on_delete=models.CASCADE, related_name='details')
     item = models.ForeignKey('inventory.Item', on_delete=models.PROTECT, null=True, blank=True)
     rap_detail = models.ForeignKey('projects.RAPDetail', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_details')
+    bank_obligation_detail = models.ForeignKey('accounting.BankObligationDetail', on_delete=models.SET_NULL, null=True, blank=True, related_name='cashbook_details')
     
     quantity = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     unit_price = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)

@@ -323,6 +323,7 @@ class CashbookReqDetailSerializer(serializers.ModelSerializer):
     unit_name = serializers.CharField(source='item.unit.unit_name', read_only=True)
     rap_detail_volume = serializers.DecimalField(source='rap_detail.volume', read_only=True, max_digits=18, decimal_places=2)
     tax_account_display = serializers.CharField(source='tax_account.account_name', read_only=True)
+    bank_obligation = serializers.IntegerField(source='bank_obligation_detail.header_id', read_only=True)
     class Meta:
         model = CashbookReqDetail
         fields = '__all__'
@@ -417,6 +418,95 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         result = obj.details.aggregate(total=Sum('quantity'))['total']
         return result if result is not None else 0
 
+    def validate(self, attrs):
+        usage_for = attrs.get('usage_for', getattr(self.instance, 'usage_for', CashbookReqHeader.UsageFor.PURCHASE_INVOICE_PAYMENT))
+        
+        # Check budget for Bank Obligation
+        if usage_for in [CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL, CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST]:
+            request = self.context.get('request')
+            if request and hasattr(request, 'user'):
+                from apps.accounting.models import BankObligationSetting
+                from apps.annual_budget.models import AnnualBudgetLine
+                from django.db.models import Sum
+                import datetime
+
+                company = getattr(request.user, 'employee_profile').position.department.company if getattr(request.user, 'employee_profile', None) and getattr(request.user.employee_profile, 'position', None) else None
+                if not company:
+                    from apps.organization.models import Company
+                    company = Company.objects.first()
+                if not company:
+                    raise serializers.ValidationError({'usage_for': 'User does not belong to any company.'})
+                    
+                setting = BankObligationSetting.objects.filter(company=company).first()
+                if not setting:
+                    raise serializers.ValidationError({'usage_for': 'Bank Obligation Setting is not configured for this company.'})
+
+                if usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL:
+                    budget_component = setting.pokok_budget_component
+                else:
+                    budget_component = setting.bunga_budget_component
+
+                if not budget_component:
+                    raise serializers.ValidationError({'usage_for': 'Budget Component is not configured for this usage in Bank Obligation Setting.'})
+
+                date = attrs.get('date', getattr(self.instance, 'date', None))
+                if date:
+                    if isinstance(date, str):
+                        date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+                    month_index = date.month
+                    year = date.year
+                    
+                    months_str = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+                    month_field = months_str[month_index - 1]
+                    reloc_field = f"{month_field}_reloc"
+
+                    # Find annual budget line for the year and budget component
+                    budget_line = AnnualBudgetLine.objects.filter(
+                        header__year=year,
+                        header__company=company,
+                        header__budget_type='BANK_OBLIGATION',
+                        budget_component=budget_component
+                    ).first()
+
+                    total_budget = 0
+                    if budget_line:
+                        budget_val = getattr(budget_line, month_field, 0) or 0
+                        reloc_val = getattr(budget_line, reloc_field, 0) or 0
+                        total_budget = float(budget_val) + float(reloc_val)
+                    
+                    # Calculate amount to be requested
+                    amount = float(attrs.get('amount', getattr(self.instance, 'amount', 0)))
+                    if request.data.get('details'):
+                        # If details are provided in request, calculate amount from them
+                        amount = sum([float(d.get('unit_price', 0)) * float(d.get('quantity', 1)) for d in request.data.get('details', [])])
+
+                    # Get existing used budget for the month (other CBRs)
+                    existing_cbrs = CashbookReqHeader.objects.filter(
+                        date__year=year,
+                        date__month=month_index,
+                        usage_for=usage_for,
+                        created_by__employee_profile__position__department__company=company
+                    ).exclude(
+                        document_status=CashbookReqHeader.DocumentStatus.CLOSE
+                    ).exclude(
+                        approval_status=CashbookReqHeader.ApprovalStatus.REJECTED
+                    )
+                    
+                    if self.instance:
+                        existing_cbrs = existing_cbrs.exclude(id=self.instance.id)
+
+                    used_budget = existing_cbrs.aggregate(total=Sum('amount'))['total'] or 0
+                    used_budget = float(used_budget)
+
+                    available_budget = total_budget - used_budget
+
+                    if amount > available_budget:
+                        raise serializers.ValidationError({
+                            'amount': f'Amount exceeds available budget. Total budget for {month_field.title()} {year}: {total_budget:,.2f}, Used: {used_budget:,.2f}, Available: {available_budget:,.2f}, Requested: {amount:,.2f}.'
+                        })
+
+        return attrs
+
     def create(self, validated_data):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
@@ -452,6 +542,10 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         # For PCA, details come from request.data
         if header.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED and request:
             self._sync_pca_details(header, request.data.get('details', []))
+            
+        # For Bank Obligation, details come from request.data
+        if header.usage_for in [CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL, CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST] and request:
+            self._sync_bank_obligation_details(header, request.data.get('details', []))
         
         return header
 
@@ -461,6 +555,11 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         # For PCA, sync details on update
         if instance.usage_for == CashbookReqHeader.UsageFor.PROJECT_CASH_ADVANCED and request:
             self._sync_pca_details(instance, request.data.get('details', []))
+            
+        # For Bank Obligation, sync details on update
+        if instance.usage_for in [CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL, CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST] and request:
+            self._sync_bank_obligation_details(instance, request.data.get('details', []))
+            
         return instance
 
     def _sync_pca_details(self, header, details_data):
@@ -509,6 +608,62 @@ class CashbookReqHeaderSerializer(serializers.ModelSerializer):
         header.tax_amount = total_tax
         header.save(update_fields=['amount', 'unpaid_amount', 'tax_amount'])
 
+    def _sync_bank_obligation_details(self, header, details_data):
+        """Create/update/delete Bank Obligation detail lines."""
+        from apps.accounting.models import BankObligationDetail
+        incoming_ids = [d.get('id') for d in details_data if d.get('id')]
+        
+        # Unmark is_cbr_pokok / is_cbr_bunga for deleted items
+        deleted_details = header.details.exclude(id__in=incoming_ids)
+        for d in deleted_details:
+            if d.bank_obligation_detail:
+                if header.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL:
+                    d.bank_obligation_detail.is_cbr_pokok = False
+                elif header.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST:
+                    d.bank_obligation_detail.is_cbr_bunga = False
+                d.bank_obligation_detail.save(update_fields=['is_cbr_pokok', 'is_cbr_bunga'])
+        
+        deleted_details.delete()
+
+        total_amt = 0
+
+        for d in details_data:
+            detail_id = d.get('id')
+            quantity = float(d.get('quantity', 1))
+            unit_price = float(d.get('unit_price', 0))
+            price = quantity * unit_price
+            bank_obligation_detail_id = d.get('bank_obligation_detail')
+
+            defaults = {
+                'bank_obligation_detail_id': bank_obligation_detail_id,
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'total_amount': price,
+            }
+
+            if detail_id:
+                CashbookReqDetail.objects.filter(id=detail_id, header=header).update(**defaults)
+            else:
+                CashbookReqDetail.objects.create(header=header, **defaults)
+                
+            # Mark is_cbr_pokok / is_cbr_bunga
+            if bank_obligation_detail_id:
+                try:
+                    bod = BankObligationDetail.objects.get(id=bank_obligation_detail_id)
+                    if header.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL:
+                        bod.is_cbr_pokok = True
+                    elif header.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST:
+                        bod.is_cbr_bunga = True
+                    bod.save(update_fields=['is_cbr_pokok', 'is_cbr_bunga'])
+                except BankObligationDetail.DoesNotExist:
+                    pass
+
+            total_amt += price
+
+        header.amount = total_amt
+        header.unpaid_amount = total_amt
+        header.save(update_fields=['amount', 'unpaid_amount'])
+
 
 # ─── Bank Obligation ──────────────────────────────────────────────────────────
 
@@ -524,7 +679,7 @@ class BankObligationDetailSerializer(serializers.ModelSerializer):
 
 class BankObligationSerializer(serializers.ModelSerializer):
     details = BankObligationDetailSerializer(many=True, required=False)
-    bank_name = serializers.CharField(source='bank.name', read_only=True)
+    bank_name = serializers.CharField(source='bank.bank_name', read_only=True)
     account_pokok_name = serializers.CharField(source='account_pokok.name', read_only=True)
     account_bunga_name = serializers.CharField(source='account_bunga.name', read_only=True)
 
@@ -566,7 +721,17 @@ class BankObligationSerializer(serializers.ModelSerializer):
 from .models import BankObligationSetting
 
 class BankObligationSettingSerializer(serializers.ModelSerializer):
+    bunga_budget_component_name = serializers.CharField(source='bunga_budget_component.name', read_only=True)
+    pokok_budget_component_name = serializers.CharField(source='pokok_budget_component.name', read_only=True)
+    bunga_cost_category_name = serializers.CharField(source='bunga_budget_component.get_cost_category_display', read_only=True)
+    pokok_cost_category_name = serializers.CharField(source='pokok_budget_component.get_cost_category_display', read_only=True)
+
     class Meta:
         model = BankObligationSetting
-        fields = ['id', 'company', 'bunga_budget_component', 'pokok_budget_component', 'created_at', 'updated_at']
+        fields = [
+            'id', 'company', 'bunga_budget_component', 'pokok_budget_component',
+            'bunga_budget_component_name', 'pokok_budget_component_name',
+            'bunga_cost_category_name', 'pokok_cost_category_name',
+            'created_at', 'updated_at'
+        ]
         read_only_fields = ['company']

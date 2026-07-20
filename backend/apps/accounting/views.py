@@ -468,16 +468,16 @@ class GlobalLinkedAccountView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 from .models import CashbookReqHeader, CashbookReqDetail
 from .serializers import CashbookReqHeaderSerializer
 from rest_framework.decorators import action
+from apps.accounting_period.period_decorators import PeriodCheckMixin
 
-class CashbookReqViewSet(viewsets.ModelViewSet):
+class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
     serializer_class = CashbookReqHeaderSerializer
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
     rbac_function_code = 'FINANCE-PAYMENT-REQUEST'
+    period_date_field = 'date'
     
     def get_queryset(self):
         qs = CashbookReqHeader.objects.all().order_by('-date', '-id')
@@ -682,8 +682,7 @@ class CashbookReqViewSet(viewsets.ModelViewSet):
 
 class BankObligationViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, HasFunctionPermission]
-    required_module = 'accounting'
-    required_function = 'bank_obligation'
+    rbac_function_code = 'FINANCE-BANK-OBLIGATION'
     serializer_class = BankObligationSerializer
     queryset = BankObligation.objects.all().order_by('-created_at')
     pagination_class = None
@@ -694,6 +693,42 @@ class BankObligationViewSet(viewsets.ModelViewSet):
         if company_id and company_id != 'undefined':
             qs = qs.filter(company_id=company_id)
         return qs
+
+    def get_permissions(self):
+        if self.action in ['active_bank_obligations', 'outstanding_details']:
+            return [permissions.IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=False, methods=['get'])
+    def active_bank_obligations(self, request):
+        company = get_company(request)
+        qs = self.get_queryset().filter(company=company, is_closed=False)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def outstanding_details(self, request, pk=None):
+        usage_for = request.query_params.get('usage_for')
+        exclude_cbr_id = request.query_params.get('exclude_cbr_id')
+        bank_obligation = self.get_object()
+        details = bank_obligation.details.all().order_by('no')
+        
+        # Filter based on whether they have already been requested in CBR
+        from django.db.models import Q
+        if usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL:
+            q_filter = Q(is_cbr_pokok=False)
+            if exclude_cbr_id:
+                q_filter = q_filter | Q(cashbook_details__header_id=exclude_cbr_id, cashbook_details__header__usage_for=usage_for)
+            details = details.filter(q_filter).distinct()
+        elif usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST:
+            q_filter = Q(is_cbr_bunga=False)
+            if exclude_cbr_id:
+                q_filter = q_filter | Q(cashbook_details__header_id=exclude_cbr_id, cashbook_details__header__usage_for=usage_for)
+            details = details.filter(q_filter).distinct()
+            
+        from .serializers import BankObligationDetailSerializer
+        serializer = BankObligationDetailSerializer(details, many=True)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         company = get_company(self.request)

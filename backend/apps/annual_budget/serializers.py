@@ -110,8 +110,21 @@ class AnnualBudgetLineWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         bc = data.pop('budget_component', None)
-        if bc and not data.get('cost_category'):
-            data['cost_category'] = bc
+        header = data.get('header')
+        
+        if header and header.budget_type == header.BudgetType.BANK_OBLIGATION:
+            if bc:
+                from apps.budget_component.models import BudgetComponent
+                try:
+                    comp = BudgetComponent.objects.get(id=bc)
+                    data['budget_component'] = comp
+                    data['cost_category'] = comp.cost_category
+                except BudgetComponent.DoesNotExist:
+                    raise serializers.ValidationError({'budget_component': 'Komponen tidak valid.'})
+        else:
+            if bc and not data.get('cost_category'):
+                data['cost_category'] = bc
+                
         return data
 
 

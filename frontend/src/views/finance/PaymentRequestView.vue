@@ -413,10 +413,13 @@
 
               <!-- Modal Form Content -->
               <div v-if="filterUsageFor === 'Purchase Invoice Payment'">
-                <PurchaseInvoicePaymentForm :form="form" @update:form="form = $event" />
+                <PurchaseInvoicePaymentForm :form="form" @update:form="Object.assign(form, $event)" />
               </div>
               <div v-else-if="filterUsageFor === 'Project Cash Advanced'">
                 <ProjectCashAdvancedForm :form="form" />
+              </div>
+              <div v-else-if="filterUsageFor === 'Bank Obligation Principal' || filterUsageFor === 'Bank Obligation Interest'">
+                <BankObligationPaymentForm :form="form" :usage-for="filterUsageFor" />
               </div>
               <div v-else class="px-6 py-4 space-y-6">
                 <!-- Data is context dependent -->
@@ -484,6 +487,7 @@ import Panel from '../../components/Panel.vue'
 import FormField from '../../components/FormField.vue'
 import PurchaseInvoicePaymentForm from './PurchaseInvoicePaymentForm.vue'
 import ProjectCashAdvancedForm from './ProjectCashAdvancedForm.vue'
+import BankObligationPaymentForm from './BankObligationPaymentForm.vue'
 import PaymentRequestPrintTemplate from '../../components/finance/PaymentRequestPrintTemplate.vue'
 import { Plus, Pencil, Trash2, Save, X, Search, FileText, Folder, FolderOpen, FolderCheck, FileClock, FileCheck, FileX, FileWarning, Send, Printer, PowerOff, Paperclip, Calendar, AlertCircle, CalendarCheck } from 'lucide-vue-next'
 import api from '../../services/api'
@@ -749,10 +753,20 @@ const editData = (item) => {
   form.is_vendor = item.is_vendor || false
   form.vendor = item.vendor || null
   form.account = item.account || null
+  
+  if (item.usage_for === 'Bank Obligation Principal' || item.usage_for === 'Bank Obligation Interest') {
+    if (item.details && item.details.length > 0) {
+      form.bank_obligation = item.details[0].bank_obligation || null
+    } else {
+      form.bank_obligation = null
+    }
+  }
+
   // Map details with display fields for editing
   form.details = (item.details || []).map(d => ({
     id: d.id,
     rap_detail: d.rap_detail,
+    bank_obligation_detail: d.bank_obligation_detail,
     item: d.item,
     item_code: d.item_code,
     item_name: d.item_name,
