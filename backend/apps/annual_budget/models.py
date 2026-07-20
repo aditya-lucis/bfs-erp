@@ -30,15 +30,25 @@ class AnnualBudgetHeader(models.Model):
     Satu header = satu kombinasi (company, department, year).
     Unique constraint mencegah duplikasi.
     """
+    class BudgetType(models.TextChoices):
+        STANDARD = 'STANDARD', 'Standard (Department)'
+        BANK_OBLIGATION = 'BANK_OBLIGATION', 'Bank Obligation'
+
     company    = models.ForeignKey(
                      Company,
                      on_delete=models.CASCADE,
                      related_name='annual_budgets',
                  )
+    budget_type = models.CharField(
+                     max_length=20,
+                     choices=BudgetType.choices,
+                     default=BudgetType.STANDARD,
+                 )
     department = models.ForeignKey(
                      Department,
                      on_delete=models.CASCADE,
                      related_name='annual_budgets',
+                     null=True, blank=True,
                  )
     year       = models.PositiveSmallIntegerField()
     notes      = models.TextField(blank=True)
@@ -57,13 +67,27 @@ class AnnualBudgetHeader(models.Model):
 
     class Meta:
         db_table        = 'annual_budget_header'
-        unique_together = ('company', 'department', 'year')
         ordering        = ['-year', 'department__name']
         verbose_name    = 'Annual Budget Header'
         verbose_name_plural = 'Annual Budget Headers'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company', 'department', 'year'],
+                condition=models.Q(budget_type='STANDARD'),
+                name='unique_standard_annual_budget'
+            ),
+            models.UniqueConstraint(
+                fields=['company', 'year'],
+                condition=models.Q(budget_type='BANK_OBLIGATION'),
+                name='unique_bank_obligation_annual_budget'
+            )
+        ]
 
     def __str__(self):
-        return f'[{self.year}] {self.department.name}'
+        if self.budget_type == self.BudgetType.BANK_OBLIGATION:
+            return f'[{self.year}] BANK OBLIGATION'
+        dept_name = self.department.name if self.department else 'Global'
+        return f'[{self.year}] {dept_name}'
 
     @property
     def total_annual(self):
@@ -82,6 +106,12 @@ class AnnualBudgetLine(models.Model):
                           AnnualBudgetHeader,
                           on_delete=models.CASCADE,
                           related_name='lines',
+                      )
+    budget_component = models.ForeignKey(
+                          BudgetComponent,
+                          on_delete=models.CASCADE,
+                          related_name='annual_budget_lines',
+                          null=True, blank=True,
                       )
     cost_category   = models.CharField(
                           max_length=20,
@@ -129,12 +159,13 @@ class AnnualBudgetLine(models.Model):
 
     class Meta:
         db_table        = 'annual_budget_line'
-        unique_together = ('header', 'cost_category')
         ordering        = ['order_no', 'id']
         verbose_name    = 'Annual Budget Line'
         verbose_name_plural = 'Annual Budget Lines'
 
     def __str__(self):
+        if self.budget_component and self.header.budget_type == self.header.BudgetType.BANK_OBLIGATION:
+            return f'{self.header} — {self.budget_component.custom_name}'
         return f'{self.header} — {self.get_cost_category_display()}'
 
     @property

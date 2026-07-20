@@ -17,7 +17,11 @@
               </button>
               <div>
                 <div class="panel-breadcrumb">Finance › Annual Budget › Process</div>
-                <h2 class="panel-title">{{ header.department_name }}</h2>
+                <h2 class="panel-title">
+                  <Landmark v-if="header.budget_type === 'BANK_OBLIGATION'" class="w-5 h-5 inline-block mr-2" />
+                  <Building2 v-else class="w-5 h-5 inline-block mr-2 text-bfs-gold" />
+                  {{ header.budget_type === 'BANK_OBLIGATION' ? 'BANK OBLIGATION' : header.department_name }}
+                </h2>
                 <p class="panel-subtitle">
                   <CalendarDays class="w-3.5 h-3.5" />
                   Budget Tahun {{ header.year }}
@@ -405,7 +409,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import {
   ArrowLeft, X, Save, Loader2, Plus, Trash2, History,
   Lock, Unlock, CalendarDays, Sparkles, FileSpreadsheet,
-  ArrowRight
+  ArrowRight, Landmark, Building2
 } from 'lucide-vue-next'
 import { useAnnualBudgetStore } from '../../stores/annualBudget.js'
 import { useToast } from '../../composables/useToast.js'

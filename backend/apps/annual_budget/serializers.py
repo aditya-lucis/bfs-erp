@@ -59,7 +59,7 @@ class AnnualBudgetLineSerializer(serializers.ModelSerializer):
     class Meta:
         model  = AnnualBudgetLine
         fields = [
-            'id', 'header', 'cost_category',
+            'id', 'header', 'cost_category', 'budget_component',
             'budget_component_name', 'budget_component_category',
             'order_no',
             # raw month fields
@@ -75,7 +75,10 @@ class AnnualBudgetLineSerializer(serializers.ModelSerializer):
         ]
 
     def get_budget_component_name(self, obj):
-        dept_name = obj.header.department.name.upper()
+        if obj.header.budget_type == obj.header.BudgetType.BANK_OBLIGATION:
+            return obj.budget_component.custom_name if obj.budget_component else 'BANK OBLIGATION'
+            
+        dept_name = obj.header.department.name.upper() if obj.header.department else 'GLOBAL'
         cat_name = obj.get_cost_category_display().upper()
         return f"{cat_name} - {dept_name}"
 
@@ -127,8 +130,8 @@ class MonthlyBudgetUpdateSerializer(serializers.Serializer):
 # ── Header ───────────────────────────────────────────────────────────────────
 
 class AnnualBudgetHeaderSerializer(serializers.ModelSerializer):
-    department_name = serializers.CharField(source='department.name', read_only=True)
-    department_code = serializers.CharField(source='department.code', read_only=True)
+    department_name = serializers.SerializerMethodField()
+    department_code = serializers.CharField(source='department.code', read_only=True, default='')
     total_annual    = serializers.SerializerMethodField()
     line_count      = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
@@ -136,13 +139,18 @@ class AnnualBudgetHeaderSerializer(serializers.ModelSerializer):
     class Meta:
         model  = AnnualBudgetHeader
         fields = [
-            'id', 'company', 'department', 'department_name', 'department_code',
+            'id', 'company', 'budget_type', 'department', 'department_name', 'department_code',
             'year', 'notes', 'is_locked',
             'total_annual', 'line_count',
             'created_by', 'created_by_name',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_by']
+
+    def get_department_name(self, obj):
+        if obj.budget_type == obj.BudgetType.BANK_OBLIGATION:
+            return 'Bank Obligation'
+        return obj.department.name if obj.department else 'Global'
 
     def get_total_annual(self, obj):
         return sum(
@@ -179,7 +187,7 @@ class AnnualBudgetHeaderWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = AnnualBudgetHeader
-        fields = ['id', 'company', 'department', 'year', 'notes', 'is_locked']
+        fields = ['id', 'company', 'budget_type', 'department', 'year', 'notes', 'is_locked']
 
     def validate(self, data):
         # Check if is_locked is being changed
@@ -211,23 +219,38 @@ class AnnualBudgetHeaderWriteSerializer(serializers.ModelSerializer):
 
         # Check unique constraint manually to return a clean 400 Bad Request
         year = data.get('year')
+        budget_type = data.get('budget_type')
         if year is None and self.instance:
             year = self.instance.year
+        if budget_type is None and self.instance:
+            budget_type = self.instance.budget_type
+            
         if department is None and self.instance:
             department = self.instance.department
 
-        if department and company and year:
+        if company and year:
             instance_id = self.instance.id if self.instance else None
             qs = AnnualBudgetHeader.objects.filter(
                 company=company,
-                department=department,
-                year=year
+                year=year,
+                budget_type=budget_type
             )
+            if budget_type == 'STANDARD':
+                if not department:
+                    raise serializers.ValidationError({'department': 'Department wajib diisi untuk tipe budget Standard.'})
+                qs = qs.filter(department=department)
+                
             if instance_id:
                 qs = qs.exclude(id=instance_id)
+                
             if qs.exists():
-                raise serializers.ValidationError({
-                    'non_field_errors': f'Annual budget untuk department {department.name} di tahun {year} sudah ada.'
-                })
+                if budget_type == 'STANDARD':
+                    raise serializers.ValidationError({
+                        'non_field_errors': f'Annual budget untuk department {department.name} di tahun {year} sudah ada.'
+                    })
+                else:
+                    raise serializers.ValidationError({
+                        'non_field_errors': f'Annual budget Bank Obligation di tahun {year} sudah ada.'
+                    })
 
         return data

@@ -77,7 +77,7 @@ onMounted(async () => {
 
 const fetchMasterData = async () => {
   try {
-    const res = await api.get('budget-component/budget-component/?component_type=bank_obligation')
+    const res = await api.get('budget-components/budget-components/?component_type=bank_obligation')
     const results = res.data.results || res.data || []
     budgetComponentOpts.value = results.map(item => ({
       id: item.id,

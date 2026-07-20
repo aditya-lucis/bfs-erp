@@ -134,16 +134,32 @@ class InitBudgetLinesView(APIView):
         skipped_count  = 0
 
         with transaction.atomic():
-            for i, (cat_val, cat_label) in enumerate(BudgetComponent.CostCategory.choices):
-                line, created = AnnualBudgetLine.objects.get_or_create(
-                    header=header,
-                    cost_category=cat_val,
-                    defaults={'order_no': i + 1},
-                )
-                if created:
-                    created_count += 1
-                else:
-                    skipped_count += 1
+            if header.budget_type == header.BudgetType.BANK_OBLIGATION:
+                components = BudgetComponent.objects.filter(component_type='bank_obligation', is_active=True)
+                for i, comp in enumerate(components):
+                    line, created = AnnualBudgetLine.objects.get_or_create(
+                        header=header,
+                        budget_component=comp,
+                        defaults={
+                            'cost_category': comp.cost_category,
+                            'order_no': comp.order_no or i + 1,
+                        }
+                    )
+                    if created:
+                        created_count += 1
+                    else:
+                        skipped_count += 1
+            else:
+                for i, (cat_val, cat_label) in enumerate(BudgetComponent.CostCategory.choices):
+                    line, created = AnnualBudgetLine.objects.get_or_create(
+                        header=header,
+                        cost_category=cat_val,
+                        defaults={'order_no': i + 1},
+                    )
+                    if created:
+                        created_count += 1
+                    else:
+                        skipped_count += 1
 
         return Response({
             'detail': f'{created_count} baris ditambahkan, {skipped_count} sudah ada.',
@@ -175,20 +191,39 @@ class BudgetComponentPickerView(APIView):
         except AnnualBudgetHeader.DoesNotExist:
             return Response({'detail': 'Header not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Exclude yang sudah ada di header
-        existing = AnnualBudgetLine.objects.filter(
-            header=header
-        ).values_list('cost_category', flat=True)
-
         data = []
-        for cat_val, cat_label in BudgetComponent.CostCategory.choices:
-            if cat_val not in existing:
+        if header.budget_type == header.BudgetType.BANK_OBLIGATION:
+            existing = AnnualBudgetLine.objects.filter(
+                header=header
+            ).values_list('budget_component_id', flat=True)
+            
+            components = BudgetComponent.objects.filter(
+                component_type='bank_obligation', 
+                is_active=True
+            ).exclude(id__in=existing)
+            
+            for comp in components:
                 data.append({
-                    'id':            cat_val,
-                    'name':          f"{cat_label.upper()} - {header.department.name.upper()}",
-                    'cost_category': cat_val,
-                    'order_no':      0,
+                    'id':               comp.id, # id BudgetComponent untuk picker
+                    'name':             comp.custom_name,
+                    'cost_category':    comp.cost_category,
+                    'budget_component': comp.id,
+                    'order_no':         comp.order_no or 0,
                 })
+        else:
+            existing = AnnualBudgetLine.objects.filter(
+                header=header
+            ).values_list('cost_category', flat=True)
+    
+            for cat_val, cat_label in BudgetComponent.CostCategory.choices:
+                if cat_val not in existing:
+                    dept_name = header.department.name.upper() if header.department else 'GLOBAL'
+                    data.append({
+                        'id':            cat_val,
+                        'name':          f"{cat_label.upper()} - {dept_name}",
+                        'cost_category': cat_val,
+                        'order_no':      0,
+                    })
 
         return Response(data)
 

@@ -87,8 +87,9 @@
         <!-- Card Header -->
         <div class="card-top">
           <div class="card-dept-badge">
-            <Building2 class="w-3.5 h-3.5" />
-            {{ header.department_code }}
+            <Landmark v-if="header.budget_type === 'BANK_OBLIGATION'" class="w-3.5 h-3.5" />
+            <Building2 v-else class="w-3.5 h-3.5" />
+            {{ header.department_code || 'BANK' }}
           </div>
           <div class="card-status">
             <span v-if="header.is_locked" class="status-locked">
@@ -178,7 +179,20 @@
                   />
                 </FormField>
 
-                <FormField label="Department" required>
+                <FormField label="Budget Type" required>
+                  <div class="flex gap-4 items-center h-10">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" v-model="createForm.budget_type" value="STANDARD" class="text-bfs-gold focus:ring-bfs-gold" />
+                      <span class="text-sm font-medium text-gray-700">Department</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" v-model="createForm.budget_type" value="BANK_OBLIGATION" class="text-bfs-gold focus:ring-bfs-gold" />
+                      <span class="text-sm font-medium text-gray-700">Bank Obligation</span>
+                    </label>
+                  </div>
+                </FormField>
+
+                <FormField v-if="createForm.budget_type === 'STANDARD'" label="Department" required>
                   <div class="select-wrap">
                     <Building2 class="select-icon" />
                     <select v-model="createForm.department" class="form-input pl-8" :disabled="isFetchingExistingHeaders">
@@ -233,7 +247,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import {
   Plus, X, Save, Loader2, Building2, Wallet, Lock, Unlock,
-  FileText, ArrowRight, BarChart3, ChevronLeft, ChevronRight, AlertCircle
+  FileText, ArrowRight, BarChart3, ChevronLeft, ChevronRight, AlertCircle, Landmark
 } from 'lucide-vue-next'
 import { useAnnualBudgetStore } from '../../stores/annualBudget.js'
 import { useOrganizationStore } from '../../stores/organization.js'
@@ -293,7 +307,7 @@ function progressWidth(total) {
 
 // ── Create Modal ─────────────────────────────────────────────────────────────
 const createModal = reactive({ show: false, error: '' })
-const createForm  = reactive({ year: new Date().getFullYear(), department: null, notes: '' })
+const createForm  = reactive({ year: new Date().getFullYear(), budget_type: 'STANDARD', department: null, notes: '' })
 const existingHeadersForYear = ref([])
 const isFetchingExistingHeaders = ref(false)
 
@@ -326,8 +340,14 @@ watch(() => createForm.year, (newYear) => {
 // Filter department list to exclude departments that already have a budget for this year
 const availableDepartments = computed(() => {
   if (!orgStore.departmentList) return []
-  const existingDeptIds = existingHeadersForYear.value.map(h => h.department)
+  const existingDeptIds = existingHeadersForYear.value
+    .filter(h => h.budget_type === 'STANDARD')
+    .map(h => h.department)
   return orgStore.departmentList.filter(d => !existingDeptIds.includes(d.id))
+})
+
+const hasBankObligationForYear = computed(() => {
+  return existingHeadersForYear.value.some(h => h.budget_type === 'BANK_OBLIGATION')
 })
 
 async function openCreateModal() {
@@ -340,14 +360,19 @@ async function openCreateModal() {
 }
 
 async function handleCreate() {
-  if (!createForm.department) {
+  if (createForm.budget_type === 'STANDARD' && !createForm.department) {
     createModal.error = 'Department wajib dipilih.'
+    return
+  }
+  if (createForm.budget_type === 'BANK_OBLIGATION' && hasBankObligationForYear.value) {
+    createModal.error = 'Budget Bank Obligation untuk tahun tersebut sudah ada.'
     return
   }
   createModal.error = ''
   try {
     await store.createHeader({
-      department: createForm.department,
+      budget_type: createForm.budget_type,
+      department: createForm.budget_type === 'STANDARD' ? createForm.department : null,
       year:       createForm.year,
       notes:      createForm.notes,
     })

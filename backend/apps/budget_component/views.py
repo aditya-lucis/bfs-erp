@@ -37,7 +37,6 @@ class BudgetComponentListView(generics.ListCreateAPIView):
         qs = BudgetComponent.objects.select_related(
             'department', 'position'
         ).order_by('order_no', 'id')
-
         cost_cat = self.request.query_params.get('cost_category')
         if cost_cat:
             qs = qs.filter(cost_category=cost_cat)
@@ -49,6 +48,10 @@ class BudgetComponentListView(generics.ListCreateAPIView):
         active = self.request.query_params.get('active')
         if active is not None:
             qs = qs.filter(is_active=(active.lower() == 'true'))
+
+        comp_type = self.request.query_params.get('component_type')
+        if comp_type:
+            qs = qs.filter(component_type=comp_type)
 
         return qs
 
