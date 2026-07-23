@@ -528,16 +528,24 @@ class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
                     doc_code = 'CBR_PCA_UM'
                 else:
                     doc_code = 'CBR_PCA_NON'
+            elif transaction.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_PRINCIPAL:
+                doc_code = 'CBR_BRC_POKOK'
+            elif transaction.usage_for == CashbookReqHeader.UsageFor.BANK_OBLIGATION_INTEREST:
+                doc_code = 'CBR_BRC_BUNGA'
             else:
                 return Response({'detail': f'Approval for usage {transaction.usage_for} is not configured yet.'}, status=status.HTTP_400_BAD_REQUEST)
                 
+            emp_profile = getattr(request.user, 'employee_profile', None)
+            emp_pos = getattr(emp_profile, 'position', None)
+            fallback_company = emp_pos.department.company if emp_pos and emp_pos.department else None
+
             create_approval_request(
                 document_code=doc_code,
                 document_id=str(transaction.id),
                 document_number=transaction.document_number,
                 creator_user=request.user,
                 amount=transaction.amount,
-                company=transaction.project.company if transaction.project else getattr(request.user, 'employee_profile', None).position.company
+                company=transaction.project.company if transaction.project else fallback_company
             )
             
             transaction.document_status = CashbookReqHeader.DocumentStatus.READY_TO_PROCESS

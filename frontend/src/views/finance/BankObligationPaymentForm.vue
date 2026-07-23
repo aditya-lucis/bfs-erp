@@ -232,6 +232,37 @@ const formatNumber = (value) => {
   }).format(value)
 }
 
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+const formatPeriod = (dateStr) => {
+  if (!dateStr) return ''
+  const [year, month] = dateStr.split('-')
+  return `${monthNames[parseInt(month, 10) - 1]}-${year}`
+}
+
+const getBankShortName = (name) => {
+  if (!name) return ''
+  const match = name.match(/\(([^)]+)\)/)
+  return match ? match[1] : name
+}
+
+const updateDescription = () => {
+  const selected = outstandingDetails.value.filter(d => d.selected)
+  if (selected.length === 0) {
+    props.form.description = ''
+    return
+  }
+
+  const typeStr = props.usageFor === 'Bank Obligation Principal' ? 'Pokok' : 'Bunga'
+  const bankName = getBankShortName(selectedBankObligation.value?.bank_name)
+  const contractNumber = selectedBankObligation.value?.contract_number || selectedBankObligation.value?.loan_no || ''
+  
+  const periods = selected.map(d => formatPeriod(d.bulan))
+  const periodStr = periods.join(' & ')
+
+  const contractPart = contractNumber ? `. ${contractNumber}` : ''
+  props.form.description = `Pembayaran ${typeStr} Pinjaman ${bankName} Periode ${periodStr}${contractPart}`
+}
+
 // ── Data Fetching ─────────────────────────────────────────────────────────────
 const loadOptions = async () => {
   try {
@@ -350,6 +381,7 @@ watch(() => outstandingDetails.value, (newVal) => {
     total_amount: d.amount
   }))
   props.form.amount = totalAmount.value
+  updateDescription()
 }, { deep: true })
 
 onMounted(() => {

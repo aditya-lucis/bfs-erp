@@ -318,7 +318,7 @@ class GlobalLinkedAccountSerializer(serializers.ModelSerializer):
 from .models import CashbookReqHeader, CashbookReqDetail
 
 class CashbookReqDetailSerializer(serializers.ModelSerializer):
-    item_name = serializers.CharField(source='item.item_name', read_only=True)
+    item_name = serializers.SerializerMethodField()
     item_code = serializers.CharField(source='item.item_code', read_only=True)
     unit_name = serializers.CharField(source='item.unit.unit_name', read_only=True)
     rap_detail_volume = serializers.DecimalField(source='rap_detail.volume', read_only=True, max_digits=18, decimal_places=2)
@@ -328,6 +328,15 @@ class CashbookReqDetailSerializer(serializers.ModelSerializer):
         model = CashbookReqDetail
         fields = '__all__'
         read_only_fields = ('header',)
+
+    def get_item_name(self, obj):
+        if obj.item:
+            return obj.item.item_name
+        if obj.bank_obligation_detail:
+            bod = obj.bank_obligation_detail
+            type_str = "Pokok" if bod.is_cbr_pokok else ("Bunga" if bod.is_cbr_bunga else "Angsuran")
+            return f"Pembayaran {type_str} Pinjaman - Cicilan Ke-{bod.no} (Bulan {bod.bulan})"
+        return None
 
 class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     details = CashbookReqDetailSerializer(many=True, read_only=True)

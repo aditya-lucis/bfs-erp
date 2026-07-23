@@ -303,6 +303,10 @@ const handleNotificationClick = (item) => {
     router.push('/finance/payment-request-inbox')
   } else if (item.document_code === 'CBR_PCA_NON') {
     router.push('/finance/payment-request-inbox')
+  } else if (item.document_code === 'CBR_BRC_POKOK') {
+    router.push('/finance/payment-request-inbox')
+  } else if (item.document_code === 'CBR_BRC_BUNGA') {
+    router.push('/finance/payment-request-inbox')
   } else {
     router.push('/projects/rap-inbox')
   }
