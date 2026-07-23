@@ -27,6 +27,7 @@ import VendorCategoryView from './views/purchase/VendorCategoryView.vue'
 import VendorGroupView from './views/purchase/VendorGroupView.vue'
 import VendorView from './views/purchase/VendorView.vue'
 import BudgetComponentView from './views/budgetcomponent/BudgetComponentView.vue'
+import BudgetRequestView from './views/finance/BudgetRequestView.vue'
 import AnnualBudgetView from './views/annualbudget/AnnualBudgetView.vue'
 import AnnualPeriodView from './views/gl/AnnualPeriodView.vue'
 import QuarterPeriodView from './views/gl/QuarterPeriodView.vue'
@@ -76,6 +77,7 @@ const implementedRoutes = [
   { path: '/purchases/vendor', component: VendorView, meta: { title: 'List Of Vendors', moduleId: 'purchases', moduleName: 'Purchases', layout: 'default' } },
   { path: '/finance/budget-component', component: BudgetComponentView, meta: { title: 'Budget Component', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/annual-budget', component: AnnualBudgetView, meta: { title: 'Annual Budget', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/budget-request', component: BudgetRequestView, meta: { title: 'Budget Request', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request', component: () => import('./views/finance/PaymentRequestView.vue'), meta: { title: 'Payment Request', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request-inbox', component: () => import('./views/finance/PaymentRequestInboxView.vue'), meta: { title: 'Payment Request Inbox', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/bank-obligation', component: BankObligationView, meta: { title: 'Bank Obligation', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },

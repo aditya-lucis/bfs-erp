@@ -420,7 +420,7 @@ export const menuData = {
         { name: 'Petty Cash Usage', url: '' },
       ]
     },
-    { name: 'Budget Request', url: '' },
+    { name: 'Budget Request', url: '/finance/budget-request' },
     {
       name: 'Cash Book Entry', url: '', children: [
         { name: 'Bank Receipt', url: '' },
