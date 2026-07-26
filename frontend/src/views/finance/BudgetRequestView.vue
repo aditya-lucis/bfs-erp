@@ -63,6 +63,7 @@
               <FileText class="w-4 h-4 text-gray-500" /> Report
             </button>
             <button
+              @click="handleExportExcel"
               class="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md text-green-700 text-sm font-medium rounded-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Download class="w-4 h-4 text-green-600" /> Export Excel
@@ -79,7 +80,7 @@
 
       <!-- Data Table (Premium Sleek Design) -->
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div class="overflow-x-auto custom-scrollbar">
+        <div class="overflow-auto max-h-[calc(100vh-280px)] custom-scrollbar">
           <table class="w-full text-left text-xs whitespace-nowrap min-w-max">
             <thead class="bg-gradient-to-r from-gray-50 to-gray-100 text-gray-600 font-semibold border-b border-gray-200 shadow-sm sticky top-0 z-10">
               <tr>
@@ -133,8 +134,8 @@
                   
                   <td class="px-2 py-2 border-r border-gray-100 align-middle">
                     <div class="flex flex-col gap-1.5 items-end bg-gray-50 p-1.5 rounded-lg border border-gray-100 group-hover:border-gray-200 transition-colors">
-                      <input type="text" v-model="item.wht_amount" class="w-full bg-white border border-gray-200 rounded px-2 py-1 text-right text-xs focus:ring-1 focus:ring-bfs-navy focus:border-bfs-navy focus:outline-none transition-all shadow-sm" />
-                      <select v-model="item.wht_type" class="w-full bg-white border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-bfs-navy focus:border-bfs-navy focus:outline-none transition-all shadow-sm text-gray-600">
+                      <input type="text" v-model="item.wht_amount" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-full bg-white border border-gray-200 rounded px-2 py-1 text-right text-xs focus:ring-1 focus:ring-bfs-navy focus:border-bfs-navy focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
+                      <select v-model="item.wht_type" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-full bg-white border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-bfs-navy focus:border-bfs-navy focus:outline-none transition-all shadow-sm text-gray-600 disabled:bg-gray-100 disabled:text-gray-500">
                         <option value="PPh 21">PPh 21</option>
                         <option value="PPh 23">PPh 23</option>
                         <option value="PPh 4 (2) PPh Final">PPh 4 (2) PPh Final</option>
@@ -142,7 +143,7 @@
                     </div>
                   </td>
                   
-                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-gray-800">{{ formatNumber(item.total_amount || item.amount) }}</td>
+                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-gray-800">{{ formatNumber(calculateTotalAmount(item)) }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-gray-600">{{ item.payment_type || '-' }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-gray-600">
                     <span class="flex items-center gap-1 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded" v-if="item.term_duration || item.term_of"><Clock class="w-3 h-3" /> {{ item.term_duration || item.term_of }}</span>
@@ -155,10 +156,10 @@
                   
                   <!-- Actual Payment Amount Input -->
                   <td class="px-2 py-2 border-r border-gray-100 align-middle bg-blue-50/20 group-hover:bg-blue-50/50 transition-colors">
-                    <input type="text" v-model="item.actual_payment_amount" class="w-24 bg-white border border-blue-200 rounded px-2 py-1.5 text-right font-semibold text-blue-800 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:outline-none transition-all shadow-sm" />
+                    <input type="text" v-model="item.actual_payment_amount" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-24 bg-white border border-blue-200 rounded px-2 py-1.5 text-right font-semibold text-blue-800 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
                   </td>
                   
-                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-red-600">{{ formatNumber(item.remaining_unpaid || item.amount) }}</td>
+                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-red-600">{{ formatNumber(calculateRemainingUnpaid(item)) }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-gray-700">
                     <span class="px-2 py-1 bg-gray-100 rounded text-[11px] font-medium border border-gray-200" v-if="item.due_date">{{ formatDate(item.due_date) }}</span>
                     <span v-else>-</span>
@@ -174,15 +175,12 @@
                   </td>
                   
                   <td class="px-2 py-2 border-r border-gray-100 align-middle">
-                    <select v-model="item.action_status" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-bfs-navy focus:border-transparent focus:outline-none transition-all shadow-sm text-gray-700 cursor-pointer hover:border-gray-300">
-                      <option value="None">None</option>
-                      <option value="Ready To Process">Ready To Process</option>
-                      <option value="Ready To Pay">Ready To Pay</option>
-                      <option value="Approve for Payment">Approve for Payment</option>
+                    <select v-model="item.action_status" :disabled="getAvailableActions(item).length <= 1" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-bfs-navy focus:border-transparent focus:outline-none transition-all shadow-sm text-gray-700 cursor-pointer hover:border-gray-300 disabled:opacity-50 disabled:bg-gray-100 disabled:cursor-not-allowed">
+                      <option v-for="opt in getAvailableActions(item)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                   </td>
                   <td class="px-3 py-3 text-center align-middle">
-                    <button class="px-2 py-1.5 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-600 text-[10px] font-semibold rounded transition-colors shadow-sm cursor-pointer flex items-center justify-center mx-auto" title="Close Document">
+                    <button @click="handleClose(item)" class="px-2 py-1.5 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-gray-600 text-[10px] font-semibold rounded transition-colors shadow-sm cursor-pointer flex items-center justify-center mx-auto" title="Close Document">
                       <XCircle class="w-4 h-4" />
                     </button>
                   </td>
@@ -198,7 +196,7 @@
                   <td colspan="2" class="border-r border-gray-100"></td>
                   <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-center text-amber-900 font-bold">{{ item.currency || 'IDR' }}</td>
                   <td class="px-3 py-2 border-r border-gray-100 bg-amber-200/50 text-right text-amber-900 font-bold shadow-inner">{{ formatNumber(item.actual_payment_amount || 0) }}</td>
-                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-right text-red-700 font-bold">{{ formatNumber(item.remaining_unpaid || item.amount) }}</td>
+                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-right text-red-700 font-bold">{{ formatNumber(calculateRemainingUnpaid(item)) }}</td>
                   <td colspan="6"></td>
                 </tr>
               </template>
@@ -223,7 +221,7 @@
                 <td colspan="18" class="px-3 py-4 border-r border-gray-100 text-right text-gray-500 font-bold uppercase tracking-widest text-[10px]">Grand Total</td>
                 <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-green-700 text-sm">{{ formatNumber(grandTotalPaidAmount) }}</td>
                 <td class="px-3 py-4 border-r border-gray-100 text-center font-bold text-gray-700">IDR</td>
-                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-blue-800 text-sm bg-blue-50/30">{{ formatNumber(0) }}</td>
+                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-blue-800 text-sm bg-blue-50/30">{{ formatNumber(grandTotalActualPayment) }}</td>
                 <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-red-700 text-sm">{{ formatNumber(grandTotalRemainingUnpaid) }}</td>
                 <td colspan="6"></td>
               </tr>
@@ -239,13 +237,33 @@
 import { ref, computed, onMounted } from 'vue'
 import Panel from '../../components/Panel.vue'
 import api from '../../services/api'
+import Swal from 'sweetalert2'
 import { Search, FileText, Download, Save, Clock, CornerDownRight, XCircle, Inbox } from 'lucide-vue-next'
+import { exportBudgetRequestExcel } from '../../utils/exportBudgetRequestExcel'
+import { useOrganizationStore } from '../../stores/organization.js'
+
+const orgStore = useOrganizationStore()
 
 const getFirstDayOfMonth = () => {
   const date = new Date()
   const y = date.getFullYear()
   const m = date.getMonth()
   return new Date(y, m, 1).toLocaleDateString('en-CA')
+}
+
+const calculateTotalAmount = (item) => {
+  const amount = parseFloat(item.amount) || 0
+  const vat = parseFloat(item.vat) || 0
+  const discount = parseFloat(item.discount) || 0
+  const wht = parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0
+  
+  return amount + vat - discount - wht
+}
+
+const calculateRemainingUnpaid = (item) => {
+  const totalAmt = calculateTotalAmount(item)
+  const paid = parseFloat(item.paid_amount) || 0
+  return totalAmt - paid
 }
 
 const getLastDayOfMonth = () => {
@@ -266,27 +284,207 @@ const tableData = ref([])
 
 const fetchTableData = async () => {
   try {
-    const response = await api.get('/accounting/cashbook-request/')
+    const params = {
+      is_budget_request: 'true',
+      show_all: filterShowAll.value,
+      budget_status: filterStatus.value
+    }
+    
+    if (!filterShowAll.value) {
+      params.date_from = filterDateFrom.value
+      params.date_to = filterDateTo.value
+      params.due_date = filterDueDate.value
+    }
+
+    const response = await api.get('/accounting/cashbook-request/', { params })
     let results = response.data.results || response.data
     
     tableData.value = results.map(item => ({
       ...item,
-      wht_amount: '0.0000',
-      wht_type: 'PPh 21',
-      actual_payment_amount: '0.0000',
-      action_status: 'None'
+      vat: item.tax_amount || '0.0000',
+      wht_amount: item.budget_request?.wht || '0.0000',
+      wht_type: item.budget_request?.wht_type || 'PPh 21',
+      actual_payment_amount: item.budget_request?.payment_amount || '0.0000',
+      action_status: item.budget_request?.budgetrequest_status === 'ReadyToProcess' ? 'Ready To Process' :
+                     item.budget_request?.budgetrequest_status === 'ReadyToPay' ? 'Ready To Pay' :
+                     item.budget_request?.budgetrequest_status === 'ApproveForPayment' ? 'Approve for Payment' : 'None',
+      original_action_status: item.budget_request?.budgetrequest_status || 'None'
     }))
   } catch (error) {
     console.error('Error fetching data:', error)
   }
 }
 
+const getAvailableActions = (item) => {
+  const currentStatus = item.original_action_status || 'None'
+  
+  if (item.paid_status === 'Full Paid' || item.is_close) {
+    return [{ value: item.action_status, label: item.action_status }]
+  }
+
+  // Mimic CF9 legacy options logic
+  if (currentStatus === 'None') {
+    return [
+      { value: 'None', label: 'None' },
+      { value: 'Ready To Process', label: 'Ready To Process' }
+    ]
+  } else if (currentStatus === 'ReadyToProcess') {
+    return [
+      { value: 'None', label: 'None' },
+      { value: 'Ready To Process', label: 'Ready To Process' },
+      { value: 'Ready To Pay', label: 'Ready To Pay' },
+      { value: 'Approve for Payment', label: 'Approve for Payment' }
+    ]
+  } else if (currentStatus === 'ReadyToPay') {
+    return [
+      { value: 'Ready To Pay', label: 'Ready To Pay' },
+      { value: 'Approve for Payment', label: 'Approve for Payment' }
+    ]
+  } else if (currentStatus === 'ApproveForPayment') {
+    return [
+      { value: 'Ready To Process', label: 'Ready To Process' },
+      { value: 'Approve for Payment', label: 'Approve for Payment' }
+    ]
+  }
+  
+  return [{ value: item.action_status, label: item.action_status }]
+}
+
 const handleSearch = () => {
   fetchTableData()
 }
 
-const handleSave = () => {
-  alert('Changes saved successfully!')
+const handleSave = async () => {
+  try {
+    // Validations (Sunfish Legacy Logic)
+    for (const item of tableData.value) {
+      // Prevent saving unchanged empty actions if they just loaded
+      if (item.action_status === item.original_action_status && item.action_status === 'None' && parseFloat(item.wht_amount) === 0 && parseFloat(item.actual_payment_amount) === 0) {
+        continue;
+      }
+
+      const wht = parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0
+      const payment = parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0
+      const baseAmount = parseFloat(item.amount) || 0
+      const ppn = parseFloat(item.vat || 0)
+      const paid = parseFloat(item.paid_amount) || 0
+      const disc = parseFloat(item.discount) || 0
+      
+      const amountPpn = baseAmount + ppn
+      if (wht > amountPpn) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: `WHT must be smaller than or equal to Amount for document ${item.document_number || ''}`
+        })
+        return
+      }
+      
+      const totalAmt = baseAmount + ppn - wht - disc
+      const remain = totalAmt - paid
+      
+      if (payment > remain && payment > 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: `Payment must be smaller or equal to ${formatNumber(remain)} for document ${item.document_number || ''}`
+        })
+        return
+      }
+    }
+
+    const payload = tableData.value.map(item => {
+      let action_status = 'None'
+      if (item.action_status === 'Ready To Process') action_status = 'ReadyToProcess'
+      else if (item.action_status === 'Ready To Pay') action_status = 'ReadyToPay'
+      else if (item.action_status === 'Approve for Payment') action_status = 'ApproveForPayment'
+
+      return {
+        id: item.id,
+        wht: parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0,
+        wht_type: item.wht_type,
+        payment_amount: parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0,
+        action_status: action_status
+      }
+    })
+    
+    await api.post('/accounting/cashbook-request/budget_request_bulk_update/', payload)
+    Swal.fire({
+      icon: 'success',
+      title: 'Success',
+      text: 'Changes saved successfully!',
+      timer: 1500,
+      showConfirmButton: false
+    })
+    fetchTableData()
+  } catch(e) {
+    console.error(e)
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to save changes.'
+    })
+  }
+}
+
+const handleExportExcel = () => {
+  if (!tableData.value || tableData.value.length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'No Data to Export',
+      text: 'There is no budget request data matching your filter criteria.'
+    })
+    return
+  }
+
+  Swal.fire({
+    title: 'Exporting to Excel...',
+    text: `Generating real-time Budget Request report with ${orgStore.company?.company_name || 'PT. Sokka Tama Fiber Dev'} profile for ${tableData.value.length} rows...`,
+    icon: 'info',
+    timer: 1500,
+    showConfirmButton: false
+  })
+
+  exportBudgetRequestExcel(tableData.value, {
+    status: filterStatus.value,
+    dateFrom: filterShowAll.value ? 'All' : filterDateFrom.value,
+    dateTo: filterShowAll.value ? 'All' : filterDateTo.value
+  }, orgStore.company)
+}
+
+const handleClose = async (item) => {
+  const { value: reason } = await Swal.fire({
+    title: 'Close Document',
+    input: 'text',
+    inputLabel: 'Enter reason for closing this document:',
+    inputPlaceholder: 'Reason...',
+    showCancelButton: true,
+    inputValidator: (value) => {
+      if (!value) {
+        return 'You need to write something!'
+      }
+    }
+  })
+  
+  if (!reason) return
+  
+  try {
+    await api.post(`/accounting/cashbook-request/${item.id}/close_document/`, { reason })
+    Swal.fire({
+      icon: 'success',
+      title: 'Closed',
+      text: 'Document has been closed.',
+      timer: 1500,
+      showConfirmButton: false
+    })
+    fetchTableData()
+  } catch (e) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Failed to Close',
+      text: e.response?.data?.detail || 'Failed to close document'
+    })
+  }
 }
 
 const formatDate = (dateString) => {
@@ -301,15 +499,22 @@ const formatNumber = (num) => {
 }
 
 const grandTotalRemainingUnpaid = computed(() => {
-  return tableData.value.reduce((sum, item) => sum + (parseFloat(item.remaining_unpaid || item.amount) || 0), 0)
+  return tableData.value.reduce((sum, item) => sum + calculateRemainingUnpaid(item), 0)
 })
 
 const grandTotalPaidAmount = computed(() => {
   return tableData.value.reduce((sum, item) => sum + (parseFloat(item.paid_amount) || 0), 0)
 })
 
+const grandTotalActualPayment = computed(() => {
+  return tableData.value.reduce((sum, item) => sum + (parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0), 0)
+})
+
 onMounted(() => {
   fetchTableData()
+  if (!orgStore.company) {
+    orgStore.fetchCompany()
+  }
 })
 
 </script>

@@ -480,10 +480,46 @@ class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
     period_date_field = 'date'
     
     def get_queryset(self):
+        from django.db.models import Q
         qs = CashbookReqHeader.objects.all().order_by('-date', '-id')
         usage_for = self.request.query_params.get('usage_for', None)
         document_status = self.request.query_params.get('document_status', None)
         approval_status = self.request.query_params.get('approval_status', None)
+        is_budget_request = self.request.query_params.get('is_budget_request', None)
+        
+        show_all = self.request.query_params.get('show_all', 'false') == 'true'
+        date_from = self.request.query_params.get('date_from', None)
+        date_to = self.request.query_params.get('date_to', None)
+        due_date = self.request.query_params.get('due_date', None)
+        budget_status = self.request.query_params.get('budget_status', None)
+        
+        if is_budget_request == 'true':
+            qs = qs.filter(approval_status=CashbookReqHeader.ApprovalStatus.APPROVED)
+            
+            # Sunfish legacy logic for Budget Request
+            if budget_status == 'Close':
+                qs = qs.filter(is_close=True)
+            else:
+                qs = qs.filter(is_close=False)
+                if budget_status and budget_status != 'All':
+                    if budget_status == 'Half Paid':
+                        qs = qs.filter(paid_status=CashbookReqHeader.PaidStatus.HALF_PAID).filter(Q(budget_request__budgetrequest_status='None') | Q(budget_request__isnull=True))
+                    elif budget_status == 'Not Paid':
+                        qs = qs.filter(paid_status=CashbookReqHeader.PaidStatus.NOT_PAID).filter(Q(budget_request__budgetrequest_status='None') | Q(budget_request__isnull=True))
+                    elif budget_status == 'Full Paid':
+                        qs = qs.filter(paid_status=CashbookReqHeader.PaidStatus.FULL_PAID).filter(Q(budget_request__budgetrequest_status='None') | Q(budget_request__isnull=True))
+                    elif budget_status == 'Ready To Process':
+                        qs = qs.filter(budget_request__budgetrequest_status='ReadyToProcess').exclude(paid_status=CashbookReqHeader.PaidStatus.FULL_PAID)
+                    elif budget_status == 'Ready To Pay':
+                        qs = qs.filter(budget_request__budgetrequest_status='ReadyToPay').exclude(paid_status=CashbookReqHeader.PaidStatus.FULL_PAID)
+                    elif budget_status == 'Approve for Payment':
+                        qs = qs.filter(budget_request__budgetrequest_status='ApproveForPayment').exclude(paid_status=CashbookReqHeader.PaidStatus.FULL_PAID)
+            
+            if not show_all:
+                if date_from and date_to:
+                    qs = qs.filter(date__gte=date_from, date__lte=date_to)
+                if due_date:
+                    qs = qs.filter(due_date__lte=due_date)
         
         if usage_for:
             qs = qs.filter(usage_for=usage_for)
@@ -493,6 +529,64 @@ class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
             qs = qs.filter(approval_status=approval_status)
             
         return qs
+
+    @action(detail=False, methods=['post'])
+    def budget_request_bulk_update(self, request):
+        from apps.accounting.models import BudgetRequest
+        payload = request.data
+        if not isinstance(payload, list):
+            return Response({'detail': 'Expected a list of objects.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_ids = []
+        for item in payload:
+            cbr_id = item.get('id')
+            wht = item.get('wht', 0)
+            wht_type = item.get('wht_type', None)
+            payment_amount = item.get('payment_amount', 0)
+            action_status = item.get('action_status', BudgetRequest.ActionStatus.NONE)
+            
+            if not cbr_id:
+                continue
+                
+            try:
+                cbr = CashbookReqHeader.objects.get(id=cbr_id)
+                budget_req, created = BudgetRequest.objects.update_or_create(
+                    cashbook_request=cbr,
+                    defaults={
+                        'wht': wht,
+                        'wht_type': wht_type,
+                        'payment_amount': payment_amount,
+                        'budgetrequest_status': action_status,
+                        'updated_by': request.user if hasattr(request, 'user') and request.user.is_authenticated else None
+                    }
+                )
+                if created and hasattr(request, 'user') and request.user.is_authenticated:
+                    budget_req.created_by = request.user
+                    budget_req.save(update_fields=['created_by'])
+                updated_ids.append(cbr_id)
+            except CashbookReqHeader.DoesNotExist:
+                pass
+                
+        return Response({'status': 'success', 'updated_ids': updated_ids})
+
+    @action(detail=True, methods=['post'])
+    def close_document(self, request, pk=None):
+        reason = request.data.get('reason')
+        if not reason:
+            return Response({'detail': 'Reason is required to close document.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from apps.accounting.services import close_cashbook_request_service
+        from rest_framework.exceptions import ValidationError
+        try:
+            cashbook_req = close_cashbook_request_service(
+                request_id=pk, 
+                reason=reason, 
+                user=request.user if hasattr(request, 'user') else None
+            )
+            return Response({'status': 'closed', 'document_number': cashbook_req.document_number})
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
     @action(detail=True, methods=['post'])
     def submit_approval(self, request, pk=None):

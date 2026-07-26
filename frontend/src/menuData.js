@@ -411,7 +411,7 @@ export const menuData = {
   ],
 
   finance: [
-    { name: 'List of Cash Book Entry', url: '' },
+    { name: 'List of Cash Book Entry', url: '/finance/list-of-cash-book-entry' },
     { name: 'Invoice Payment Selection', url: '' },
     {
       name: 'Payment Request', url: '', children: [
@@ -423,10 +423,10 @@ export const menuData = {
     { name: 'Budget Request', url: '/finance/budget-request' },
     {
       name: 'Cash Book Entry', url: '', children: [
-        { name: 'Bank Receipt', url: '' },
-        { name: 'Bank Payment', url: '' },
-        { name: 'Cash Receipt', url: '' },
-        { name: 'Cash Payment', url: '' },
+        { name: 'Bank Receipt', url: '/finance/list-of-cash-book-entry?type=Bank+Receipt' },
+        { name: 'Bank Payment', url: '/finance/list-of-cash-book-entry?type=Bank+Payment' },
+        { name: 'Cash Receipt', url: '/finance/list-of-cash-book-entry?type=Cash+Receipt' },
+        { name: 'Cash Payment', url: '/finance/list-of-cash-book-entry?type=Cash+Payment' },
         { name: 'Cash Book Entry Inbox', url: '' },
       ]
     },

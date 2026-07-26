@@ -568,6 +568,8 @@ class CashbookReqHeader(models.Model):
     paid_status = models.CharField(max_length=20, choices=PaidStatus.choices, default=PaidStatus.NOT_PAID)
     
     is_close = models.BooleanField(default=False)
+    close_reason = models.TextField(null=True, blank=True)
+    close_date = models.DateTimeField(null=True, blank=True)
     allow_previous_year_budget = models.BooleanField(default=False)
     reason_allow_previous_year_budget = models.TextField(null=True, blank=True)
 
@@ -626,6 +628,27 @@ class CashbookReqDetail(models.Model):
         db_table = 'acc_cashbook_req_detail'
         verbose_name = 'Cashbook Request Detail'
 
+
+class BudgetRequest(models.Model):
+    class ActionStatus(models.TextChoices):
+        NONE = 'None', 'None'
+        READY_TO_PROCESS = 'ReadyToProcess', 'Ready to Process'
+        READY_TO_PAY = 'ReadyToPay', 'Ready to Pay'
+        APPROVE_FOR_PAYMENT = 'ApproveForPayment', 'Approve for Payment'
+
+    cashbook_request = models.OneToOneField(CashbookReqHeader, on_delete=models.CASCADE, related_name='budget_request')
+    wht = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    wht_type = models.CharField(max_length=50, null=True, blank=True)
+    payment_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    budgetrequest_status = models.CharField(max_length=30, choices=ActionStatus.choices, default=ActionStatus.NONE)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    class Meta:
+        db_table = 'acc_budget_request'
+        verbose_name = 'Budget Request'
 
 # ─── Bank Obligation ──────────────────────────────────────────────────────────
 

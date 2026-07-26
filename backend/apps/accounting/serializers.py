@@ -315,7 +315,13 @@ class GlobalLinkedAccountSerializer(serializers.ModelSerializer):
             validated_data['updated_by'] = request.user
         return super().update(instance, validated_data)
 
-from .models import CashbookReqHeader, CashbookReqDetail
+from .models import CashbookReqHeader, CashbookReqDetail, BudgetRequest
+
+class BudgetRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BudgetRequest
+        fields = '__all__'
+        read_only_fields = ('cashbook_request', 'created_at', 'updated_at', 'created_by')
 
 class CashbookReqDetailSerializer(serializers.ModelSerializer):
     item_name = serializers.SerializerMethodField()
@@ -340,6 +346,7 @@ class CashbookReqDetailSerializer(serializers.ModelSerializer):
 
 class CashbookReqHeaderSerializer(serializers.ModelSerializer):
     details = CashbookReqDetailSerializer(many=True, read_only=True)
+    budget_request = BudgetRequestSerializer(read_only=True)
     transaction_type_display = serializers.CharField(source='transaction_type.type_name_en', read_only=True)
     project_display = serializers.CharField(source='project.project_name', read_only=True)
     payment_to_display = serializers.CharField(source='payment_to.name', read_only=True)
