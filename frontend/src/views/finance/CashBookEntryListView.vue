@@ -48,15 +48,6 @@
           <option value="Payment Request">Payment Request</option>
         </select>
 
-        <select 
-          v-model="searchCondition"
-          class="border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-bfs-navy outline-none"
-        >
-          <option value="Any Part of Field">Any Part of Field</option>
-          <option value="Exact Match">Exact Match</option>
-          <option value="Starts With">Starts With</option>
-        </select>
-
         <div class="relative flex-1 min-w-[200px] max-w-md">
           <input 
             v-model="searchQuery" 
@@ -67,25 +58,11 @@
           />
         </div>
 
-        <select 
-          v-model="searchCategory"
-          class="border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-xs font-medium text-gray-700 shadow-sm focus:ring-2 focus:ring-bfs-navy outline-none"
-        >
-          <option value="NONE">NONE</option>
-        </select>
-
         <button 
           @click="handleSearch"
           class="px-3.5 py-1.5 bg-bfs-navy hover:bg-bfs-navy-dark text-white text-xs font-semibold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
         >
           <Search class="w-3.5 h-3.5" /> Search
-        </button>
-
-        <button 
-          @click="handleShowAll"
-          class="px-3.5 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
-        >
-          Show All
         </button>
       </div>
 
@@ -482,8 +459,18 @@ const searchField = ref('Document No')
 const searchCondition = ref('Any Part of Field')
 const searchQuery = ref('')
 const searchCategory = ref('NONE')
-const filterDateFrom = ref('2026-01-01')
-const filterDateTo = ref('2026-07-31')
+const getFirstDayOfMonth = () => {
+  const date = new Date()
+  return new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-CA')
+}
+
+const getLastDayOfMonth = () => {
+  const date = new Date()
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).toLocaleDateString('en-CA')
+}
+
+const filterDateFrom = ref(getFirstDayOfMonth())
+const filterDateTo = ref(getLastDayOfMonth())
 const filterDocStatus = ref('')
 const filterAppStatus = ref('')
 const currentPage = ref(1)
@@ -722,12 +709,16 @@ const handleVoidCashBook = () => {
 }
 
 const handleCreateNew = () => {
-  Swal.fire({
-    title: `Create New ${filterType.value}`,
-    text: 'Form entry for ' + filterType.value + ' will open here.',
-    icon: 'info',
-    confirmButtonColor: '#1e293b'
-  })
+  if (filterType.value === 'Cash Payment') {
+    router.push('/finance/cash-payment-create')
+  } else {
+    Swal.fire({
+      title: `Create New ${filterType.value}`,
+      text: 'Form entry for ' + filterType.value + ' will open here.',
+      icon: 'info',
+      confirmButtonColor: '#1e293b'
+    })
+  }
 }
 
 const formatDate = (dateString) => {

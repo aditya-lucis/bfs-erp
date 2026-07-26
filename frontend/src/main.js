@@ -81,6 +81,7 @@ const implementedRoutes = [
   { path: '/finance/payment-request', component: () => import('./views/finance/PaymentRequestView.vue'), meta: { title: 'Payment Request', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/payment-request-inbox', component: () => import('./views/finance/PaymentRequestInboxView.vue'), meta: { title: 'Payment Request Inbox', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/list-of-cash-book-entry', component: () => import('./views/finance/CashBookEntryListView.vue'), meta: { title: 'List of Cash Book Entry', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
+  { path: '/finance/cash-payment-create', component: () => import('./views/finance/CashPaymentFormView.vue'), meta: { title: 'Cash Payment | Create', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/bank-obligation', component: BankObligationView, meta: { title: 'Bank Obligation', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/bank-obligation/new', component: () => import('./views/finance/BankObligationForm.vue'), meta: { title: 'Bank Obligation | Add', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
   { path: '/finance/bank-obligation/edit/:id', component: () => import('./views/finance/BankObligationForm.vue'), meta: { title: 'Bank Obligation | Edit', moduleId: 'finance', moduleName: 'Finance', layout: 'default' } },
