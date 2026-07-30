@@ -104,8 +104,10 @@
                 <th class="px-3 py-3 border-r border-gray-200">PIC</th>
                 <th class="px-3 py-3 border-r border-gray-200 text-right">Paid Amount</th>
                 <th class="px-3 py-3 border-r border-gray-200 text-center">Currency</th>
-                <th class="px-3 py-3 border-r border-gray-200 text-right bg-blue-50/50">Actual Payment</th>
-                <th class="px-3 py-3 border-r border-gray-200 text-right">Remaining Unpaid</th>
+                <th class="px-3 py-3 border-r border-gray-200 text-right bg-blue-50/50">Payment Amount</th>
+                <th class="px-3 py-3 border-r border-gray-200 text-right bg-amber-50/50">Payment Tax</th>
+                <th class="px-3 py-3 border-r border-gray-200 text-right">Remaining Unpaid (Amount)</th>
+                <th class="px-3 py-3 border-r border-gray-200 text-right">Remaining Unpaid (Tax)</th>
                 <th class="px-3 py-3 border-r border-gray-200">Due Date</th>
                 <th class="px-3 py-3 border-r border-gray-200">Comment</th>
                 <th class="px-3 py-3 border-r border-gray-200 text-right">Aging</th>
@@ -132,6 +134,7 @@
                   <td class="px-3 py-3 border-r border-gray-100 text-right text-gray-500">{{ formatNumber(item.vat || 0) }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-right text-gray-500">{{ formatNumber(item.discount || 0) }}</td>
                   
+                  <!-- WHT Withholding (Memotong) -->
                   <td class="px-2 py-2 border-r border-gray-100 align-middle">
                     <div class="flex flex-col gap-1.5 items-end bg-gray-50 p-1.5 rounded-lg border border-gray-100 group-hover:border-gray-200 transition-colors">
                       <input type="text" v-model="item.wht_amount" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-full bg-white border border-gray-200 rounded px-2 py-1 text-right text-xs focus:ring-1 focus:ring-bfs-navy focus:border-bfs-navy focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
@@ -154,12 +157,17 @@
                   <td class="px-3 py-3 border-r border-gray-100 text-right text-green-600 font-medium">{{ formatNumber(item.paid_amount || 0) }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-center font-semibold text-gray-500">{{ item.currency || 'IDR' }}</td>
                   
-                  <!-- Actual Payment Amount Input -->
+                  <!-- Payment Amount Input -->
                   <td class="px-2 py-2 border-r border-gray-100 align-middle bg-blue-50/20 group-hover:bg-blue-50/50 transition-colors">
-                    <input type="text" v-model="item.actual_payment_amount" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-24 bg-white border border-blue-200 rounded px-2 py-1.5 text-right font-semibold text-blue-800 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
+                    <input type="text" v-model="item.actual_payment_amount" @change="validatePaymentAmount(item)" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-24 bg-white border border-blue-200 rounded px-2 py-1.5 text-right font-semibold text-blue-800 focus:ring-2 focus:ring-blue-400 focus:border-transparent focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
                   </td>
-                  
-                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-red-600">{{ formatNumber(calculateRemainingUnpaid(item)) }}</td>
+                  <!-- Payment Tax Input -->
+                  <td class="px-2 py-2 border-r border-gray-100 align-middle bg-amber-50/20 group-hover:bg-amber-50/50 transition-colors">
+                    <input type="text" v-model="item.payment_tax_amount" @change="validatePaymentTax(item)" :disabled="item.original_action_status === 'ApproveForPayment' || item.paid_status === 'full_paid' || item.is_close" class="w-24 bg-white border border-amber-200 rounded px-2 py-1.5 text-right font-semibold text-amber-900 focus:ring-2 focus:ring-amber-400 focus:border-transparent focus:outline-none transition-all shadow-sm disabled:bg-gray-100 disabled:text-gray-500" />
+                  </td>
+                  <!-- Remaining Unpaid (Amount & Tax) -->
+                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-red-600">{{ formatNumber(calculateRemainingUnpaidAmount(item)) }}</td>
+                  <td class="px-3 py-3 border-r border-gray-100 text-right font-bold text-red-600">{{ formatNumber(calculateRemainingUnpaidTax(item)) }}</td>
                   <td class="px-3 py-3 border-r border-gray-100 text-gray-700">
                     <span class="px-2 py-1 bg-gray-100 rounded text-[11px] font-medium border border-gray-200" v-if="item.due_date">{{ formatDate(item.due_date) }}</span>
                     <span v-else>-</span>
@@ -196,14 +204,16 @@
                   <td colspan="2" class="border-r border-gray-100"></td>
                   <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-center text-amber-900 font-bold">{{ item.currency || 'IDR' }}</td>
                   <td class="px-3 py-2 border-r border-gray-100 bg-amber-200/50 text-right text-amber-900 font-bold shadow-inner">{{ formatNumber(item.actual_payment_amount || 0) }}</td>
-                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-right text-red-700 font-bold">{{ formatNumber(calculateRemainingUnpaid(item)) }}</td>
+                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-200/50 text-right text-amber-900 font-bold shadow-inner">{{ formatNumber(item.payment_tax_amount || 0) }}</td>
+                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-right text-red-700 font-bold">{{ formatNumber(calculateRemainingUnpaidAmount(item)) }}</td>
+                  <td class="px-3 py-2 border-r border-gray-100 bg-amber-100/50 text-right text-red-700 font-bold">{{ formatNumber(calculateRemainingUnpaidTax(item)) }}</td>
                   <td colspan="6"></td>
                 </tr>
               </template>
               
               <!-- Empty State -->
               <tr v-if="tableData.length === 0">
-                <td colspan="28" class="px-6 py-16 text-center">
+                <td colspan="29" class="px-6 py-16 text-center">
                   <div class="flex flex-col items-center justify-center gap-3">
                     <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
                       <Inbox class="w-8 h-8 text-gray-300" />
@@ -222,7 +232,9 @@
                 <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-green-700 text-sm">{{ formatNumber(grandTotalPaidAmount) }}</td>
                 <td class="px-3 py-4 border-r border-gray-100 text-center font-bold text-gray-700">IDR</td>
                 <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-blue-800 text-sm bg-blue-50/30">{{ formatNumber(grandTotalActualPayment) }}</td>
-                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-red-700 text-sm">{{ formatNumber(grandTotalRemainingUnpaid) }}</td>
+                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-amber-800 text-sm bg-amber-50/30">{{ formatNumber(grandTotalPaymentTax) }}</td>
+                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-red-700 text-sm">{{ formatNumber(grandTotalRemainingUnpaidAmount) }}</td>
+                <td class="px-3 py-4 border-r border-gray-100 text-right font-bold text-red-700 text-sm">{{ formatNumber(grandTotalRemainingUnpaidTax) }}</td>
                 <td colspan="6"></td>
               </tr>
             </tfoot>
@@ -260,10 +272,54 @@ const calculateTotalAmount = (item) => {
   return amount + vat - discount - wht
 }
 
+const calculateRemainingUnpaidAmount = (item) => {
+  const amount = parseFloat(item.amount) || 0
+  const discount = parseFloat(item.discount) || 0
+  const wht = parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0
+  const paidBase = parseFloat(item.paid_amount_base || item.paid_amount) || 0
+  return Math.max(0, amount - discount - wht - paidBase)
+}
+
+const calculateRemainingUnpaidTax = (item) => {
+  const vat = parseFloat(item.vat) || 0
+  const paidTax = parseFloat(item.paid_tax_amount || 0) || 0
+  return Math.max(0, vat - paidTax)
+}
+
 const calculateRemainingUnpaid = (item) => {
-  const totalAmt = calculateTotalAmount(item)
-  const paid = parseFloat(item.paid_amount) || 0
-  return totalAmt - paid
+  return calculateRemainingUnpaidAmount(item) + calculateRemainingUnpaidTax(item)
+}
+
+const validatePaymentAmount = (item) => {
+  const val = parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0
+  const maxRemain = calculateRemainingUnpaidAmount(item)
+  if (val > maxRemain + 0.0001 && val > 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Limit Exceeded',
+      text: `Payment Amount (${formatNumber(val)}) cannot exceed Remaining Unpaid (Amount) (${formatNumber(maxRemain)})`,
+      confirmButtonColor: '#1e293b'
+    })
+    item.actual_payment_amount = maxRemain > 0 ? maxRemain.toFixed(2) : '0.00'
+  } else if (val < 0) {
+    item.actual_payment_amount = '0.00'
+  }
+}
+
+const validatePaymentTax = (item) => {
+  const val = parseFloat(item.payment_tax_amount?.toString().replace(/,/g, '')) || 0
+  const maxRemainTax = calculateRemainingUnpaidTax(item)
+  if (val > maxRemainTax + 0.0001 && val > 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Limit Exceeded',
+      text: `Payment Tax (${formatNumber(val)}) cannot exceed Remaining Unpaid (Tax) (${formatNumber(maxRemainTax)})`,
+      confirmButtonColor: '#1e293b'
+    })
+    item.payment_tax_amount = maxRemainTax > 0 ? maxRemainTax.toFixed(2) : '0.00'
+  } else if (val < 0) {
+    item.payment_tax_amount = '0.00'
+  }
 }
 
 const getLastDayOfMonth = () => {
@@ -305,6 +361,7 @@ const fetchTableData = async () => {
       wht_amount: item.budget_request?.wht || '0.0000',
       wht_type: item.budget_request?.wht_type || 'PPh 21',
       actual_payment_amount: item.budget_request?.payment_amount || '0.0000',
+      payment_tax_amount: item.budget_request?.payment_tax_amount || '0.0000',
       action_status: item.budget_request?.budgetrequest_status === 'ReadyToProcess' ? 'Ready To Process' :
                      item.budget_request?.budgetrequest_status === 'ReadyToPay' ? 'Ready To Pay' :
                      item.budget_request?.budgetrequest_status === 'ApproveForPayment' ? 'Approve for Payment' : 'None',
@@ -364,7 +421,8 @@ const handleSave = async () => {
       }
 
       const wht = parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0
-      const payment = parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0
+      const paymentAmount = parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0
+      const paymentTax = parseFloat(item.payment_tax_amount?.toString().replace(/,/g, '')) || 0
       const baseAmount = parseFloat(item.amount) || 0
       const ppn = parseFloat(item.vat || 0)
       const paid = parseFloat(item.paid_amount) || 0
@@ -380,14 +438,23 @@ const handleSave = async () => {
         return
       }
       
-      const totalAmt = baseAmount + ppn - wht - disc
-      const remain = totalAmt - paid
+      const remainAmount = calculateRemainingUnpaidAmount(item)
+      const remainTax = calculateRemainingUnpaidTax(item)
       
-      if (payment > remain && payment > 0) {
+      if (paymentAmount > remainAmount + 0.0001 && paymentAmount > 0) {
         Swal.fire({
           icon: 'warning',
           title: 'Validation Error',
-          text: `Payment must be smaller or equal to ${formatNumber(remain)} for document ${item.document_number || ''}`
+          text: `Payment Amount (${formatNumber(paymentAmount)}) must not exceed Remaining Unpaid (Amount) (${formatNumber(remainAmount)}) for document ${item.document_number || '-'}`
+        })
+        return
+      }
+
+      if (paymentTax > remainTax + 0.0001 && paymentTax > 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: `Payment Tax (${formatNumber(paymentTax)}) must not exceed Remaining Unpaid (Tax) (${formatNumber(remainTax)}) for document ${item.document_number || '-'}`
         })
         return
       }
@@ -404,6 +471,7 @@ const handleSave = async () => {
         wht: parseFloat(item.wht_amount?.toString().replace(/,/g, '')) || 0,
         wht_type: item.wht_type,
         payment_amount: parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0,
+        payment_tax_amount: parseFloat(item.payment_tax_amount?.toString().replace(/,/g, '')) || 0,
         action_status: action_status
       }
     })
@@ -498,8 +566,16 @@ const formatNumber = (num) => {
   return parseFloat(num).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 }
 
+const grandTotalRemainingUnpaidAmount = computed(() => {
+  return tableData.value.reduce((sum, item) => sum + calculateRemainingUnpaidAmount(item), 0)
+})
+
+const grandTotalRemainingUnpaidTax = computed(() => {
+  return tableData.value.reduce((sum, item) => sum + calculateRemainingUnpaidTax(item), 0)
+})
+
 const grandTotalRemainingUnpaid = computed(() => {
-  return tableData.value.reduce((sum, item) => sum + calculateRemainingUnpaid(item), 0)
+  return grandTotalRemainingUnpaidAmount.value + grandTotalRemainingUnpaidTax.value
 })
 
 const grandTotalPaidAmount = computed(() => {
@@ -508,6 +584,10 @@ const grandTotalPaidAmount = computed(() => {
 
 const grandTotalActualPayment = computed(() => {
   return tableData.value.reduce((sum, item) => sum + (parseFloat(item.actual_payment_amount?.toString().replace(/,/g, '')) || 0), 0)
+})
+
+const grandTotalPaymentTax = computed(() => {
+  return tableData.value.reduce((sum, item) => sum + (parseFloat(item.payment_tax_amount?.toString().replace(/,/g, '')) || 0), 0)
 })
 
 onMounted(() => {

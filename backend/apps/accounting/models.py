@@ -640,6 +640,7 @@ class BudgetRequest(models.Model):
     wht = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     wht_type = models.CharField(max_length=50, null=True, blank=True)
     payment_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
+    payment_tax_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0.00)
     budgetrequest_status = models.CharField(max_length=30, choices=ActionStatus.choices, default=ActionStatus.NONE)
 
     created_at = models.DateTimeField(auto_now_add=True)

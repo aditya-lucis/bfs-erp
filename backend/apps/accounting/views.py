@@ -543,6 +543,7 @@ class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
             wht = item.get('wht', 0)
             wht_type = item.get('wht_type', None)
             payment_amount = item.get('payment_amount', 0)
+            payment_tax_amount = item.get('payment_tax_amount', 0)
             action_status = item.get('action_status', BudgetRequest.ActionStatus.NONE)
             
             if not cbr_id:
@@ -556,6 +557,7 @@ class CashbookReqViewSet(PeriodCheckMixin, viewsets.ModelViewSet):
                         'wht': wht,
                         'wht_type': wht_type,
                         'payment_amount': payment_amount,
+                        'payment_tax_amount': payment_tax_amount,
                         'budgetrequest_status': action_status,
                         'updated_by': request.user if hasattr(request, 'user') and request.user.is_authenticated else None
                     }

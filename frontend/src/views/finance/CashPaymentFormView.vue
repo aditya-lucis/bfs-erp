@@ -601,14 +601,23 @@
       </div>
     </div>
 
+    <!-- Sunfish ERP Style Reference Lookup Modal -->
+    <CashbookReferenceLookupModal
+      :is-open="isReferenceModalOpen"
+      :active-row-index="activeLookupRowIndex"
+      @close="isReferenceModalOpen = false"
+      @select="handleReferenceSelected"
+    />
+
   </Panel>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Panel from '../../components/Panel.vue'
 import SearchableSelect from '../../components/SearchableSelect.vue'
+import CashbookReferenceLookupModal from '../../components/finance/CashbookReferenceLookupModal.vue'
 import api from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import Swal from 'sweetalert2'
@@ -801,17 +810,18 @@ const loadRealtimeData = async () => {
     // 3. Chart of Accounts (DETAIL_CASH and Expenses)
     const coaData = coaRes.data?.results || coaRes.data
     if (Array.isArray(coaData) && coaData.length > 0) {
+      // Hanya ambil akun postable bertipe DETAIL_CASH (dan pastikan tidak termasuk akun HEADER seperti [1.2] Kas)
       const cashAccounts = coaData.filter(a => 
-        a.account_type === 'DETAIL_CASH' || 
-        (a.account_name && a.account_name.toLowerCase().includes('kas')) || 
-        (a.account_number && a.account_number.startsWith('1-11'))
+        a.account_type !== 'HEADER' &&
+        (a.account_type === 'DETAIL_CASH' || 
+         (a.account_name && a.account_name.toLowerCase().includes('kas') && a.account_type !== 'HEADER' && !a.account_number?.endsWith('.0') && a.account_number !== '1.2'))
       )
       if (cashAccounts.length > 0) {
         cashAccountOptions.value = cashAccounts.map(a => ({
           id: a.id,
           account_number: a.account_number,
           account_name: a.account_name,
-          balance: parseFloat(a.balance || a.current_balance || 45000000)
+          balance: parseFloat(a.amount !== undefined && a.amount !== null ? a.amount : (a.balance || a.current_balance || 0))
         }))
       }
       expenseAccountOptions.value = coaData.map(a => ({
@@ -872,6 +882,22 @@ onMounted(() => {
   loadRealtimeData()
 })
 
+// ── Watch General Cash Account for 100% Real-time Balance from DB ──
+watch(() => form.general_cash_account, async (newId) => {
+  if (!newId) return
+  try {
+    const res = await api.get(`/accounting/coa/${newId}/realtime_balance/`).catch(() => null)
+    if (res?.data?.balance !== undefined && res?.data?.balance !== null) {
+      const found = cashAccountOptions.value.find(acc => acc.id === newId)
+      if (found) {
+        found.balance = parseFloat(res.data.balance || 0)
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching realtime balance:', e)
+  }
+}, { immediate: true })
+
 // ── Computed Balances & Totals ──
 const selectedAccountBalance = computed(() => {
   if (!form.general_cash_account) return 0
@@ -919,13 +945,59 @@ const removeSelectedRows = () => {
   selectedRowIndexes.value = []
 }
 
+// ── Sunfish ERP Style Reference Lookup Modal State & Handlers ──
+const isReferenceModalOpen = ref(false)
+const activeLookupRowIndex = ref(0)
+
 const handleSmallSquareButton = (index) => {
-  Swal.fire({
-    title: `Row #${index + 1} Action`,
-    text: 'Kotak kecil diklik. Fungsi lanjutan akan dikonfigurasi sesuai arahan selanjutnya.',
-    icon: 'info',
-    confirmButtonColor: '#1e293b'
-  })
+  activeLookupRowIndex.value = index
+  isReferenceModalOpen.value = true
+}
+
+const handleReferenceSelected = ({ rowIndex, items }) => {
+  if (!items || items.length === 0) return
+
+  const firstItem = items[0]
+  const targetRow = form.items[rowIndex]
+  if (targetRow) {
+    if (!documentNoOptions.value.some(opt => opt.id === firstItem.document_no)) {
+      documentNoOptions.value.push({
+        id: firstItem.document_no,
+        label: firstItem.document_no
+      })
+    }
+    targetRow.document_no = firstItem.document_no
+    targetRow.payment_for = 'Amount'
+    targetRow.amount_due = firstItem.amount
+    targetRow.payment = firstItem.amount
+    targetRow.description = firstItem.description
+  }
+
+  for (let i = 1; i < items.length; i++) {
+    const extraItem = items[i]
+    if (!documentNoOptions.value.some(opt => opt.id === extraItem.document_no)) {
+      documentNoOptions.value.push({
+        id: extraItem.document_no,
+        label: extraItem.document_no
+      })
+    }
+    form.items.push({
+      document_no: extraItem.document_no,
+      payment_for: 'Amount',
+      currency: 'IDR',
+      rate: 1.0000,
+      amount_due: extraItem.amount,
+      general_ledger_account: '',
+      dk: 'D',
+      dep: false,
+      payment: extraItem.amount,
+      description: extraItem.description,
+      cheque_bg_no: '',
+      due_date: new Date().toISOString().split('T')[0],
+      cost_center: costCenterOptions.value[0]?.id || '',
+      project: projectOptions.value[0]?.id || ''
+    })
+  }
 }
 
 // ── File Attachment Slots Handling (1 to 5 upload forms) ──
